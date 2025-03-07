@@ -1,6 +1,6 @@
 modLoader="javafml"
 loaderVersion="[40,41)"
-license="MIT"
+license="GPL-3.0-only"
 
 [[mods]]
 modId="soundattractmod"
