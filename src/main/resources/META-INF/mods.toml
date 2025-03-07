@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[40,41)"
+license="MIT"
+
+[[mods]]
+modId="soundattractmod"
+version="1.0"
+displayName="Sound Attract Mod"
+authors="Sylsatra"
+description='''A mod to make mobs attracted to sound.'''
+
+[[dependencies.fearofire]]
+modId="forge"
+mandatory=true
+versionRange="[40,)" 
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.fearofire]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.18,1.19)" 
+ordering="NONE"
+side="BOTH"
