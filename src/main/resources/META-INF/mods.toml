@@ -1,10 +1,10 @@
 modLoader="javafml"
 loaderVersion="[40,41)"
-license="GPL-3.0-only"
+license="GPLv3"
 
 [[mods]]
 modId="soundattractmod"
-version="1.0"
+version="1.0.1"
 displayName="Sound Attract Mod"
 authors="Sylsatra"
 description='''A mod to make mobs attracted to sound.'''
