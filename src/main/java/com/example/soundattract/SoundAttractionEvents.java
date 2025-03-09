@@ -9,9 +9,10 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.client.event.sound.PlaySoundEvent;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraft.core.Registry;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractionEvents {
@@ -50,26 +51,20 @@ public class SoundAttractionEvents {
     }
     
     @SubscribeEvent
-    public static void onEntityJoin(EntityJoinWorldEvent event) {
-        if (!(event.getEntity() instanceof Mob mob)) {
-            return;
-        }
-        if (event.getWorld().isClientSide()) {
-            return;
-        }
+    public static void onEntityJoinWorld(EntityJoinLevelEvent event) {
+        if (event.getEntity() instanceof Mob mob) {
+            ResourceLocation entityId = Registry.ENTITY_TYPE.getKey(mob.getType());
+            if (entityId == null) return;
+
+            String entityIdStr = entityId.toString();
+            if (!SoundAttractConfig.ATTRACTED_ENTITIES.contains(entityIdStr)) {
+                return;
+            }
     
-        var key = mob.getType().getRegistryName();
-        if (key == null) return;
-    
-        String idStr = key.toString();
-        if (!SoundAttractConfig.ATTRACTED_ENTITIES.contains(idStr)) {
-            return;
-        }
-    
-        mob.goalSelector.addGoal(2, new AttractionGoal(
+            mob.goalSelector.addGoal(2, new AttractionGoal(
             mob,
             1.0D,
-            SoundAttractConfig.SOUND_HEARING_RADIUS
-        ));
+            SoundAttractConfig.SOUND_HEARING_RADIUS));
+        }
     }
 }
