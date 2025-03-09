@@ -35,7 +35,7 @@ public class SoundAttractConfig {
         );
 
         if (!data.contains("soundattract.entities")) {
-            data.set("soundattract.entities", Arrays.asList("minecraft:zombie", "minecraft:husk"));
+            data.set("soundattract.entities", Arrays.asList("minecraft:zombie", "minecraft:husk", "minecraft:skeleton", "minecraft:creeper", "minecraft:drowned", "minecraft:warden", "minecraft:vindicator", "minecraft:pillager", "minecraft:evoker", "minecraft:ravager", "minecraft:spider", "minecraft:cave_spider", "minecraft:piglin", "minecraft:zombified_piglin", "minecraft:hoglin", "minecraft:zoglin", "minecraft:piglin_brute"));
         }
         data.setComment("soundattract.entities",
             "List of entity IDs that should be attracted to certain sounds.\n" +
@@ -44,10 +44,7 @@ public class SoundAttractConfig {
 
         if (!data.contains("soundattract.sounds")) {
             data.set("soundattract.sounds", Arrays.asList(
-                "minecraft:block.lever.click",
-                "minecraft:block.piston.extend",
-                "minecraft:block.piston.contract",
-                "minecraft:block.wooden_trapdoor.open"
+     "minecraft:block.lever.click", "minecraft:block.piston.extend", "minecraft:block.piston.contract", "minecraft:block.wooden_trapdoor.open", "minecraft:block.wooden_trapdoor.close", "minecraft:block.bamboo_wood_trapdoor.open", "minecraft:block.bamboo_wood_trapdoor.close", "minecraft:block.cherry_wood_trapdoor.open", "minecraft:block.cherry_wood_trapdoor.close", "minecraft:block.iron_trapdoor.open", "minecraft:block.iron_trapdoor.close", "minecraft:block.wooden_door.open", "minecraft:block.wooden_door.close", "minecraft:block.bamboo_wood_door.open", "minecraft:block.bamboo_wood_door.close", "minecraft:block.cherry_wood_door.open", "minecraft:block.cherry_wood_door.close", "minecraft:block.iron_door.open", "minecraft:block.iron_door.close", "minecraft:block.sand.fall", "minecraft:block.gravel.fall", "minecraft:block.anvil.land", "minecraft:block.anvil.use", "minecraft:block.anvil.destroy", "minecraft:block.dispenser.dispense", "minecraft:block.dispenser.launch", "minecraft:block.tripwire.click_on", "minecraft:block.tripwire.click_off", "minecraft:block.grass.break", "minecraft:block.scaffolding.break"
             ));
         }
         data.setComment("soundattract.sounds",
