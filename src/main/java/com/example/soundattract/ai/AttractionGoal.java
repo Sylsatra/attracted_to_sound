@@ -5,6 +5,8 @@ import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.LivingEntity; 
+import net.minecraft.world.level.Level; 
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -69,9 +71,10 @@ public class AttractionGoal extends Goal {
     }
 
     private BlockPos findInterestingSound() {
-        if (mob.level.isClientSide) return null;
+        Level level = mob.level(); 
+        if (level.isClientSide()) return null; 
         BlockPos mobPos = mob.blockPosition();
-        var record = SoundTracker.findNearestSound(mob.level, mobPos);
+        var record = SoundTracker.findNearestSound(level, mobPos); 
         if (record == null) return null;
         double distSqr = mobPos.distSqr(record.pos);
         double maxSqr = SoundAttractConfig.SOUND_HEARING_RADIUS * SoundAttractConfig.SOUND_HEARING_RADIUS;
