@@ -7,6 +7,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level; 
 
 import java.util.function.Supplier;
 
@@ -43,15 +46,18 @@ public class SoundMessage {
 
     public static void handle(SoundMessage msg, Supplier<NetworkEvent.Context> ctx) {
         ctx.get().enqueueWork(() -> {
-            var player = ctx.get().getSender();
+            ServerPlayer player = (ServerPlayer) ctx.get().getSender();
             if (player == null) return;
 
-            if (!player.level.dimension().location().equals(msg.dimension)) return;
+            Level level = player.level(); 
+            if (level == null) return;
+
+            if (!level.dimension().location().equals(msg.dimension)) return;
 
             var snd = ForgeRegistries.SOUND_EVENTS.getValue(msg.soundId);
             if (snd == null) return;
 
-            BlockPos pos = new BlockPos(msg.x, msg.y, msg.z);
+            BlockPos pos = new BlockPos((int) msg.x, (int) msg.y, (int) msg.z);
             String dimString = msg.dimension.toString();
 
             SoundTracker.addSound(snd, pos, dimString);
