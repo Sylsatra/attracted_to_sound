@@ -12,7 +12,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries; 
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractionEvents {
@@ -22,7 +22,7 @@ public class SoundAttractionEvents {
         if (event.getSound() == null) {
             return;
         }
-    
+
         if (event.getSound() instanceof net.minecraft.client.resources.sounds.AbstractSoundInstance soundInstance) {
             ResourceLocation soundRL = soundInstance.getLocation();
             if (soundRL == null) {
@@ -31,36 +31,36 @@ public class SoundAttractionEvents {
             double x = event.getSound().getX();
             double y = event.getSound().getY();
             double z = event.getSound().getZ();
-    
+
             Level clientWorld = Minecraft.getInstance().level;
             if (clientWorld == null) {
                 return;
             }
             ResourceLocation dim = clientWorld.dimension().location();
-    
+
             SoundMessage msg = new SoundMessage(soundRL, x, y, z, dim);
             SoundAttractNetwork.INSTANCE.sendToServer(msg);
         }
     }
-    
+
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             SoundTracker.tick();
         }
     }
-    
+
     @SubscribeEvent
     public static void onEntityJoinWorld(EntityJoinLevelEvent event) {
         if (event.getEntity() instanceof Mob mob) {
-            ResourceLocation entityId = Registry.ENTITY_TYPE.getKey(mob.getType());
+            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType()); 
             if (entityId == null) return;
 
             String entityIdStr = entityId.toString();
             if (!SoundAttractConfig.ATTRACTED_ENTITIES.contains(entityIdStr)) {
                 return;
             }
-    
+
             mob.goalSelector.addGoal(2, new AttractionGoal(
             mob,
             1.0D,
