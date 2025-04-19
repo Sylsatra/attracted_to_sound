@@ -1,0 +1,38 @@
+modLoader="javafml" 
+loaderVersion="[47,)"
+license="GPLv3"
+[[mods]]
+modId="soundattract" 
+version="1.1.0" 
+displayName="Sound Attract Mod" 
+authors="Sylsatra" 
+description='''
+A mod to make mobs lured into sound
+'''
+[[dependencies.soundattract]] 
+    modId="forge"
+    mandatory=true 
+    versionRange="[47,)" 
+    ordering="NONE"
+    side="BOTH"
+[[dependencies.soundattract]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.20,1.21)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="voicechat"
+    mandatory=false
+    versionRange="[1.20.1-2.5.29,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="tacz"
+    mandatory=false
+    versionRange="[*,)"
+    ordering="NONE"
+    side="BOTH"
+
