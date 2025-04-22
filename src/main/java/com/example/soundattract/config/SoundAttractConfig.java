@@ -45,23 +45,20 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue taczReloadWeight;
         public final ForgeConfigSpec.DoubleValue taczShootRange;
         public final ForgeConfigSpec.IntValue taczShootWeight;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczGunShootDecibels;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczAttachmentReductions;
+        public final ForgeConfigSpec.DoubleValue soundSwitchRatio;
 
         Common(ForgeConfigSpec.Builder builder) {
             builder.comment(
-                "Sound Attract Mod Configuration",
-                "------------------------------------",
-                "This mod allows specific entities to be attracted to certain sounds.",
-                "Modify this config to control which mobs react and what sounds they respond to.",
-                "------------------------------------",
-                "FINDING SOUND IDs:",
-                "  - Vanilla Minecraft: Check the official Minecraft Wiki for a list of sound event IDs.",
-                "    Link: https://minecraft.fandom.com/wiki/Sounds.json#Java_Edition_values ",
-                "  - Modded Sounds: Look inside the mod's JAR file or source code (if available).",
-                "    Navigate to: src/main/resources/assets/<modid>/sounds.json ",
-                "    Find the sound event name, formatted like 'modid:sound_name'.",
-                "FINDING ENTITY IDs:",
-                "  - Use the in-game /summon command. Start typing '/summon minecraft:' or '/summon <modid>:' ",
-                "    and the game will suggest valid entity IDs."
+                "Sound Attract – General Settings",
+                "Configure which mobs respond to which sounds.",
+                "",
+                "Fields:",
+                "  - attractedEntities: list of mob IDs (e.g., 'minecraft:skeleton').",
+                "  - soundConfigs: soundId;range;weight entries (see below).",
+                "",
+                "Tip: in-game autocomplete helps you find valid sound and entity IDs."
             ).push("General");
 
             attractedEntities = builder
@@ -83,12 +80,9 @@ public class SoundAttractConfig {
 
             soundConfigsRaw = builder
                 .comment(
-                    "List of standard sound events and their attraction configuration.",
-                    "Format: \"sound_event_id;range;weight\"",
-                    "  - sound_event_id: The ID of the sound (e.g., 'minecraft:block.lever.click').",
-                    "  - range: Max distance (in blocks) mobs will notice the sound (integer > 0).",
-                    "  - weight: Priority (integer > 0, higher=more important).",
-                    "Example: \"minecraft:block.lever.click;24;1\""
+                    "soundConfigs: each entry 'soundId;range;weight'.",
+                    " range = max detection blocks (>0), weight = priority (>0).",
+                    "Example: 'minecraft:block.lever.click;24;1'"
                 )
                 .defineList("soundConfigs", Arrays.asList(
                     "minecraft:block.lever.click;5;3",
@@ -292,12 +286,63 @@ public class SoundAttractConfig {
                 
             builder.pop(); 
 
-            builder.push("TaCz Gun Mod Integration (Requires TaCz mod)");
-            enableTaczIntegration = builder.define("enableTaczIntegration", true);
-            taczReloadRange = builder.defineInRange("taczReloadRange", 8.0, 0.0, 256.0);
-            taczReloadWeight = builder.defineInRange("taczReloadWeight", 3, 0, 100);
-            taczShootRange = builder.defineInRange("taczShootRange", 128.0, 0.0, 512.0);
-            taczShootWeight = builder.defineInRange("taczShootWeight", 10, 0, 100);
+            builder.push("Sound Behavior");
+            soundSwitchRatio = builder
+                .comment("Multiplier threshold: new sound weight > current * ratio to switch target.")
+                .defineInRange("soundSwitchRatio", 1.1, 1.0, 10.0);
+            builder.pop();
+
+            builder.push("TaCz Gun Integration");
+
+            enableTaczIntegration = builder
+                .comment("Enable mobs to react to TaCz gun shot and reload sounds.")
+                .define("enableTaczIntegration", true);
+
+            taczReloadRange = builder
+                .comment("Fallback reload sound range (blocks) if gun not in mapping.")
+                .defineInRange("taczReloadRange", 8.0, 0.0, 256.0);
+
+            taczReloadWeight = builder
+                .comment("Fallback reload sound weight if gun not in mapping.")
+                .defineInRange("taczReloadWeight", 3, 0, 100);
+
+            taczShootRange = builder
+                .comment("Fallback shot sound range (blocks) if gun not in mapping.")
+                .defineInRange("taczShootRange", 128.0, 0.0, 512.0);
+
+            taczShootWeight = builder
+                .comment("Fallback shot sound weight if gun not in mapping.")
+                .defineInRange("taczShootWeight", 10, 0, 100);
+
+            taczGunShootDecibels = builder
+                .comment("Gun peak sound levels: each entry 'gun_id;decibel'. Range = dB, weight = dB/10.")
+                .defineList("taczGunShootDecibels", Arrays.asList(
+                    "tacz:ai_awp;166.5", "tacz:cz75;163", "tacz:glock_17;163", "tacz:p320;163", "tacz:uzi;159.8",
+                    "tacz:hk_mp5a5;159.8", "tacz:m95;159.7", "tacz:deagle;159.7", "tacz:ak47;158.9", "tacz:m4a1;158.9",
+                    "tacz:m16a1;158.9", "tacz:m16a4;158.9", "tacz:hk416d;158.9", "tacz:aug;158.9", "tacz:mk14;158.9",
+                    "tacz:m249;158.9", "tacz:rpk;158.9", "tacz:ump45;157.0", "tacz:vector45;157.0", "tacz:db_short;156.3",
+                    "tacz:db_long;156.3", "tacz:aa12;156.3", "tacz:scar_h;156.2", "tacz:hk_g3;156.2", "tacz:sks_tactical;156.0"
+                ), obj -> {
+                    if (!(obj instanceof String str)) return false;
+                    String[] parts = str.split(";", 2);
+                    if (parts.length != 2) return false;
+                    if (ResourceLocation.tryParse(parts[0]) == null) return false;
+                    try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                });
+
+            taczAttachmentReductions = builder
+                .comment("Attachment dB reductions: each entry 'attachment_id;reduction'.")
+                .defineList("taczAttachmentReductions", Arrays.asList(
+                    "tacz:muzzle_silence_phantom_s1;35", "tacz:muzzle_silencer_vulture;32", "tacz:muzzle_silence_mirage;30",
+                    "tacz:muzzle_silence_knight_qd;28", "tacz:muzzle_silencer_ursus;25", "tacz:muzzle_silence_ptilopsis;20",
+                    "tacz:deagle_golden_long_barrel;-5"
+                ), obj -> {
+                    if (!(obj instanceof String str)) return false;
+                    String[] parts = str.split(";", 2);
+                    if (parts.length != 2) return false;
+                    if (ResourceLocation.tryParse(parts[0]) == null) return false;
+                    try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                });
             builder.pop(); 
         }
     }
@@ -330,6 +375,9 @@ public class SoundAttractConfig {
     public static int TACZ_RELOAD_WEIGHT_CACHE = 1;
     public static double TACZ_SHOOT_RANGE_CACHE = 128.0;
     public static int TACZ_SHOOT_WEIGHT_CACHE = 5;
+    public static Map<ResourceLocation, Double> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
+    public static Map<ResourceLocation, Double> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static double SOUND_SWITCH_RATIO_CACHE = 1.1;
 
     public static class SoundConfig {
         public final int range;
@@ -460,6 +508,38 @@ public class SoundAttractConfig {
         TACZ_SHOOT_WEIGHT_CACHE = COMMON.taczShootWeight.get();
         SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked TaCz Config: Enabled={}, Reload(R={}, W={}), Shoot(R={}, W={})",
                 TACZ_ENABLED_CACHE, TACZ_RELOAD_RANGE_CACHE, TACZ_RELOAD_WEIGHT_CACHE, TACZ_SHOOT_RANGE_CACHE, TACZ_SHOOT_WEIGHT_CACHE);
+
+        SOUND_SWITCH_RATIO_CACHE = COMMON.soundSwitchRatio.get();
+        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Sound switch ratio set to {}", SOUND_SWITCH_RATIO_CACHE);
+
+        // Bake TaCz decibel maps
+        TACZ_GUN_SHOOT_DB_CACHE.clear();
+        List<? extends String> rawShoot = COMMON.taczGunShootDecibels.get();
+        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} TaCz gun shoot decibel entries", rawShoot.size());
+        for (String raw : rawShoot) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double db = Double.parseDouble(parts[1]);
+                if (rl != null && db >= 0) TACZ_GUN_SHOOT_DB_CACHE.put(rl, db);
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("[SoundAttract] Invalid TaCz shoot decibel entry '{}'.", raw);
+            }
+        }
+
+        TACZ_ATTACHMENT_REDUCTION_DB_CACHE.clear();
+        List<? extends String> rawAtt = COMMON.taczAttachmentReductions.get();
+        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} TaCz attachment reduction entries", rawAtt.size());
+        for (String raw : rawAtt) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double db = Double.parseDouble(parts[1]);
+                if (rl != null) TACZ_ATTACHMENT_REDUCTION_DB_CACHE.put(rl, db);
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("[SoundAttract] Invalid TaCz attachment reduction entry '{}'.", raw);
+            }
+        }
 
         SoundAttractMod.LOGGER.info("[SoundAttractConfig] Finished baking configuration.");
     }

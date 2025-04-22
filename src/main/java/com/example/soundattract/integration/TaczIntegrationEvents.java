@@ -11,11 +11,15 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.ForgeRegistries;
+import com.tacz.guns.api.item.IGun;
+import com.tacz.guns.api.item.attachment.AttachmentType;
+import java.util.Arrays;
 
 public class TaczIntegrationEvents {
 
@@ -40,8 +44,9 @@ public class TaczIntegrationEvents {
             String dimensionKey = level.dimension().location().toString();
             int lifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
 
-            double range = SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
-            double weight = SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
+            double[] rw = calculateTaczReloadRangeWeight(player);
+            double range = rw[0];
+            double weight = rw[1];
 
             SoundTracker.addSound(
                     taczGunSound,
@@ -74,8 +79,9 @@ public class TaczIntegrationEvents {
             String dimensionKey = level.dimension().location().toString();
             int lifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
 
-            double range = SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
-            double weight = SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
+            double[] rw = calculateTaczShootRangeWeight(player);
+            double range = rw[0];
+            double weight = rw[1];
 
             SoundTracker.addSound(
                     taczGunSound,
@@ -89,4 +95,35 @@ public class TaczIntegrationEvents {
                 range, weight, player.getName().getString(), pos);
         }
     }
-} 
+
+    private static double[] calculateTaczReloadRangeWeight(Player player) {
+        ItemStack gunStack = player.getMainHandItem();
+        IGun iGun = IGun.getIGunOrNull(gunStack);
+        if (iGun != null) {
+            ResourceLocation gunId = iGun.getGunId(gunStack);
+            Double shootDb = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(gunId);
+            if (shootDb != null) {
+                double reloadRange = shootDb / 20.0;
+                double reloadWeight = (shootDb / 10.0) / 2.0;
+                return new double[]{reloadRange, reloadWeight};
+            }
+        }
+        return new double[]{SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE, SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE};
+    }
+
+    private static double[] calculateTaczShootRangeWeight(Player player) {
+        ItemStack gunStack = player.getMainHandItem();
+        IGun iGun = IGun.getIGunOrNull(gunStack);
+        if (iGun != null) {
+            ResourceLocation gunId = iGun.getGunId(gunStack);
+            Double db = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(gunId);
+            if (db != null) {
+                ResourceLocation attId = iGun.getAttachmentId(gunStack, AttachmentType.MUZZLE);
+                Double reduction = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attId);
+                if (reduction != null) db = Math.max(0, db - reduction);
+                return new double[]{db, db / 10.0};
+            }
+        }
+        return new double[]{SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE, SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE};
+    }
+}

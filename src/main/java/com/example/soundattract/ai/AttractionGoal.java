@@ -29,6 +29,7 @@ public class AttractionGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (mob.getTarget() != null || mob.getLastHurtByMob() != null) return false;
         SoundTracker.SoundRecord initialSound = findInterestingSoundRecord();
         if (initialSound != null) {
             this.targetSoundPos = initialSound.pos;
@@ -40,6 +41,7 @@ public class AttractionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (mob.getTarget() != null || mob.getLastHurtByMob() != null) return false;
         if (targetSoundPos == null) return false;
         SoundTracker.SoundRecord currentBest = findInterestingSoundRecord();
 
@@ -81,7 +83,8 @@ public class AttractionGoal extends Goal {
             scanCooldown = SoundAttractConfig.COMMON.scanCooldownTicks.get();
             SoundTracker.SoundRecord potentialNewSound = findInterestingSoundRecord();
 
-            if (potentialNewSound != null && potentialNewSound.weight >= this.currentTargetWeight) {
+            double switchRatio = SoundAttractConfig.SOUND_SWITCH_RATIO_CACHE;
+            if (potentialNewSound != null && potentialNewSound.weight >= this.currentTargetWeight * switchRatio) {
                 if (!potentialNewSound.pos.equals(this.targetSoundPos)) {
                     this.targetSoundPos = potentialNewSound.pos;
                     this.currentTargetWeight = potentialNewSound.weight;
