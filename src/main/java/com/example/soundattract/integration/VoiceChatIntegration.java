@@ -22,7 +22,6 @@ import java.util.UUID;
 import com.example.soundattract.SoundMessage;
 import com.example.soundattract.SoundAttractNetwork;
 
-
 @ForgeVoicechatPlugin
 public class VoiceChatIntegration implements VoicechatPlugin {
 
@@ -35,7 +34,6 @@ public class VoiceChatIntegration implements VoicechatPlugin {
 
     @Override
     public void registerEvents(EventRegistration registration) {
-        SoundAttractMod.LOGGER.info("Simple Voice Chat detected and integration enabled. VoiceChatIntegration class loaded and registering events.");
         registration.registerEvent(ClientSoundEvent.class, this::onClientSound);
     }
 
@@ -62,11 +60,6 @@ public class VoiceChatIntegration implements VoicechatPlugin {
         double z = clientPlayer.getZ();
         ResourceLocation dim = clientWorld.dimension().location();
         Optional<UUID> sourcePlayerUUID = Optional.of(clientPlayer.getUUID());
-
-        SoundAttractMod.LOGGER.trace("Player {} {} (range {}, weight {}), sending voice sound message.",
-                clientPlayer.getName().getString(),
-                isWhispering ? "whispering" : "talking",
-                range, weight);
 
         SoundMessage msg = new SoundMessage(SoundMessage.VOICE_CHAT_SOUND_ID, x, y, z, dim, sourcePlayerUUID, range, weight);
         SoundAttractNetwork.INSTANCE.sendToServer(msg);

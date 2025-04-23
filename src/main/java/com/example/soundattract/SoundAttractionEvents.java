@@ -98,40 +98,32 @@ public class SoundAttractionEvents {
                     case CRAWLING:
                         calculatedRange = 2;
                         calculatedWeight = 1.0;
-                        SoundAttractMod.LOGGER.trace("Player Action: CRAWLING -> Range: {}, Weight: {}", calculatedRange, calculatedWeight);
                         break;
                     case SNEAKING:
                         calculatedRange = 3;
                         calculatedWeight = 1.0;
-                        SoundAttractMod.LOGGER.trace("Player Action: SNEAKING -> Range: {}, Weight: {}", calculatedRange, calculatedWeight);
                         break;
                     case WALKING:
                         calculatedRange = 8;
                         calculatedWeight = 1.0;
-                        SoundAttractMod.LOGGER.trace("Player Action: WALKING -> Range: {}, Weight: {}", calculatedRange, calculatedWeight);
                         break;
                     case SPRINTING:
                         calculatedRange = 12;
                         calculatedWeight = 1.0;
-                        SoundAttractMod.LOGGER.trace("Player Action: SPRINTING -> Range: {}, Weight: {}", calculatedRange, calculatedWeight);
                         break;
                     case SPRINT_JUMPING:
                         calculatedRange = 16;
                         calculatedWeight = 1.0;
-                        SoundAttractMod.LOGGER.trace("Player Action: SPRINT_JUMPING -> Range: {}, Weight: {}", calculatedRange, calculatedWeight);
                         break;
                     case IDLE:
                     default:
-                        SoundAttractMod.LOGGER.trace("Player Action: IDLE -> No message sent.");
                         return;
                 }
             }
 
             SoundMessage msg = new SoundMessage(soundRL, x, y, z, dim, sourcePlayerUUID, calculatedRange, calculatedWeight);
             SoundAttractNetwork.INSTANCE.sendToServer(msg);
-            SoundAttractMod.LOGGER.trace(" -> Sent SoundMessage: {}, Pos: ({}, {}, {}), PlayerUUID: {}, Range: {}, Weight: {}", soundRL, x, y, z, sourcePlayerUUID.map(UUID::toString).orElse("None"), calculatedRange, calculatedWeight);
         } else {
-            SoundAttractMod.LOGGER.trace("Ignoring non-AbstractSoundInstance sound: {}", event.getSound().getClass().getName());
         }
     }
 
@@ -139,6 +131,15 @@ public class SoundAttractionEvents {
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
             SoundTracker.tick();
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLevelTick(TickEvent.LevelTickEvent event) {
+        if (event.phase == TickEvent.Phase.END && !event.level.isClientSide()) {
+            if (event.level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                SoundTracker.pruneIrrelevantSounds(serverLevel);
+            }
         }
     }
 
@@ -154,17 +155,13 @@ public class SoundAttractionEvents {
             }
 
             double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
-            int scanRadius = SoundAttractConfig.COMMON.mobScanRadius.get();
 
             boolean goalExists = mob.goalSelector.getAvailableGoals().stream()
                     .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
 
             if (!goalExists) {
-                mob.goalSelector.addGoal(2, new AttractionGoal(mob, moveSpeed, scanRadius));
-                SoundAttractMod.LOGGER.debug("Added AttractionGoal to {} (ID: {}) with speed {} and radius {}",
-                        mob.getName().getString(), entityIdStr, moveSpeed, scanRadius);
+                mob.goalSelector.addGoal(2, new AttractionGoal(mob, moveSpeed));
             } else {
-                SoundAttractMod.LOGGER.trace("AttractionGoal already exists for {}", mob.getName().getString());
             }
         }
     }

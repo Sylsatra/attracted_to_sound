@@ -22,7 +22,6 @@ import java.util.function.Supplier;
 
 public class SoundAttractConfig {
 
-
     public static class Common {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundConfigsRaw; 
@@ -30,7 +29,6 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue scanCooldownTicks;
         public final ForgeConfigSpec.DoubleValue arrivalDistance;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed;
-        public final ForgeConfigSpec.IntValue mobScanRadius;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerStepSounds;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerSpeedConfigsRaw; 
         public final ForgeConfigSpec.BooleanValue enableSoundBasedDetection;
@@ -48,26 +46,26 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczGunShootDecibels;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczAttachmentReductions;
         public final ForgeConfigSpec.DoubleValue soundSwitchRatio;
+        public final ForgeConfigSpec.IntValue woolBlockRangeReduction;
+        public final ForgeConfigSpec.DoubleValue woolBlockWeightReduction;
+        public final ForgeConfigSpec.IntValue solidBlockRangeReduction;
+        public final ForgeConfigSpec.DoubleValue solidBlockWeightReduction;
+        public final ForgeConfigSpec.IntValue nonSolidBlockRangeReduction;
+        public final ForgeConfigSpec.DoubleValue nonSolidBlockWeightReduction;
+        public final ForgeConfigSpec.IntValue thinBlockRangeReduction;
+        public final ForgeConfigSpec.DoubleValue thinBlockWeightReduction;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> customWoolBlocks;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> customSolidBlocks;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> customNonSolidBlocks;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> customThinBlocks;
+        public final ForgeConfigSpec.BooleanValue woolMufflingEnabled;
 
         Common(ForgeConfigSpec.Builder builder) {
-            builder.comment(
-                "Sound Attract – General Settings",
-                "Configure which mobs respond to which sounds.",
-                "",
-                "Fields:",
-                "  - attractedEntities: list of mob IDs (e.g., 'minecraft:skeleton').",
-                "  - soundConfigs: soundId;range;weight entries (see below).",
-                "",
-                "Tip: in-game autocomplete helps you find valid sound and entity IDs."
-            ).push("General");
+            builder.push("General");
 
             attractedEntities = builder
-                .comment(
-                    "List of entity IDs that should be attracted to configured sounds.",
-                    "Example: Add \"minecraft:skeleton\" to make skeletons react."
-                )
+                .comment("List of mobs that will be attracted to sounds. Example: ['minecraft:zombie', 'minecraft:skeleton'].")
                 .defineList("attractedEntities", Arrays.asList(
-                    // Default Hostile Mobs List
                     "minecraft:cave_spider", "minecraft:creeper", "minecraft:drowned",
                     "minecraft:endermite", "minecraft:evoker", "minecraft:guardian", "minecraft:hoglin", "minecraft:husk",
                     "minecraft:magma_cube", "minecraft:phantom", "minecraft:piglin", "minecraft:piglin_brute",
@@ -76,14 +74,10 @@ public class SoundAttractConfig {
                     "minecraft:vex", "minecraft:vindicator", "minecraft:witch",
                     "minecraft:wither_skeleton", "minecraft:zoglin", "minecraft:zombie", "minecraft:zombie_villager",
                     "minecraft:zombified_piglin"
-                ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null); 
+                ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
 
             soundConfigsRaw = builder
-                .comment(
-                    "soundConfigs: each entry 'soundId;range;weight'.",
-                    " range = max detection blocks (>0), weight = priority (>0).",
-                    "Example: 'minecraft:block.lever.click;24;1'"
-                )
+                .comment("List of sounds that attract mobs. Format: 'soundId;range;weight'. Example: 'minecraft:block.bell.use;20;5' (range in blocks, weight = priority, higher means more attractive).")
                 .defineList("soundConfigs", Arrays.asList(
                     "minecraft:block.lever.click;5;3",
                     "minecraft:block.wooden_trapdoor.open;8;3",
@@ -134,7 +128,7 @@ public class SoundAttractConfig {
                     "minecraft:entity.firework_rocket.launch;10;3",
                     "minecraft:entity.firework_rocket.blast;20;5",
                     "minecraft:entity.firework_rocket.large_blast;30;6"
-                ), obj -> { 
+                ), obj -> {
                     if (!(obj instanceof String str)) return false;
                     String[] parts = str.split(";", 3);
                     if (parts.length != 3) return false;
@@ -149,51 +143,75 @@ public class SoundAttractConfig {
                 });
 
             soundLifetimeTicks = builder
-                .comment("How long (in ticks) a sound remains 'interesting' after being heard. 20 ticks = 1 second.")
-                .defineInRange("soundLifetimeTicks", 60, 1, Integer.MAX_VALUE);
+                .comment("How long (in ticks) a sound remains interesting. 20 ticks = 1 second. Example: 400 = 20 seconds.")
+                .defineInRange("soundLifetimeTicks", 400, 20, 1200);
 
             scanCooldownTicks = builder
-                .comment("How often (in ticks) the mob scans for new sounds. 20 = once per second.")
-                .defineInRange("scanCooldownTicks", 20, 1, Integer.MAX_VALUE);
+                .comment("How often (in ticks) mobs scan for new sounds. 20 = once per second. Lower = more responsive, higher = less lag.")
+                .defineInRange("scanCooldownTicks", 20, 5, 100);
 
             arrivalDistance = builder
-                .comment(
-                    "The distance (in blocks) at which the mob is considered to have reached the sound.",
-                    "Example: If set to 4.0, mobs will stop moving toward the sound when within 4 blocks."
-                 )
-                .defineInRange("arrivalDistance", 4.0, 0.5, 64.0);
+                .comment("The distance (in blocks) at which the mob is considered to have reached the sound. Example: 4.0 = mob stops within 4 blocks of sound.")
+                .defineInRange("arrivalDistance", 6.0, 1.0, 16.0);
 
             mobMoveSpeed = builder
-                .comment("The movement speed modifier for mobs moving towards a sound.")
-                .defineInRange("mobMoveSpeed", 1.0, 0.1, 5.0);
+                .comment("The movement speed modifier for mobs moving towards a sound. 1.0 = normal mob speed, 2.0 = twice as fast.")
+                .defineInRange("mobMoveSpeed", 1.0, 0.5, 2.0);
 
-            mobScanRadius = builder
-                .comment("The radius (in blocks) mobs use to initially detect sounds with the AttractionGoal.")
-                .defineInRange("mobScanRadius", 32, 4, 128);
+            woolBlockRangeReduction = builder
+                .comment("How much the range is reduced for each wool block between mob and sound. Example: 30 means wool blocks reduce the sound range by 30 blocks.")
+                .defineInRange("woolBlockRangeReduction", 30, 0, 100);
+
+            woolBlockWeightReduction = builder
+                .comment("How much the weight is reduced for each wool block between mob and sound. Example: 1 means wool blocks make sounds less attractive.")
+                .defineInRange("woolBlockWeightReduction", 3.0, 0.0, 10.0);
+
+            solidBlockRangeReduction = builder
+                .comment("How much the range is reduced for each solid block (not wool) between mob and sound.")
+                .defineInRange("solidBlockRangeReduction", 20, 0, 100);
+
+            solidBlockWeightReduction = builder
+                .comment("How much the weight is reduced for each solid block (not wool) between mob and sound.")
+                .defineInRange("solidBlockWeightReduction", 2.0, 0.0, 10.0);
+
+            nonSolidBlockRangeReduction = builder
+                .comment("How much the range is reduced for each non-solid block (like glass) between mob and sound.")
+                .defineInRange("nonSolidBlockRangeReduction", 10, 0, 50);
+
+            nonSolidBlockWeightReduction = builder
+                .comment("How much the weight is reduced for each non-solid block (like glass) between mob and sound.")
+                .defineInRange("nonSolidBlockWeightReduction", 1.0, 0.0, 5.0);
+
+            thinBlockRangeReduction = builder
+                .comment("How much the range is reduced for each thin block (like panes, fences) between mob and sound.")
+                .defineInRange("thinBlockRangeReduction", 5, 0, 25);
+
+            thinBlockWeightReduction = builder
+                .comment("How much the weight is reduced for each thin block (like panes, fences) between mob and sound.")
+                .defineInRange("thinBlockWeightReduction", 0.5, 0.0, 2.0);
+
+            woolMufflingEnabled = builder
+                .comment("Enable wool muffling.")
+                .define("woolMufflingEnabled", true);
 
             builder.pop();
 
             builder.push("Player Movement Sounds");
 
             enableSoundBasedDetection = builder
-                .comment("Enable sound detection for regular player steps (walking, sprinting, falling).")
+                .comment("Enable sound detection for regular player steps (walking, sprinting, falling). Recommended: true.")
                 .define("enableSoundBasedDetection", true);
 
             enableMovementBasedDetection = builder
-                .comment("Enable movement state detection for specific actions (sneaking, potentially modded crawling/proning).")
+                .comment("Enable detection for specific player actions (sneaking, crawling). Recommended: true.")
                 .define("enableMovementBasedDetection", true);
 
-             movementCheckFrequencyTicks = builder
-                .comment("How often (in ticks) to check player movement state for sneak/crawl/prone detection. 4 ticks = 5 times/sec.")
-                .defineInRange("movementCheckFrequencyTicks", 4, 1, 60);
+            movementCheckFrequencyTicks = builder
+                .comment("How often (in ticks) to check player movement state. Lower = more accurate, higher = less lag. Example: 4 = 5 times/sec.")
+                .defineInRange("movementCheckFrequencyTicks", 4, 1, 20);
 
             playerStepSounds = builder
-                .comment(
-                    "List of sound event IDs considered player steps (e.g., walking, running, sneaking).",
-                    "These sounds will use dynamic range/weight based on player speed.",
-                    "At least one sound MUST be defined here if using movement based detection.",
-                    "Make sure these IDs exist!"
-                 )
+                .comment("List of sound event IDs considered player steps (e.g., walking, running, sneaking). Only change if you add new sounds.")
                 .defineList("playerStepSounds", Arrays.asList(
                     "minecraft:block.stone.step",
                     "minecraft:block.wood.step",
@@ -235,87 +253,75 @@ public class SoundAttractConfig {
                 ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
 
             playerSpeedConfigsRaw = builder
-                .comment(
-                    "List of player speed configurations determining sound range/weight.",
-                    "Format: \"minSpeed;maxSpeed;range;weight\"",
-                    "  - minSpeed: Minimum speed (blocks/sec, >= 0).",
-                    "  - maxSpeed: Maximum speed (blocks/sec, >= minSpeed).",
-                    "  - range: Detection range (integer > 0).",
-                    "  - weight: Attraction weight (integer > 0).",
-                    "Speed ranges should ideally not overlap."
-                )
+                .comment("List of player speed configs for step sounds. Format: 'minSpeed;maxSpeed;range;weight'. Example: '0.1;1.0;2;1'.")
                 .defineList("playerSpeedConfigs", Arrays.asList(
                     "0.1;1.0;2;1",
                     "0.1;1.5;4;1",    
                     "1.51;4.5;8;1",  
                     "4.51;6.0;16;1",  
-                    "6.01;10.0;24;1"  
-                ), obj -> { 
-                    if (!(obj instanceof String str)) return false;
-                    String[] parts = str.split(";", 4);
-                    if (parts.length != 4) return false;
-                    try {
-                        double minSpeed = Double.parseDouble(parts[0]);
-                        double maxSpeed = Double.parseDouble(parts[1]);
-                        int range = Integer.parseInt(parts[2]);
-                        int weight = Integer.parseInt(parts[3]);
-                        return minSpeed >= 0 && maxSpeed >= minSpeed && range > 0 && weight > 0;
-                    } catch (NumberFormatException e) {
-                        return false;
-                    }
-                });
+                    "6.01;10.0;24;1" 
+                ), obj -> obj instanceof String);
 
+            builder.pop();
+
+            builder.push("Custom Block Muffling");
+            customWoolBlocks = builder
+                .defineListAllowEmpty("customWoolBlocks", java.util.Collections::emptyList, o -> o instanceof String);
+            customSolidBlocks = builder
+                .defineListAllowEmpty("customSolidBlocks", java.util.Collections::emptyList, o -> o instanceof String);
+            customNonSolidBlocks = builder
+                .defineListAllowEmpty("customNonSolidBlocks", java.util.Collections::emptyList, o -> o instanceof String);
+            customThinBlocks = builder
+                .defineListAllowEmpty("customThinBlocks", java.util.Collections::emptyList, o -> o instanceof String);
             builder.pop();
 
             builder.push("Voice Chat Integration (Requires Simple Voice Chat mod)");
             enableVoiceChatIntegration = builder
-                .comment("Enable integration with the Simple Voice Chat mod to attract mobs to voice sounds.")
                 .define("enableVoiceChatIntegration", true);
                 
             voiceChatWhisperRange = builder
-                .comment("Attraction range (in blocks) for whispering voice chat sounds.")
+                .comment("The range (in blocks) at which voice chat is considered a whisper.")
                 .defineInRange("voiceChatWhisperRange", 4, 0, 64);
                 
             voiceChatNormalRange = builder
-                .comment("Attraction range (in blocks) for normal (non-whispering) voice chat sounds.")
+                .comment("The range (in blocks) at which voice chat is considered normal.")
                 .defineInRange("voiceChatNormalRange", 16, 0, 128);
                 
             voiceChatWeight = builder
-                .comment("Attraction weight for voice chat sounds (higher means more priority).")
+                .comment("The weight of voice chat sounds. Higher means more attractive to mobs.")
                 .defineInRange("voiceChatWeight", 10.0, 0.0, 100.0);
                 
             builder.pop(); 
 
             builder.push("Sound Behavior");
             soundSwitchRatio = builder
-                .comment("Multiplier threshold: new sound weight > current * ratio to switch target.")
+                .comment("The ratio at which mobs switch between sounds. Higher means more likely to switch.")
                 .defineInRange("soundSwitchRatio", 1.1, 1.0, 10.0);
             builder.pop();
 
             builder.push("TaCz Gun Integration");
 
             enableTaczIntegration = builder
-                .comment("Enable mobs to react to TaCz gun shot and reload sounds.")
                 .define("enableTaczIntegration", true);
 
             taczReloadRange = builder
-                .comment("Fallback reload sound range (blocks) if gun not in mapping.")
+                .comment("The range (in blocks) at which TaCz gun reload sounds are heard.")
                 .defineInRange("taczReloadRange", 8.0, 0.0, 256.0);
 
             taczReloadWeight = builder
-                .comment("Fallback reload sound weight if gun not in mapping.")
+                .comment("The weight of TaCz gun reload sounds. Higher means more attractive to mobs.")
                 .defineInRange("taczReloadWeight", 3, 0, 100);
 
             taczShootRange = builder
-                .comment("Fallback shot sound range (blocks) if gun not in mapping.")
+                .comment("The range (in blocks) at which TaCz gun shoot sounds are heard.")
                 .defineInRange("taczShootRange", 128.0, 0.0, 512.0);
 
             taczShootWeight = builder
-                .comment("Fallback shot sound weight if gun not in mapping.")
+                .comment("The weight of TaCz gun shoot sounds. Higher means more attractive to mobs.")
                 .defineInRange("taczShootWeight", 10, 0, 100);
 
             taczGunShootDecibels = builder
-                .comment("Gun peak sound levels: each entry 'gun_id;decibel'. Range = dB, weight = dB/10.")
+                .comment("List of TaCz gun shoot decibel levels. Format: 'soundId;decibel'. Example: 'tacz:ai_awp;166.5'.")
                 .defineList("taczGunShootDecibels", Arrays.asList(
                     "tacz:ai_awp;166.5", "tacz:cz75;163", "tacz:glock_17;163", "tacz:p320;163", "tacz:uzi;159.8",
                     "tacz:hk_mp5a5;159.8", "tacz:m95;159.7", "tacz:deagle;159.7", "tacz:ak47;158.9", "tacz:m4a1;158.9",
@@ -331,10 +337,10 @@ public class SoundAttractConfig {
                 });
 
             taczAttachmentReductions = builder
-                .comment("Attachment dB reductions: each entry 'attachment_id;reduction'.")
+                .comment("List of TaCz gun attachment decibel reductions. Format: 'soundId;reduction'. Example: 'tacz:muzzle_silencer_phantom_s1;35'.")
                 .defineList("taczAttachmentReductions", Arrays.asList(
-                    "tacz:muzzle_silence_phantom_s1;35", "tacz:muzzle_silencer_vulture;32", "tacz:muzzle_silence_mirage;30",
-                    "tacz:muzzle_silence_knight_qd;28", "tacz:muzzle_silencer_ursus;25", "tacz:muzzle_silence_ptilopsis;20",
+                    "tacz:muzzle_silencer_phantom_s1;35", "tacz:muzzle_silencer_vulture;32", "tacz:muzzle_silencer_mirage;30",
+                    "tacz:muzzle_silencer_knight_qd;28", "tacz:muzzle_silencer_ursus;25", "tacz:muzzle_silencer_ptilopsis;20",
                     "tacz:deagle_golden_long_barrel;-5"
                 ), obj -> {
                     if (!(obj instanceof String str)) return false;
@@ -378,6 +384,18 @@ public class SoundAttractConfig {
     public static Map<ResourceLocation, Double> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static Map<ResourceLocation, Double> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static double SOUND_SWITCH_RATIO_CACHE = 1.1;
+    public static int WOOL_BLOCK_RANGE_REDUCTION_CACHE = 50;
+    public static double WOOL_BLOCK_WEIGHT_REDUCTION_CACHE = 5.0;
+    public static int SOLID_BLOCK_RANGE_REDUCTION_CACHE = 30;
+    public static double SOLID_BLOCK_WEIGHT_REDUCTION_CACHE = 3.0;
+    public static int NON_SOLID_BLOCK_RANGE_REDUCTION_CACHE = 10;
+    public static double NON_SOLID_BLOCK_WEIGHT_REDUCTION_CACHE = 1.0;
+    public static int THIN_BLOCK_RANGE_REDUCTION_CACHE = 5;
+    public static double THIN_BLOCK_WEIGHT_REDUCTION_CACHE = 0.5;
+    public static List<String> CUSTOM_WOOL_BLOCKS_CACHE = java.util.Collections.emptyList();
+    public static List<String> CUSTOM_SOLID_BLOCKS_CACHE = java.util.Collections.emptyList();
+    public static List<String> CUSTOM_NON_SOLID_BLOCKS_CACHE = java.util.Collections.emptyList();
+    public static List<String> CUSTOM_THIN_BLOCKS_CACHE = java.util.Collections.emptyList();
 
     public static class SoundConfig {
         public final int range;
@@ -395,15 +413,11 @@ public class SoundAttractConfig {
     }
 
     public static void bakeConfig() {
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking configuration...");
-
         ATTRACTED_ENTITIES_CACHE = new ArrayList<>(COMMON.attractedEntities.get());
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked {} attracted entity IDs.", ATTRACTED_ENTITIES_CACHE.size());
 
         SOUND_CONFIGS_CACHE.clear();
         Map<SoundEvent, SoundConfig> bakedSounds = new HashMap<>();
         List<? extends String> rawSounds = COMMON.soundConfigsRaw.get(); 
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} standard sound config entries from raw list.", rawSounds.size());
 
         for (String rawEntry : rawSounds) {
             try {
@@ -417,30 +431,18 @@ public class SoundAttractConfig {
                             double weight = Double.parseDouble(parts[2]);
                             if (range > 0 && weight > 0) {
                                 bakedSounds.put(se, new SoundConfig(range, weight));
-                            } else {
-                                SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Invalid range/weight in baked sound config entry '{}'. Must be positive.", rawEntry);
-                            }
-                         } else {
-                             SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Configured sound ID '{}' does not correspond to a registered SoundEvent.", parts[0]);
-                         }
-                    } else {
-                         SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Configured sound ID '{}' is not a valid ResourceLocation format.", parts[0]);
-                    }
-                } else {
-                    SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Invalid sound config entry format '{}'. Expected 'id;range;weight'.", rawEntry);
-                }
+                            } 
+                         } 
+                    } 
+                } 
             } catch (Exception e) {
-                SoundAttractMod.LOGGER.error("[SoundAttract] Error parsing sound config entry '{}': {}", rawEntry, e.getMessage());
             }
         }
         SOUND_CONFIGS_CACHE = bakedSounds;
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked {} standard sound configs.", SOUND_CONFIGS_CACHE.size());
 
         SOUND_BASED_DETECTION_ENABLED_CACHE = COMMON.enableSoundBasedDetection.get();
         MOVEMENT_BASED_DETECTION_ENABLED_CACHE = COMMON.enableMovementBasedDetection.get();
         MOVEMENT_CHECK_FREQUENCY_TICKS_CACHE = COMMON.movementCheckFrequencyTicks.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Sound-based detection: {}. Movement-based detection: {}. Movement check freq: {} ticks.",
-               SOUND_BASED_DETECTION_ENABLED_CACHE, MOVEMENT_BASED_DETECTION_ENABLED_CACHE, MOVEMENT_CHECK_FREQUENCY_TICKS_CACHE);
 
         PLAYER_STEP_SOUNDS_CACHE.clear();
         List<SoundEvent> bakedPlayerSounds = new ArrayList<>();
@@ -451,23 +453,16 @@ public class SoundAttractConfig {
                     SoundEvent se = ForgeRegistries.SOUND_EVENTS.getValue(rl);
                     if (se != null) {
                         bakedPlayerSounds.add(se);
-                    } else {
-                        SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Configured player step sound ID '{}' does not correspond to a registered SoundEvent.", soundIdStr);
-                    }
-                } else {
-                    SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Configured player step sound ID '{}' is not a valid ResourceLocation format.", soundIdStr);
-                }
+                    } 
+                } 
             } catch (Exception e) {
-                SoundAttractMod.LOGGER.error("[SoundAttract] Error parsing player step sound entry '{}': {}", soundIdStr, e.getMessage());
             }
         }
         PLAYER_STEP_SOUNDS_CACHE = bakedPlayerSounds;
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked {} player step sounds.", PLAYER_STEP_SOUNDS_CACHE.size());
 
         PLAYER_SPEED_CONFIGS_CACHE.clear();
         List<PlayerSpeedConfig> bakedSpeedConfigs = new ArrayList<>();
         List<? extends String> rawSpeedConfigs = COMMON.playerSpeedConfigsRaw.get(); 
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} player speed config entries from raw list.", rawSpeedConfigs.size());
 
         for (String rawEntry : rawSpeedConfigs) {
             try {
@@ -479,43 +474,45 @@ public class SoundAttractConfig {
                     double weight = Double.parseDouble(parts[3]);
                     if (minSpeed >= 0 && maxSpeed >= minSpeed && range > 0 && weight > 0) {
                         bakedSpeedConfigs.add(new PlayerSpeedConfig(minSpeed, maxSpeed, range, weight));
-                    } else {
-                         SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Invalid values in baked player speed config entry '{}'. Skipping.", rawEntry);
-                    }
-                } else {
-                     SoundAttractMod.LOGGER.warn("[SoundAttract] Warning: Invalid player speed config entry format '{}'. Expected 'minSpeed;maxSpeed;range;weight'.", rawEntry);
-                }
+                    } 
+                } 
             } catch (Exception e) {
-                 SoundAttractMod.LOGGER.error("[SoundAttract] Error parsing player speed config entry '{}': {}", rawEntry, e.getMessage());
             }
         }
 
         bakedSpeedConfigs.sort(Comparator.comparingDouble(c -> c.minSpeed));
         PLAYER_SPEED_CONFIGS_CACHE = bakedSpeedConfigs;
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked and sorted {} player speed configs.", PLAYER_SPEED_CONFIGS_CACHE.size());
 
         VOICE_CHAT_ENABLED_CACHE = ModList.get().isLoaded("voicechat") && COMMON.enableVoiceChatIntegration.get();
         VOICE_CHAT_DETECTION_ENABLED_CACHE = VOICE_CHAT_ENABLED_CACHE;
         VOICE_CHAT_WHISPER_RANGE_CACHE = COMMON.voiceChatWhisperRange.get();
         VOICE_CHAT_NORMAL_RANGE_CACHE = COMMON.voiceChatNormalRange.get();
         VOICE_CHAT_WEIGHT_CACHE = COMMON.voiceChatWeight.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked Voice Chat Config: Enabled={}, WhisperRange={}, NormalRange={}, Weight={}", VOICE_CHAT_ENABLED_CACHE, VOICE_CHAT_WHISPER_RANGE_CACHE, VOICE_CHAT_NORMAL_RANGE_CACHE, VOICE_CHAT_WEIGHT_CACHE);
 
         TACZ_ENABLED_CACHE = ModList.get().isLoaded("tacz") && COMMON.enableTaczIntegration.get();
         TACZ_RELOAD_RANGE_CACHE = COMMON.taczReloadRange.get();
         TACZ_RELOAD_WEIGHT_CACHE = COMMON.taczReloadWeight.get();
         TACZ_SHOOT_RANGE_CACHE = COMMON.taczShootRange.get();
         TACZ_SHOOT_WEIGHT_CACHE = COMMON.taczShootWeight.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baked TaCz Config: Enabled={}, Reload(R={}, W={}), Shoot(R={}, W={})",
-                TACZ_ENABLED_CACHE, TACZ_RELOAD_RANGE_CACHE, TACZ_RELOAD_WEIGHT_CACHE, TACZ_SHOOT_RANGE_CACHE, TACZ_SHOOT_WEIGHT_CACHE);
 
         SOUND_SWITCH_RATIO_CACHE = COMMON.soundSwitchRatio.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Sound switch ratio set to {}", SOUND_SWITCH_RATIO_CACHE);
 
-        // Bake TaCz decibel maps
+        WOOL_BLOCK_RANGE_REDUCTION_CACHE = COMMON.woolBlockRangeReduction.get();
+        WOOL_BLOCK_WEIGHT_REDUCTION_CACHE = COMMON.woolBlockWeightReduction.get();
+        SOLID_BLOCK_RANGE_REDUCTION_CACHE = COMMON.solidBlockRangeReduction.get();
+        SOLID_BLOCK_WEIGHT_REDUCTION_CACHE = COMMON.solidBlockWeightReduction.get();
+        NON_SOLID_BLOCK_RANGE_REDUCTION_CACHE = COMMON.nonSolidBlockRangeReduction.get();
+        NON_SOLID_BLOCK_WEIGHT_REDUCTION_CACHE = COMMON.nonSolidBlockWeightReduction.get();
+        THIN_BLOCK_RANGE_REDUCTION_CACHE = COMMON.thinBlockRangeReduction.get();
+        THIN_BLOCK_WEIGHT_REDUCTION_CACHE = COMMON.thinBlockWeightReduction.get();
+
+        CUSTOM_WOOL_BLOCKS_CACHE = new ArrayList<>(COMMON.customWoolBlocks.get());
+        CUSTOM_SOLID_BLOCKS_CACHE = new ArrayList<>(COMMON.customSolidBlocks.get());
+        CUSTOM_NON_SOLID_BLOCKS_CACHE = new ArrayList<>(COMMON.customNonSolidBlocks.get());
+        CUSTOM_THIN_BLOCKS_CACHE = new ArrayList<>(COMMON.customThinBlocks.get());
+
         TACZ_GUN_SHOOT_DB_CACHE.clear();
         List<? extends String> rawShoot = COMMON.taczGunShootDecibels.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} TaCz gun shoot decibel entries", rawShoot.size());
         for (String raw : rawShoot) {
             try {
                 String[] parts = raw.split(";", 2);
@@ -523,13 +520,11 @@ public class SoundAttractConfig {
                 double db = Double.parseDouble(parts[1]);
                 if (rl != null && db >= 0) TACZ_GUN_SHOOT_DB_CACHE.put(rl, db);
             } catch (Exception e) {
-                SoundAttractMod.LOGGER.warn("[SoundAttract] Invalid TaCz shoot decibel entry '{}'.", raw);
             }
         }
 
         TACZ_ATTACHMENT_REDUCTION_DB_CACHE.clear();
         List<? extends String> rawAtt = COMMON.taczAttachmentReductions.get();
-        SoundAttractMod.LOGGER.debug("[SoundAttractConfig] Baking {} TaCz attachment reduction entries", rawAtt.size());
         for (String raw : rawAtt) {
             try {
                 String[] parts = raw.split(";", 2);
@@ -537,11 +532,8 @@ public class SoundAttractConfig {
                 double db = Double.parseDouble(parts[1]);
                 if (rl != null) TACZ_ATTACHMENT_REDUCTION_DB_CACHE.put(rl, db);
             } catch (Exception e) {
-                SoundAttractMod.LOGGER.warn("[SoundAttract] Invalid TaCz attachment reduction entry '{}'.", raw);
             }
         }
-
-        SoundAttractMod.LOGGER.info("[SoundAttractConfig] Finished baking configuration.");
     }
 
 }

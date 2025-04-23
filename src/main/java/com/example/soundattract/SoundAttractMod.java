@@ -2,6 +2,7 @@ package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
 import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -12,7 +13,6 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import org.slf4j.Logger;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 import com.example.soundattract.SoundTracker;
@@ -32,14 +32,11 @@ public class SoundAttractMod {
 
         modEventBus.register(this); 
 
-        LOGGER.info("SoundAttractMod Initialized");
+        handleTaczIntegration();
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("SoundAttractMod Common Setup");
         SoundAttractNetwork.init();
-        LOGGER.info("Initialized SoundAttractNetwork");
-        LOGGER.info("SoundAttractionEvents registered via annotation.");
 
         handleTaczIntegration();
     }
@@ -47,25 +44,21 @@ public class SoundAttractMod {
     private void handleTaczIntegration() {
         if (ModList.get().isLoaded("tacz")) {
             if (SoundAttractConfig.TACZ_ENABLED_CACHE) {
-                LOGGER.info("TaCz mod detected and integration enabled. Registering event listeners.");
                 try {
                     MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
                 } catch (Exception e) {
-                    LOGGER.error("Failed to register TaCz integration event listener", e);
+                    try {
+                        MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
+                    } catch (NoClassDefFoundError e1) {
+                    }
                 } catch (NoClassDefFoundError e) {
-                    LOGGER.error("TaCz integration class not found, disabling integration.", e);
                 }
-            } else {
-                LOGGER.info("TaCz integration disabled in config.");
             }
-        } else {
-            LOGGER.info("TaCz mod not detected. Integration disabled.");
         }
     }
 
     @SubscribeEvent
     public void onModConfigEvent(ModConfigEvent.Loading event) {
-        LOGGER.info("SoundAttractMod Config Loading: {}", event.getConfig().getFileName());
         if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
             SoundAttractConfig.bakeConfig();
         }
@@ -73,7 +66,6 @@ public class SoundAttractMod {
 
     @SubscribeEvent
     public void onModConfigEvent(ModConfigEvent.Reloading event) {
-        LOGGER.info("SoundAttractMod Config Reloading: {}", event.getConfig().getFileName());
         if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
             SoundAttractConfig.bakeConfig();
         }

@@ -34,10 +34,7 @@ public class TaczIntegrationEvents {
         if (entity instanceof Player player && !player.level().isClientSide()) {
             SoundEvent taczGunSound = ForgeRegistries.SOUND_EVENTS.getValue(TACZ_GUN_SOUND_ID);
 
-            if (taczGunSound == null) {
-                SoundAttractMod.LOGGER.warn("[SoundAttract-TaCz] Failed to find 'tacz:gun' SoundEvent during GunReloadEvent for player {}. Skipping sound tracking for this event.", player.getName().getString());
-                return;
-            }
+            if (taczGunSound == null) return;
 
             Level level = player.level();
             BlockPos pos = player.blockPosition();
@@ -56,8 +53,6 @@ public class TaczIntegrationEvents {
                     weight,
                     lifetime
             );
-            SoundAttractMod.LOGGER.debug("Added TaCz reload sound (tacz:gun, R={}, W={}) for player {} at {}",
-                range, weight, player.getName().getString(), pos);
         }
     }
 
@@ -69,10 +64,7 @@ public class TaczIntegrationEvents {
         if (entity instanceof Player player && !player.level().isClientSide()) {
             SoundEvent taczGunSound = ForgeRegistries.SOUND_EVENTS.getValue(TACZ_GUN_SOUND_ID);
 
-            if (taczGunSound == null) {
-                SoundAttractMod.LOGGER.warn("[SoundAttract-TaCz] Failed to find 'tacz:gun' SoundEvent during GunShootEvent for player {}. Skipping sound tracking for this event.", player.getName().getString());
-                return;
-            }
+            if (taczGunSound == null) return;
 
             Level level = player.level();
             BlockPos pos = player.blockPosition();
@@ -91,8 +83,6 @@ public class TaczIntegrationEvents {
                     weight,
                     lifetime
             );
-            SoundAttractMod.LOGGER.debug("Added TaCz shoot sound (tacz:gun, R={}, W={}) for player {} at {}",
-                range, weight, player.getName().getString(), pos);
         }
     }
 
@@ -105,9 +95,11 @@ public class TaczIntegrationEvents {
             if (shootDb != null) {
                 double reloadRange = shootDb / 20.0;
                 double reloadWeight = (shootDb / 10.0) / 2.0;
+                SoundAttractMod.LOGGER.info("[GunReload] Player {} reloaded gun {}: reloadRange={}, reloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
                 return new double[]{reloadRange, reloadWeight};
             }
         }
+        SoundAttractMod.LOGGER.info("[GunReload] Player {} reloaded unknown gun: using default reloadRange={}, reloadWeight={}", player.getName().getString(), SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE, SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE);
         return new double[]{SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE, SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE};
     }
 
@@ -117,13 +109,20 @@ public class TaczIntegrationEvents {
         if (iGun != null) {
             ResourceLocation gunId = iGun.getGunId(gunStack);
             Double db = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(gunId);
+
             if (db != null) {
                 ResourceLocation attId = iGun.getAttachmentId(gunStack, AttachmentType.MUZZLE);
                 Double reduction = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attId);
-                if (reduction != null) db = Math.max(0, db - reduction);
+
+                if (reduction != null) {
+                    db = Math.max(0, db - reduction);
+                }
+
+                SoundAttractMod.LOGGER.info("[GunSound] Player {} fired gun {} with attachment {}: db={}, range={}, weight={}", player.getName().getString(), gunId, attId, db, db, db / 10.0);
                 return new double[]{db, db / 10.0};
             }
         }
+        SoundAttractMod.LOGGER.info("[GunSound] Player {} fired unknown gun: using default range={}, weight={}", player.getName().getString(), SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE, SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE);
         return new double[]{SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE, SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE};
     }
 }

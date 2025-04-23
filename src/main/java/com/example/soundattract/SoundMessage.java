@@ -86,12 +86,10 @@ public class SoundMessage {
 
 
             if (serverLevel == null) {
-                 SoundAttractMod.LOGGER.warn("Could not get server level to handle SoundMessage (dimension: {}).", msg.dimension);
                  return;
             }
 
             if (!serverLevel.dimension().location().equals(msg.dimension)) {
-                 SoundAttractMod.LOGGER.trace("SoundMessage dimension mismatch ({} vs {}), ignoring.", msg.dimension, serverLevel.dimension().location());
                  return;
             }
 
@@ -101,31 +99,24 @@ public class SoundMessage {
 
             if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
                 if (msg.range > 0) {
-                     SoundAttractMod.LOGGER.trace("Handling voice chat sound at {}, range {}, weight {}", pos, msg.range, msg.weight);
                      SoundTracker.addSound(null, pos, dimString, msg.range, msg.weight, lifetime);
                 } else {
-                     SoundAttractMod.LOGGER.warn("Received voice chat sound message with invalid range: {}", msg.range);
                 }
             } else {
                  SoundEvent snd = ForgeRegistries.SOUND_EVENTS.getValue(msg.soundId);
                  if (snd == null) {
-                    SoundAttractMod.LOGGER.warn("Received SoundMessage with unknown regular sound ID: {}", msg.soundId);
                     return;
                  }
 
                  if (msg.range >= 0) {
-                     SoundAttractMod.LOGGER.trace("Handling sound {} at {} with client-provided range={}, weight={}", msg.soundId, pos, msg.range, msg.weight);
                      SoundTracker.addSound(snd, pos, dimString, msg.range, msg.weight, lifetime);
                  } else {
                      SoundAttractConfig.SoundConfig config = SoundAttractConfig.SOUND_CONFIGS_CACHE.get(snd);
                      if (config != null) {
-                         SoundAttractMod.LOGGER.trace("Handling sound {} at {} using server config range={}, weight={}", msg.soundId, pos, config.range, config.weight);
                          SoundTracker.addSound(snd, pos, dimString, config.range, config.weight, lifetime);
                      } else {
                          if (!SoundAttractConfig.PLAYER_STEP_SOUNDS_CACHE.contains(snd)) {
-                             SoundAttractMod.LOGGER.trace("Ignoring unconfigured sound: {}", msg.soundId);
                          } else {
-                              SoundAttractMod.LOGGER.warn("Player step sound {} received with default range (-1) but no server config found.", msg.soundId);
                          }
                      }
                  }
