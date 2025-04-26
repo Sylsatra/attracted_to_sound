@@ -67,6 +67,16 @@ minecraft {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// Ensure config directory and files are included in the built JAR
+sourceSets.main.resources {
+    srcDir 'src/main/resources'
+    // include 'config/**'
+}
+
+tasks.processResources {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
 repositories {
     mavenCentral()
     maven {
@@ -93,12 +103,14 @@ repositories {
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.3.0' 
 
-    implementation "de.maxhenkel.voicechat:voicechat-api:2.5.27"
+    compileOnly "de.maxhenkel.voicechat:voicechat-api:2.5.27"
 
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-1.20.1-2.5.27")
 
  
     implementation fg.deobf('curse.maven:timeless-and-classics-zero-1028108:5529117-sources-5529578')
+
+    implementation fg.deobf("curse.maven:parcool-482378:6189397")
 
 
 }

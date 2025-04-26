@@ -1,24 +1,16 @@
 package com.example.soundattract.integration;
 
-import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundAttractionEvents;
-import com.example.soundattract.SoundTracker;
-import com.example.soundattract.config.SoundAttractConfig;
-import de.maxhenkel.voicechat.api.ForgeVoicechatPlugin;
-import de.maxhenkel.voicechat.api.VoicechatApi;
-import de.maxhenkel.voicechat.api.VoicechatPlugin;
 import de.maxhenkel.voicechat.api.events.EventRegistration;
 import de.maxhenkel.voicechat.api.events.ClientSoundEvent;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
+import de.maxhenkel.voicechat.api.VoicechatPlugin;
+import de.maxhenkel.voicechat.api.ForgeVoicechatPlugin;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.resources.ResourceLocation;
 import java.util.Optional;
 import java.util.UUID;
+import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.SoundMessage;
 import com.example.soundattract.SoundAttractNetwork;
 
@@ -64,4 +56,4 @@ public class VoiceChatIntegration implements VoicechatPlugin {
         SoundMessage msg = new SoundMessage(SoundMessage.VOICE_CHAT_SOUND_ID, x, y, z, dim, sourcePlayerUUID, range, weight);
         SoundAttractNetwork.INSTANCE.sendToServer(msg);
     }
-} 
+}

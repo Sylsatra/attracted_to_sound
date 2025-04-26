@@ -1,6 +1,5 @@
 package com.example.soundattract;
 
-import com.example.soundattract.config.SoundAttractConfig;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import net.minecraftforge.common.MinecraftForge;
@@ -9,14 +8,15 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
 import com.example.soundattract.SoundTracker;
-import com.example.soundattract.integration.VoiceChatIntegration;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import com.example.soundattract.config.SoundAttractConfig;
+import net.minecraftforge.fml.config.ModConfig;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -26,48 +26,48 @@ public class SoundAttractMod {
     public SoundAttractMod() {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        modEventBus.addListener(this::commonSetup);
+        modEventBus.register(this); 
+
+        modEventBus.addListener(this::onCommonSetup);
+        modEventBus.addListener(SoundAttractMod::onClientSetup);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, "soundattract-common.toml");
 
-        modEventBus.register(this); 
-
         handleTaczIntegration();
+
+        if (ModList.get().isLoaded("parcool")) {
+            try {
+                MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.ParcoolIntegrationEvents.class);
+            } catch (Exception | NoClassDefFoundError e) {
+            }
+        }
+        MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.VanillaIntegrationEvents.class);
     }
 
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        SoundAttractNetwork.init();
+    private void onCommonSetup(final FMLCommonSetupEvent event) {
+        SoundAttractNetwork.register();
+    }
 
-        handleTaczIntegration();
+    private static void onClientSetup(final FMLClientSetupEvent event) {
+        if (net.minecraftforge.fml.ModList.get().isLoaded("voicechat")) {
+            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] Registering VoiceChat integration on client setup");
+            com.example.soundattract.SoundAttractClientEvents.registerVoiceChatIntegration();
+        } else {
+            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
+        }
     }
 
     private void handleTaczIntegration() {
         if (ModList.get().isLoaded("tacz")) {
-            if (SoundAttractConfig.TACZ_ENABLED_CACHE) {
+            try {
+                MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
+            } catch (Exception e) {
                 try {
                     MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
-                } catch (Exception e) {
-                    try {
-                        MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
-                    } catch (NoClassDefFoundError e1) {
-                    }
-                } catch (NoClassDefFoundError e) {
+                } catch (NoClassDefFoundError e1) {
                 }
+            } catch (NoClassDefFoundError e) {
             }
-        }
-    }
-
-    @SubscribeEvent
-    public void onModConfigEvent(ModConfigEvent.Loading event) {
-        if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
-            SoundAttractConfig.bakeConfig();
-        }
-    }
-
-    @SubscribeEvent
-    public void onModConfigEvent(ModConfigEvent.Reloading event) {
-        if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
-            SoundAttractConfig.bakeConfig();
         }
     }
 }
