@@ -108,6 +108,13 @@ public class SoundMessage {
             }
 
             BlockPos pos = BlockPos.containing(msg.x, msg.y, msg.z);
+            // Fallback: If position is (0,0,0), try to use sender's position if available
+            if (pos.getX() == 0 && pos.getY() == 0 && pos.getZ() == 0 && sender != null) {
+                pos = sender.blockPosition();
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Fallback to sender position {} for sound {}", pos, msg.soundId);
+                }
+            }
             String dimString = msg.dimension.toString();
             int lifetime = SoundAttractConfig.soundLifetimeTicks.get();
 

@@ -238,10 +238,14 @@ public class AttractionGoal extends Goal {
                 }
             }
             if (cachedSound == null) {
-                SoundAttractMod.LOGGER.info("[DIAG] Mob {} found NO sound to pursue at {}", mob.getName().getString(), mob.blockPosition());
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[DIAG] Mob {} found NO sound to pursue at {}", mob.getName().getString(), mob.blockPosition());
+                }
                 return;
             }
-            SoundAttractMod.LOGGER.info("[DIAG] Mob {} found sound: {} at {} (range={})", mob.getName().getString(), cachedSound.weight, cachedSound.pos, cachedSound.range);
+            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[DIAG] Mob {} found sound: {} at {} (range={})", mob.getName().getString(), cachedSound.weight, cachedSound.pos, cachedSound.range);
+            }
             if (com.example.soundattract.ai.MobGroupManager.getLeader(mob) == mob) {
                 if (isPursuingSound) {
                     pursuingSoundTicksRemaining--;
@@ -421,10 +425,14 @@ public class AttractionGoal extends Goal {
             return;
         }
         if (cachedSound == null) {
-            SoundAttractMod.LOGGER.info("[DIAG] Mob {} found NO sound to pursue at {}", mob.getName().getString(), mob.blockPosition());
+            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[DIAG] Mob {} found NO sound to pursue at {}", mob.getName().getString(), mob.blockPosition());
+            }
             return;
         }
-        SoundAttractMod.LOGGER.info("[DIAG] Mob {} found sound: {} at {} (range={})", mob.getName().getString(), cachedSound.weight, cachedSound.pos, cachedSound.range);
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[DIAG] Mob {} found sound: {} at {} (range={})", mob.getName().getString(), cachedSound.weight, cachedSound.pos, cachedSound.range);
+        }
         if (com.example.soundattract.ai.MobGroupManager.getLeader(mob) == mob) {
             if (isPursuingSound) {
                 pursuingSoundTicksRemaining--;
