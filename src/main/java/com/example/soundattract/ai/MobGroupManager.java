@@ -46,18 +46,21 @@ public class MobGroupManager {
     }
 
     public static boolean isEdgeMob(Mob mob) {
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
+        }
         Mob leader = getLeader(mob);
         if (leader == mob) {
-            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
                 com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} is its own leader (not edge)", mob.getName().getString());
+            }
             return false;
         }
         Set<Mob> edgeSet = lastEdgeMobMap.get(leader);
         boolean isEdge = edgeSet != null && edgeSet.contains(mob);
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} edge result: {} (from cache)", mob.getName().getString(), isEdge);
+        }
         return isEdge;
     }
 
@@ -91,8 +94,9 @@ public class MobGroupManager {
     }
 
     public static void updateGroups(ServerLevel level) {
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] updateGroups called at game time {}", level.getGameTime());
+        }
         long time = level.getGameTime();
         int scanCooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
         int groupAssignInterval = Math.max(1, scanCooldown / 2);
@@ -119,8 +123,9 @@ public class MobGroupManager {
             ResourceLocation id = mob.getType().builtInRegistryHolder().key().location();
             allMobTypesLog.append(String.format("%s at (%.1f, %.1f, %.1f); ", id.toString(), mob.getX(), mob.getY(), mob.getZ()));
         }
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] All mobs present ({}): {}", mobs.size(), allMobTypesLog.toString());
+        }
         List<Mob> attractedMobs = new ArrayList<>();
         for (Mob mob : mobs) {
             ResourceLocation id = mob.getType().builtInRegistryHolder().key().location();
@@ -132,8 +137,9 @@ public class MobGroupManager {
         for (Mob mob : attractedMobs) {
             mobPosLog.append(String.format("%s at (%.1f, %.1f, %.1f); ", mob.getName().getString(), mob.getX(), mob.getY(), mob.getZ()));
         }
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
+        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Attracted mobs ({}): {}", attractedMobs.size(), mobPosLog.toString());
+        }
         uuidToLeader.clear();
         leaders.clear();
         if (attractedMobs.isEmpty()) return;
