@@ -23,10 +23,11 @@ public class SoundMessage {
     private final int range;
     private final double weight;
     private final String animatorClass;
+    private final String taczType; // "shoot" or "reload" or null
 
     public static final ResourceLocation VOICE_CHAT_SOUND_ID = new ResourceLocation(SoundAttractMod.MOD_ID, "voice_chat");
 
-    public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass) {
+    public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass, String taczType) {
         this.soundId = soundId;
         this.x = x;
         this.y = y;
@@ -36,18 +37,23 @@ public class SoundMessage {
         this.range = range;
         this.weight = weight;
         this.animatorClass = animatorClass;
+        this.taczType = taczType;
+    }
+
+    public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass) {
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, -1, 1.0, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, -1, 1.0, null, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, 1.0, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, 1.0, null, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, null, null);
     }
 
     public static void encode(SoundMessage msg, FriendlyByteBuf buf) {
@@ -62,6 +68,8 @@ public class SoundMessage {
         buf.writeDouble(msg.weight);
         buf.writeBoolean(msg.animatorClass != null);
         if (msg.animatorClass != null) buf.writeUtf(msg.animatorClass);
+        buf.writeBoolean(msg.taczType != null);
+        if (msg.taczType != null) buf.writeUtf(msg.taczType);
     }
 
     public static SoundMessage decode(FriendlyByteBuf buf) {
@@ -74,7 +82,8 @@ public class SoundMessage {
         int range = buf.readInt();
         double weight = buf.readDouble();
         String animatorClass = buf.readBoolean() ? buf.readUtf() : null;
-        return new SoundMessage(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass);
+        String taczType = buf.readBoolean() ? buf.readUtf() : null;
+        return new SoundMessage(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, taczType);
     }
 
     public static void handle(SoundMessage msg, Supplier<NetworkEvent.Context> ctx) {
@@ -128,15 +137,6 @@ public class SoundMessage {
                  double range = msg.range;
                  double weight = msg.weight;
                  String id = msg.soundId != null ? msg.soundId.toString() : "";
-                 if (range <= 0 || weight <= 0) {
-                     if (id.contains("tacz:gun")) {
-                         range = SoundAttractConfig.taczShootRange.get();
-                         weight = SoundAttractConfig.taczShootWeight.get();
-                     } else if (id.contains("tacz:reload")) {
-                         range = SoundAttractConfig.taczReloadRange.get();
-                         weight = SoundAttractConfig.taczReloadWeight.get();
-                     }
-                 }
                  SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
             }
 

@@ -1,222 +1,191 @@
 package com.example.soundattract.integration;
 
-import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundTracker;
 import com.example.soundattract.SoundMessage;
 import com.example.soundattract.SoundAttractNetwork;
-import net.minecraftforge.fml.ModList;
-import net.minecraft.core.BlockPos;
+import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.registries.ForgeRegistries;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.List;
 
+import java.util.Optional;
+
+@Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class TaczIntegrationEvents {
+    private static final String GUN_ITEM_ID = "tacz:modern_kinetic_gun";
+    private static final String SOUND_ID = "tacz:gun";
 
-    private static final boolean IS_TACZ_LOADED = ModList.get().isLoaded("tacz");
-    private static final String GUN_RELOAD_EVENT = "com.tacz.guns.api.event.common.GunReloadEvent";
-    private static final String GUN_SHOOT_EVENT = "com.tacz.guns.api.event.common.GunShootEvent";
-    private static final String IGUN_CLASS = "com.tacz.guns.api.item.IGun";
-    private static final String ATTACHMENT_TYPE_CLASS = "com.tacz.guns.api.item.attachment.AttachmentType";
-    private static final String GUN_ID_METHOD = "getGunId";
-    private static final String ATTACHMENT_ID_METHOD = "getAttachmentId";
-    private static final String TACZ_GUN_SOUND_ID = "tacz:gun";
-
-    private static Class<?> igunClass;
-    private static Class<?> attachmentTypeClass;
-    private static Method gunIdMethod;
-    private static Method attachmentIdMethod;
-
-    public static void register() {
-        if (!IS_TACZ_LOADED) return;
-        try {
-            Class<?> reloadEventClass = Class.forName(GUN_RELOAD_EVENT);
-            Class<?> shootEventClass = Class.forName(GUN_SHOOT_EVENT);
-            igunClass = Class.forName(IGUN_CLASS);
-            attachmentTypeClass = Class.forName(ATTACHMENT_TYPE_CLASS);
-            gunIdMethod = igunClass.getMethod(GUN_ID_METHOD, ItemStack.class);
-            attachmentIdMethod = igunClass.getMethod(ATTACHMENT_ID_METHOD, ItemStack.class, attachmentTypeClass);
-            // Register event handlers via reflection
-            // ...
-        } catch (Exception e) {
-            // Tacz API not present, safe to ignore
-        }
+    @SubscribeEvent
+    public static void onPlayerLeftClick(PlayerInteractEvent.LeftClickEmpty event) {
+        // Removed old handleGunShot logic
     }
 
-    public static void onGunReload(Object event) {
-        if (!IS_TACZ_LOADED || !SoundAttractConfig.enableTaczIntegration.get()) return;
+    @SubscribeEvent
+    public static void onPlayerLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
+        // Removed old handleGunShot logic
+    }
 
-        LivingEntity entity = getEntity(event);
-        if (entity instanceof Player player && !player.level().isClientSide()) {
-            SoundEvent taczGunSound = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation(TACZ_GUN_SOUND_ID));
-
-            if (taczGunSound == null) return;
-
-            double[] rw = calculateTaczReloadRangeWeight(player);
-            double range = rw[0];
-            double weight = rw[1];
+    public static void handleReloadFromClient(Player player, String gunId) {
+        if (player == null || player.level().isClientSide()) return;
+        player.getPersistentData().putBoolean("tacz_reload_handled", true);
+        double reloadRange;
+        double reloadWeight;
+        if (gunId == null || gunId.isEmpty() || !isGunIdInReloadConfig(gunId)) {
+            // Fallback for reload
+            reloadRange = SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
+            reloadWeight = SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
             if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[Tacz] GunReload: Player={}, Gun={}, Range={}, Weight={}", player.getName().getString(), getGunId(player), range, weight);
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading (fallback): Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
             }
-
-            SoundTracker.addSound(
-                    taczGunSound,
-                    player.blockPosition(),
-                    player.level().dimension().location().toString(),
-                    range,
-                    weight,
-                    SoundAttractConfig.soundLifetimeTicks.get()
-            );
-        }
-    }
-
-    public static void onGunShoot(Object event) {
-        LivingEntity shooter = getShooter(event);
-        boolean isPlayer = shooter instanceof Player;
-        boolean sneaking = isPlayer && ((Player)shooter).isCrouching();
-        boolean crawling = isPlayer && ((Player)shooter).isSwimming();
-
-        if (!IS_TACZ_LOADED || !SoundAttractConfig.enableTaczIntegration.get()) return;
-
-        if (isPlayer) {
-            Player player = (Player)shooter;
-            double[] rw = calculateTaczShootRangeWeight(player);
-            double range = rw[0];
-            double weight = rw[1];
+        } else {
+            reloadRange = getReloadRangeFromConfig(gunId);
+            reloadWeight = getReloadWeightFromConfig(gunId);
             if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[Tacz] GunShoot: Player={}, Gun={}, Range={}, Weight={}, Sneaking={}, Crawling={}", player.getName().getString(), getGunId(player), range, weight, sneaking, crawling);
-            }
-
-            SoundTracker.addSound(
-                    ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation(TACZ_GUN_SOUND_ID)),
-                    player.blockPosition(),
-                    player.level().dimension().location().toString(),
-                    range,
-                    weight,
-                    SoundAttractConfig.soundLifetimeTicks.get()
-            );
-        }
-    }
-
-    private static double[] calculateTaczReloadRangeWeight(Player player) {
-        ItemStack gunStack = player.getMainHandItem();
-        Object iGun = getIGun(gunStack);
-        ResourceLocation gunId = null;
-        if (iGun != null) {
-            gunId = (ResourceLocation) invokeMethod(gunIdMethod, iGun, gunStack);
-            double shootDb = getTaczGunShootDb(gunId);
-            if (shootDb >= 0) {
-                double reloadRange = shootDb / 20.0;
-                double reloadWeight = (shootDb / 10.0) / 2.0;
-                return new double[]{reloadRange, reloadWeight};
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading: Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
             }
         }
-        return new double[]{SoundAttractConfig.taczReloadRange.get(), SoundAttractConfig.taczReloadWeight.get()};
+        ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
+        ResourceLocation dim = player.level().dimension().location();
+        SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)reloadRange, reloadWeight, null, "reload");
+        SoundAttractNetwork.INSTANCE.sendToServer(msg);
     }
 
-    private static double[] calculateTaczShootRangeWeight(Player player) {
-        ItemStack gunStack = player.getMainHandItem();
-        Object iGun = getIGun(gunStack);
-        ResourceLocation gunId = null;
-        ResourceLocation attId = null;
-        if (iGun != null) {
-            gunId = (ResourceLocation) invokeMethod(gunIdMethod, iGun, gunStack);
-            double db = getTaczGunShootDb(gunId);
-            attId = (ResourceLocation) invokeMethod(attachmentIdMethod, iGun, gunStack, getAttachmentType("MUZZLE"));
-            double origDb = db;
-            if (attId != null) {
-                double reduction = getTaczAttachmentReduction(attId);
-                if (reduction > 0) {
-                    db = Math.max(0, db - reduction);
-                }
-                return new double[]{db, db / 10.0};
-            } else {
-                return new double[]{db, db / 10.0};
+    public static void handleGunshotFromClient(Player player, String gunId, String attachmentId) {
+        if (player == null || player.level().isClientSide()) return;
+        if (player.getPersistentData().getBoolean("tacz_reload_handled")) {
+            player.getPersistentData().remove("tacz_reload_handled");
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Skipping fallback shooting because reload was just handled for Player={}", player.getName().getString());
+            }
+            return;
+        }
+        if (SoundAttractConfig.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[TaczIntegration] Server: Received gunshot message from player={}, GunId={}, AttachmentId={}", player.getName().getString(), gunId, attachmentId);
+        }
+        ItemStack held = player.getMainHandItem();
+        if (held.isEmpty() || ForgeRegistries.ITEMS.getKey(held.getItem()) == null ||
+                !ForgeRegistries.ITEMS.getKey(held.getItem()).toString().equals(GUN_ITEM_ID)) {
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: Not a tacz:modern_kinetic_gun");
+            }
+            return;
+        }
+        CompoundTag tag = held.getTag();
+        if (tag == null || !tag.contains("GunId")) {
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: GunId tag missing");
+            }
+            return;
+        }
+        if (gunId == null || gunId.isEmpty() || !isGunIdInShootConfig(gunId)) {
+            // Fallback for shooting
+            double fallbackRange = SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
+            double fallbackWeight = SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting (fallback): Player={}, GunId={}, Range={}, Weight={}", player.getName().getString(), gunId, fallbackRange, fallbackWeight);
+            }
+            ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
+            ResourceLocation dim = player.level().dimension().location();
+            SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)fallbackRange, fallbackWeight, null, "shoot");
+            SoundAttractNetwork.INSTANCE.sendToServer(msg);
+            return;
+        }
+        double gunRange = getGunRangeFromConfig(gunId);
+        double reduction = 0.0;
+        if (attachmentId != null && !attachmentId.isEmpty()) {
+            reduction = getAttachmentReductionFromConfig(attachmentId);
+        }
+        double finalRange = Math.max(0, gunRange - reduction);
+        double finalWeight = getGunWeightFromConfig(gunId);
+        if (SoundAttractConfig.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting: Player={}, GunId={}, AttachmentId={}, Range={}, Weight={}", player.getName().getString(), gunId, attachmentId, finalRange, finalWeight);
+        }
+        ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
+        ResourceLocation dim = player.level().dimension().location();
+        SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)finalRange, finalWeight, null, "shoot");
+        SoundAttractNetwork.INSTANCE.sendToServer(msg);
+    }
+
+    private static boolean isGunIdInReloadConfig(String gunId) {
+        if (gunId == null || gunId.isEmpty()) return false;
+        String normalizedGunId = gunId.trim().toLowerCase();
+        if (SoundAttractConfig.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[TaczIntegration] Checking reload gunId '{}', normalized '{}', against keys: {}", gunId, normalizedGunId,
+                com.example.soundattract.config.SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet().stream()
+                    .map(rl -> rl.toString().trim().toLowerCase())
+                    .collect(java.util.stream.Collectors.toList()));
+        }
+        for (ResourceLocation rl : com.example.soundattract.config.SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet()) {
+            if (rl.toString().trim().toLowerCase().equals(normalizedGunId)) {
+                return true;
             }
         }
-        return new double[]{SoundAttractConfig.taczShootRange.get(), SoundAttractConfig.taczShootWeight.get()};
+        return false;
     }
 
-    private static double getTaczGunShootDb(ResourceLocation gunId) {
-        if (gunId == null) return -1;
-        for (String raw : SoundAttractConfig.taczGunShootDecibels.get()) {
-            String[] parts = raw.split(";");
-            if (parts.length >= 2 && parts[0].equals(gunId.toString())) {
-                try {
-                    return Double.parseDouble(parts[1]);
-                } catch (NumberFormatException ignored) {}
+    private static boolean isGunIdInShootConfig(String gunId) {
+        if (gunId == null || gunId.isEmpty()) return false;
+        String normalizedGunId = gunId.trim().toLowerCase();
+        if (SoundAttractConfig.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[TaczIntegration] Checking shoot gunId '{}', normalized '{}', against keys: {}", gunId, normalizedGunId,
+                com.example.soundattract.config.SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet().stream()
+                    .map(rl -> rl.toString().trim().toLowerCase())
+                    .collect(java.util.stream.Collectors.toList()));
+        }
+        for (ResourceLocation rl : com.example.soundattract.config.SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet()) {
+            if (rl.toString().trim().toLowerCase().equals(normalizedGunId)) {
+                return true;
             }
         }
-        return -1;
+        return false;
     }
 
-    private static double getTaczAttachmentReduction(ResourceLocation attId) {
-        if (attId == null) return 0;
-        for (String raw : SoundAttractConfig.taczAttachmentReductions.get()) {
-            String[] parts = raw.split(";");
-            if (parts.length >= 2 && parts[0].equals(attId.toString())) {
-                try {
-                    return Double.parseDouble(parts[1]);
-                } catch (NumberFormatException ignored) {}
+    private static double getReloadRangeFromConfig(String gunId) {
+        // For now, use the global reload range
+        return com.example.soundattract.config.SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
+    }
+
+    private static double getReloadWeightFromConfig(String gunId) {
+        // For now, use the global reload weight
+        return com.example.soundattract.config.SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
+    }
+
+    private static double getGunRangeFromConfig(String gunId) {
+        if (gunId == null || gunId.isEmpty()) return SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
+        String normalizedGunId = gunId.trim().toLowerCase();
+        for (ResourceLocation rl : SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet()) {
+            if (rl.toString().trim().toLowerCase().equals(normalizedGunId)) {
+                return SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(rl);
             }
         }
-        return 0;
+        return SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
     }
 
-    private static ResourceLocation getGunId(Player player) {
-        ItemStack gunStack = player.getMainHandItem();
-        Object iGun = getIGun(gunStack);
-        if (iGun != null) {
-            return (ResourceLocation) invokeMethod(gunIdMethod, iGun, gunStack);
+    private static double getGunWeightFromConfig(String gunId) {
+        if (gunId == null || gunId.isEmpty()) return SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
+        String normalizedGunId = gunId.trim().toLowerCase();
+        for (ResourceLocation rl : SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.keySet()) {
+            if (rl.toString().trim().toLowerCase().equals(normalizedGunId)) {
+                double db = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(rl);
+                return db / 10.0;
+            }
         }
-        return null;
+        return SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
     }
 
-    private static Object getIGun(ItemStack gunStack) {
-        try {
-            return igunClass.getMethod("getIGunOrNull", ItemStack.class).invoke(null, gunStack);
-        } catch (Exception e) {
-            return null;
+    private static double getAttachmentReductionFromConfig(String attachmentId) {
+        if (attachmentId == null || attachmentId.isEmpty()) return 0.0;
+        String normalizedAttachmentId = attachmentId.trim().toLowerCase();
+        for (ResourceLocation rl : com.example.soundattract.config.SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.keySet()) {
+            if (rl.toString().trim().toLowerCase().equals(normalizedAttachmentId)) {
+                return com.example.soundattract.config.SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(rl);
+            }
         }
-    }
-
-    private static Object getAttachmentType(String type) {
-        try {
-            return attachmentTypeClass.getField(type).get(null);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static LivingEntity getEntity(Object event) {
-        try {
-            return (LivingEntity) event.getClass().getMethod("getEntity").invoke(event);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static LivingEntity getShooter(Object event) {
-        try {
-            return (LivingEntity) event.getClass().getMethod("getShooter").invoke(event);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static Object invokeMethod(Method method, Object obj, Object... args) {
-        try {
-            return method.invoke(obj, args);
-        } catch (Exception e) {
-            return null;
-        }
+        return 0.0;
     }
 }

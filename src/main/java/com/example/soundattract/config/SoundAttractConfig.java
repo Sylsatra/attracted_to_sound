@@ -124,6 +124,15 @@ public class SoundAttractConfig {
             builder.push("Sound");
             nonPlayerSoundIdList = builder.comment("List of non-player sound IDs that mobs can be attracted to. Format: 'soundId;range;weight'. Example: 'minecraft:block.lever.click;5;3'")
                 .defineList("nonPlayerSoundIdList", Arrays.asList(
+                    "minecraft:item.crossbow.shoot;16;4",
+                    "minecraft:item.crossbow.loading_start;6;2",
+                    "minecraft:item.crossbow.loading_middle;6;2",
+                    "minecraft:item.crossbow.loading_end;6;2",
+                    "minecraft:item.crossbow.quick_charge_1;6;2",
+                    "minecraft:item.crossbow.quick_charge_2;6;2",
+                    "minecraft:item.crossbow.quick_charge_3;6;2",
+                    "minecraft:entity.arrow.shoot;14;4",
+                    "minecraft:item.shield.block;12;3",
                     "minecraft:block.lever.click;5;3",
                     "minecraft:block.wooden_trapdoor.open;8;3",
                     "minecraft:block.wooden_trapdoor.close;8;3",
@@ -172,13 +181,56 @@ public class SoundAttractConfig {
                     "minecraft:entity.generic.explode;50;7",
                     "minecraft:entity.firework_rocket.launch;10;3",
                     "minecraft:entity.firework_rocket.blast;20;5",
-                    "minecraft:entity.firework_rocket.large_blast;30;6"
+                    "minecraft:entity.firework_rocket.large_blast;30;6",
+                    "musketmod:musket_fire;155;8",
+                    "musketmod:blunderbuss_fire;154;7",
+                    "musketmod:pistol_fire;164;5",
+                    "cgm:item.shotgun.fire;156;15",
+                    "cgm:item.shotgun.silenced_fire;131;13",
+                    "cgm:item.shotgun.enchanted_fire;156;15",
+                    "cgm:item.shotgun.cock;90;6",
+                    "cgm:item.rifle.fire;162;16",
+                    "cgm:item.rifle.silenced_fire;137;13",
+                    "cgm:item.rifle.enchanted_fire;162;16",
+                    "cgm:item.rifle.cock;90;6",
+                    "cgm:item.pistol.fire;164;16",
+                    "cgm:item.pistol.silenced_fire;139;13",
+                    "cgm:item.pistol.enchanted_fire;164;16",
+                    "cgm:item.pistol.reload;85;7",
+                    "cgm:item.pistol.cock;90;6",
+                    "cgm:item.assault_rifle.fire;159;16",
+                    "cgm:item.assault_rifle.silenced_fire;134;13",
+                    "cgm:item.assault_rifle.enchanted_fire;159;16",
+                    "cgm:item.assault_rifle.cock;90;6",
+                    "cgm:item.grenade_launcher.fire;172;17",
+                    "cgm:item.bazooka.fire;184;17",
+                    "cgm:item.mini_gun.fire;180;17",
+                    "cgm:item.mini_gun.enchanted_fire;180;17",
+                    "cgm:item.machine_pistol.fire;160;16",
+                    "cgm:item.machine_pistol.silenced_fire;135;13",
+                    "cgm:item.machine_pistol.enchanted_fire;160;16",
+                    "cgm:item.heavy_rifle.fire;165;16",
+                    "cgm:item.heavy_rifle.silenced_fire;140;13",
+                    "cgm:item.heavy_rifle.enchanted_fire;165;16",
+                    "cgm:item.heavy_rifle.cock;90;6",
+                    "cgm:item.grenade.pin;72;6",
+                    "cgm:entity.stun_grenade.explosion;175;18",
+                    "cgm:entity.stun_grenade.ring;104;10"
                 ), obj -> obj instanceof String && ((String) obj).split(";").length == 3);
             builder.pop();
 
             builder.push("SoundIdWhitelist");
             soundIdWhitelist = builder.comment("Whitelist of sound IDs to process (all others will be ignored for performance). Example: 'minecraft:block.note_block.bass'")
                 .defineListAllowEmpty("soundIdWhitelist", Arrays.asList(
+                    "minecraft:item.crossbow.shoot",
+                    "minecraft:item.crossbow.loading_start",
+                    "minecraft:item.crossbow.loading_middle",
+                    "minecraft:item.crossbow.loading_end",
+                    "minecraft:item.crossbow.quick_charge_1",
+                    "minecraft:item.crossbow.quick_charge_2",
+                    "minecraft:item.crossbow.quick_charge_3",
+                    "minecraft:entity.arrow.shoot",
+                    "minecraft:item.shield.block",
                     "minecraft:block.lever.click",
                     "minecraft:block.wooden_trapdoor.open",
                     "minecraft:block.wooden_trapdoor.close",
@@ -242,7 +294,41 @@ public class SoundAttractConfig {
                     "minecraft:entity.player.jump",
                     "minecraft:entity.player.sneak",
                     "tacz:gun",
-                    "soundattract:voice_chat"
+                    "soundattract:voice_chat",
+                    "musketmod:musket_fire",
+                    "musketmod:blunderbuss_fire",
+                    "musketmod:pistol_fire",
+                    "cgm:item.shotgun.fire",
+                    "cgm:item.shotgun.silenced_fire",
+                    "cgm:item.shotgun.enchanted_fire",
+                    "cgm:item.shotgun.cock",
+                    "cgm:item.rifle.fire",
+                    "cgm:item.rifle.silenced_fire",
+                    "cgm:item.rifle.enchanted_fire",
+                    "cgm:item.rifle.cock",
+                    "cgm:item.pistol.fire",
+                    "cgm:item.pistol.silenced_fire",
+                    "cgm:item.pistol.enchanted_fire",
+                    "cgm:item.pistol.reload",
+                    "cgm:item.pistol.cock",
+                    "cgm:item.assault_rifle.fire",
+                    "cgm:item.assault_rifle.silenced_fire",
+                    "cgm:item.assault_rifle.enchanted_fire",
+                    "cgm:item.assault_rifle.cock",
+                    "cgm:item.grenade_launcher.fire",
+                    "cgm:item.bazooka.fire",
+                    "cgm:item.mini_gun.fire",
+                    "cgm:item.mini_gun.enchanted_fire",
+                    "cgm:item.machine_pistol.fire",
+                    "cgm:item.machine_pistol.silenced_fire",
+                    "cgm:item.machine_pistol.enchanted_fire",
+                    "cgm:item.heavy_rifle.fire",
+                    "cgm:item.heavy_rifle.silenced_fire",
+                    "cgm:item.heavy_rifle.enchanted_fire",
+                    "cgm:item.heavy_rifle.cock",
+                    "cgm:item.grenade.pin",
+                    "cgm:entity.stun_grenade.explosion",
+                    "cgm:entity.stun_grenade.ring"
                 ), o -> o instanceof String);
             builder.pop();
 
@@ -413,12 +499,26 @@ public class SoundAttractConfig {
             taczShootWeight = builder.comment("Tacz shoot sound weight (fallback, calculated as db/10.0 for known guns)").defineInRange("taczShootWeight", 10, 0, 10);
             taczGunShootDecibels = builder.comment("Tacz gun shoot decibels. Format: 'modid:item;decibels'. Example: 'tacz:akm;120.0'")
                 .defineList("taczGunShootDecibels", Arrays.asList(
-                    "tacz:ai_awp;166.5", "tacz:cz75;163", "tacz:glock_17;163", "tacz:p320;163", "tacz:uzi;159.8",
-                    "tacz:hk_mp5a5;159.8", "tacz:m95;159.7", "tacz:deagle;159.7", "tacz:ak47;158.9", "tacz:m4a1;158.9",
-                    "tacz:m16a1;158.9", "tacz:m16a4;158.9", "tacz:hk416d;158.9", "tacz:aug;158.9", "tacz:mk14;158.9",
-                    "tacz:m249;158.9", "tacz:rpk;158.9", "tacz:ump45;157.0", "tacz:vector45;157.0", "tacz:db_short;156.3",
-                    "tacz:db_long;156.3", "tacz:aa12;156.3", "tacz:scar_h;156.2", "tacz:hk_g3;156.2", "tacz:sks_tactical;156.0",
-                    "tacz:m107;170.2"
+                    "suffuse:aks74u;157.0", "suffuse:python;155.0", "suffuse:tec9;160.0", 
+                    "suffuse:tt33;158.0", "tacz:deagle_golder;164.0", "suffuse:tti2011;158.0", 
+                    "tacz:m1911;157.0", "suffuse:trapper50cal;172.0", "tacz:deagle;164.0", 
+                    "tacz:cz75;157.0", "tacz:p320;157.0", "suffuse:viper2011;158.0",
+                    "tacz:m700;160.0", "tacz:m107;171.0", "tacz:m95;172.0",
+                    "tacz:ai_awp;170.0", "suffuse:aw50;173.0", "suffuse:gm6;172.0",
+                    "suffuse:m200;173.0", "suffuse:xm7;165.0", "suffuse:qbu191;164.0",
+                    "suffuse:n4;161.0", "suffuse:qbz951;160.0", "suffuse:ash12;165.0",
+                    "suffuse:aks74u;157.0", "suffuse:qbz951s;160.0", "suffuse:qbz192;159.0",
+                    "suffuse:an94;161.0", "tacz:sks_tactical;159.0", "tacz:ak47;159.0",
+                    "tacz:type_81;158.0", "tacz:qbz_95;160.0", "tacz:hk416d;161.0",
+                    "tacz:m4a1;159.0", "tacz:m16a1;159.0", "tacz:hk_g3;161.0",
+                    "tacz:m16a4;159.0", "tacz:mk14;162.0", "tacz:scar_l;161.0", 
+                    "tacz:scar_h;162.0", "tacz:aug;160.0", "tacz:db_short;165.0",
+                    "tacz:db_long;166.0", "tacz:m870;165.0", "tacz:aa12;161.0",
+                    "tacz:ump45;158.0", "tacz:hk_mp5a5;158.0", "suffuse:ump45;158.0",
+                    "tacz:uzi;157.0", "suffuse:pp19;157.0", "tacz:vector45;158.0",
+                    "tacz:p90;156.0", "tacz:rpg7;180.0", "tacz:m320;172.0",
+                    "suffuse:m79;172.0", "suffuse:pkp;165.0", "tacz:m249;165.0",
+                    "tacz:rpk;164.0"
                 ), obj -> {
                     if (!(obj instanceof String str)) return false;
                     String[] parts = str.split(";", 2);
@@ -427,9 +527,18 @@ public class SoundAttractConfig {
                 });
             taczAttachmentReductions = builder.comment("Tacz attachment sound reduction. Format: 'modid:item;reduction'. Example: 'tacz:suppressor;15.0'")
                 .defineList("taczAttachmentReductions", Arrays.asList(
-                    "tacz:muzzle_silencer_phantom_s1;35", "tacz:muzzle_silencer_vulture;32", "tacz:muzzle_silencer_mirage;30",
-                    "tacz:muzzle_silencer_knight_qd;28", "tacz:muzzle_silencer_ursus;25", "tacz:muzzle_silencer_ptilopsis;20",
-                    "tacz:deagle_golden_long_barrel;-5"
+                    "tacz:muzzle_brake_cthulhu;-3.0",         
+                    "tacz:muzzle_brake_pioneer;-3.0",        
+                    "tacz:muzzle_brake_cyclone_d2;-3.0",     
+                    "tacz:muzzle_brake_trex;-5.0",           
+                    "tacz:muzzle_silencer_mirage;30.0",      
+                    "tacz:muzzle_silencer_vulture;30.0",     
+                    "tacz:muzzle_silencer_knight_qd;30.0",   
+                    "tacz:muzzle_silencer_ursus;30.0",       
+                    "tacz:muzzle_silencer_ptilopsis;30.0",   
+                    "tacz:muzzle_silencer_phantom_s1;30.0",  
+                    "tacz:muzzle_compensator_trident;-2.0",  
+                    "tacz:deagle_golden_long_barrel;-1.0" 
                 ), obj -> {
                     if (!(obj instanceof String str)) return false;
                     String[] parts = str.split(";", 2);

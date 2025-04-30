@@ -125,15 +125,19 @@ public class SoundTracker {
             && (soundId == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundId))
             && (soundId == null || !soundId.equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID.toString()))) {
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped non-whitelist sound: {} at {} (dim: {}), range={}, weight={}",
-                        soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range, weight);
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped non-whitelist sound: {} at {} (dim: {}), range={}, weight={}",
+                            soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range, weight);
+                }
             }
             return;
         }
         if (range < 0) {
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                com.example.soundattract.SoundAttractMod.LOGGER.warn("[SoundTracker] Attempted to register sound {} at {} (dim: {}) with negative range={}, skipping.",
-                        soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range);
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.warn("[SoundTracker] Attempted to register sound {} at {} (dim: {}) with negative range={}, skipping.",
+                            soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range, weight);
+                }
             }
             return;
         }
@@ -143,13 +147,17 @@ public class SoundTracker {
             RECENT_SOUNDS.removeIf(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight == weight);
             RECENT_SOUNDS.add(new SoundRecord(se, soundId, pos, lifetime, dimensionKey, range, weight));
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Registered sound {} at {} (dim: {}), range={}, weight={}",
-                        soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range, weight);
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Registered sound {} at {} (dim: {}), range={}, weight={}",
+                            soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, range, weight);
+                }
             }
             updateSpatialSounds();
         } else {
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped adding sound {} at {} (dim: {}) with weight {} because higher-weight sound exists", soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, weight);
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped adding sound {} at {} (dim: {}) with weight {} because higher-weight sound exists", soundId != null ? soundId : (se != null ? se.getLocation() : "null"), pos, dimensionKey, weight);
+                }
             }
         }
     }
@@ -223,7 +231,9 @@ public class SoundTracker {
     public static double[] applyBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
         if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && (soundId == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundId))) {
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped muffling for sound {} at {} -> {} due to whitelist", soundId, src, dst);
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundTracker] Skipped muffling for sound {} at {} -> {} due to whitelist", soundId, src, dst);
+                }
             }
             return new double[]{0, 0};
         }

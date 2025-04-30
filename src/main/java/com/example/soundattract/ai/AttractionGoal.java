@@ -424,6 +424,18 @@ public class AttractionGoal extends Goal {
             }
             return;
         }
+        if (mob.level() != null && !mob.level().isClientSide() && com.example.soundattract.DynamicScanCooldownManager.shouldScanThisTick(mob.getId(), mob.level().getGameTime())) {
+            SoundTracker.SoundRecord newSound = findInterestingSoundRecord();
+            if (newSound != null && newSound != cachedSound) {
+                cachedSound = newSound;
+                targetSoundPos = newSound.pos;
+                currentTargetWeight = newSound.weight;
+                lastSoundTicksRemaining = newSound.ticksRemaining;
+                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} switched target to new sound at {}", mob.getName().getString(), newSound.pos);
+                }
+            }
+        }
         if (cachedSound == null) {
             if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info("[DIAG] Mob {} found NO sound to pursue at {}", mob.getName().getString(), mob.blockPosition());
@@ -483,7 +495,8 @@ public class AttractionGoal extends Goal {
         }
         if (currentTarget != null && best != null && best != currentTarget) {
             double switchRatio = com.example.soundattract.config.SoundAttractConfig.SOUND_SWITCH_RATIO_CACHE;
-            if (best.weight < currentTarget.weight * switchRatio) {
+            boolean canSwitch = best.weight > currentTarget.weight * switchRatio || best.range > currentTarget.range * switchRatio;
+            if (!canSwitch) {
                 return currentTarget;
             }
         }

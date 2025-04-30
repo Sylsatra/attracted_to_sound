@@ -33,8 +33,6 @@ public class SoundAttractMod {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, "soundattract-common.toml");
 
-        handleTaczIntegration();
-
         if (ModList.get().isLoaded("parcool")) {
             try {
                 MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.ParcoolIntegrationEvents.class);
@@ -45,28 +43,19 @@ public class SoundAttractMod {
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
+        SoundAttractConfig.bakeConfig(); // Ensure config cache is populated before any events
         SoundAttractNetwork.register();
     }
 
     private static void onClientSetup(final FMLClientSetupEvent event) {
         if (net.minecraftforge.fml.ModList.get().isLoaded("voicechat")) {
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] Registering VoiceChat integration on client setup");
+            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] Registering VoiceChat integration on client setup");
+            }
             com.example.soundattract.SoundAttractClientEvents.registerVoiceChatIntegration();
         } else {
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
-        }
-    }
-
-    private void handleTaczIntegration() {
-        if (ModList.get().isLoaded("tacz")) {
-            try {
-                MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
-            } catch (Exception e) {
-                try {
-                    MinecraftForge.EVENT_BUS.register(com.example.soundattract.integration.TaczIntegrationEvents.class);
-                } catch (NoClassDefFoundError e1) {
-                }
-            } catch (NoClassDefFoundError e) {
+            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
             }
         }
     }

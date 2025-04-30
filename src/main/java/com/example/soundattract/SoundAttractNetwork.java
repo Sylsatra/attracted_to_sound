@@ -23,6 +23,16 @@ public class SoundAttractNetwork {
                 .decoder(SoundMessage::decode)
                 .consumerMainThread(SoundMessage::handle)
                 .add();
+        INSTANCE.messageBuilder(com.example.soundattract.integration.TaczReloadMessage.class, id++)
+                .encoder((msg, buf) -> msg.toBytes(buf))
+                .decoder(com.example.soundattract.integration.TaczReloadMessage::new)
+                .consumerMainThread((msg, ctx) -> msg.handle(ctx))
+                .add();
+        INSTANCE.messageBuilder(com.example.soundattract.integration.TaczGunshotMessage.class, id++)
+                .encoder((msg, buf) -> msg.toBytes(buf))
+                .decoder(com.example.soundattract.integration.TaczGunshotMessage::new)
+                .consumerMainThread((msg, ctx) -> msg.handle(ctx))
+                .add();
     }
 
     public static void init() {
