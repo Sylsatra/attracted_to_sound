@@ -43,7 +43,7 @@ public class SoundAttractMod {
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
-        SoundAttractConfig.bakeConfig(); // Ensure config cache is populated before any events
+        SoundAttractConfig.bakeConfig(); 
         SoundAttractNetwork.register();
     }
 

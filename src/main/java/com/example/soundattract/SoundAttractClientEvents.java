@@ -19,6 +19,12 @@ import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Method;
 
+import net.minecraftforge.client.event.sound.PlaySoundEvent;
+import net.minecraft.client.resources.sounds.AbstractSoundInstance;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.phys.Vec3;
+
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractClientEvents {
@@ -61,43 +67,98 @@ public class SoundAttractClientEvents {
         }
     }
 
+    @OnlyIn(Dist.CLIENT)
     @SubscribeEvent
-    public static void onPlaySoundEvent(net.minecraftforge.client.event.sound.PlaySoundEvent event) {
-        if (event.getSound() == null) return;
-        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-        net.minecraft.world.level.Level clientWorld = mc.level;
-        net.minecraft.world.entity.player.Player clientPlayer = mc.player;
-        if (clientWorld == null || clientPlayer == null) return;
-
-        if (!(event.getSound() instanceof net.minecraft.client.resources.sounds.AbstractSoundInstance soundInstance)) return;
-        net.minecraft.resources.ResourceLocation soundRL = soundInstance.getLocation();
-        if (soundRL == null) return;
-
-        String soundId = soundRL.toString();
-        if (!com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
-            && !com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundId)
-            && !soundRL.equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID)) {
+    public static void onPlaySoundEvent(PlaySoundEvent event) {
+        if (event.getSound() == null) {
             return;
         }
 
-        for (Object entryObj : com.example.soundattract.config.SoundAttractConfig.COMMON.nonPlayerSoundIdList.get()) {
-            if (!(entryObj instanceof String entry)) continue;
-            String[] parts = entry.split(";");
-            if (parts.length < 1) continue;
-            String configSoundId = parts[0];
-            if (!soundId.equals(configSoundId)) continue;
-            int range = parts.length > 1 ? parseIntOr(parts[1], 16) : 16;
-            double weight = parts.length > 2 ? parseDoubleOr(parts[2], 1.0) : 1.0;
+        Level clientWorld = Minecraft.getInstance().level;
+        Player clientPlayer = Minecraft.getInstance().player;
+        if (clientWorld == null || clientPlayer == null) {
+            return;
+        }
+
+        if (event.getSound() instanceof AbstractSoundInstance soundInstance) {
+            ResourceLocation soundRL = soundInstance.getLocation();
+            if (soundRL == null || soundRL.equals(SoundMessage.VOICE_CHAT_SOUND_ID)) {
+                return;
+            }
+
+            SoundEvent se = BuiltInRegistries.SOUND_EVENT.get(soundRL);
+            if (se == null) {
+                return;
+            }
+
             double x = soundInstance.getX();
             double y = soundInstance.getY();
             double z = soundInstance.getZ();
-            net.minecraft.resources.ResourceLocation dim = clientWorld.dimension().location();
-            java.util.Optional<java.util.UUID> sourcePlayerUUID = java.util.Optional.empty();
-            com.example.soundattract.SoundMessage msg = new com.example.soundattract.SoundMessage(
-                soundRL, x, y, z, dim, sourcePlayerUUID, range, weight, "VanillaBlockSound");
-            com.example.soundattract.SoundAttractNetwork.INSTANCE.sendToServer(msg);
-            break;
+            ResourceLocation dim = clientWorld.dimension().location();
+            Optional<UUID> sourcePlayerUUID = Optional.empty();
+            int calculatedRange = -1;
+            double calculatedWeight = 1.0;
+
+            if (se != null && se.getLocation().getPath().contains("step") && clientPlayer.position().distanceToSqr(x, y, z) < 1.5 * 1.5) {
+
+                sourcePlayerUUID = Optional.of(clientPlayer.getUUID());
+                Vec3 motion = clientPlayer.getDeltaMovement();
+                double horizontalSpeedSq = motion.x * motion.x + motion.z * motion.z;
+                boolean isOnGround = clientPlayer.onGround();
+                boolean isSneaking = clientPlayer.isShiftKeyDown();
+                boolean isSprinting = clientPlayer.isSprinting();
+
+                PlayerAction currentAction = PlayerAction.IDLE;
+
+                if (isSneaking) {
+                    if (horizontalSpeedSq > 0.001 * 0.001 && horizontalSpeedSq <= 0.03 * 0.03) {
+                        currentAction = PlayerAction.CRAWLING;
+                    } else if (horizontalSpeedSq > 0.03 * 0.03 && horizontalSpeedSq <= 0.066 * 0.066 * 1.1) {
+                        currentAction = PlayerAction.SNEAKING;
+                    }
+                } else {
+                    if (isSprinting && !isOnGround) {
+                        currentAction = PlayerAction.SPRINT_JUMPING;
+                    } else if (isSprinting && horizontalSpeedSq > 0.216 * 0.216) {
+                        currentAction = PlayerAction.SPRINTING;
+                    } else if (isOnGround && horizontalSpeedSq > 0.001 * 0.001 && horizontalSpeedSq <= 0.216 * 0.216) {
+                        currentAction = PlayerAction.WALKING;
+                    }
+                }
+
+                switch (currentAction) {
+                    case CRAWLING:
+                        calculatedRange = 2;
+                        calculatedWeight = 1.0;
+                        break;
+                    case SNEAKING:
+                        calculatedRange = 3;
+                        calculatedWeight = 1.0;
+                        break;
+                    case WALKING:
+                        calculatedRange = 8;
+                        calculatedWeight = 1.0;
+                        break;
+                    case SPRINTING:
+                        calculatedRange = 12;
+                        calculatedWeight = 1.0;
+                        break;
+                    case SPRINT_JUMPING:
+                        calculatedRange = 16;
+                        calculatedWeight = 1.0;
+                        break;
+                    case IDLE:
+                    default:
+                        return;
+                }
+            }
+
+            SoundMessage msg = new SoundMessage(soundRL, x, y, z, dim, sourcePlayerUUID, calculatedRange, calculatedWeight);
+            SoundAttractNetwork.INSTANCE.sendToServer(msg);
         }
+    }
+
+    public static void registerVoiceChatIntegration() {
     }
 
     private static int parseIntOr(String s, int def) {
@@ -107,6 +168,12 @@ public class SoundAttractClientEvents {
         try { return Double.parseDouble(s); } catch (Exception e) { return def; }
     }
 
-    public static void registerVoiceChatIntegration() {
+    public enum PlayerAction {
+        IDLE,
+        CRAWLING,
+        SNEAKING,
+        WALKING,
+        SPRINTING,
+        SPRINT_JUMPING
     }
 }

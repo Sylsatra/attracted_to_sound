@@ -22,93 +22,97 @@ public class TaczIntegrationEvents {
 
     @SubscribeEvent
     public static void onPlayerLeftClick(PlayerInteractEvent.LeftClickEmpty event) {
-        // Removed old handleGunShot logic
     }
 
     @SubscribeEvent
     public static void onPlayerLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
-        // Removed old handleGunShot logic
     }
 
     public static void handleReloadFromClient(Player player, String gunId) {
-        if (player == null || player.level().isClientSide()) return;
-        player.getPersistentData().putBoolean("tacz_reload_handled", true);
-        double reloadRange;
-        double reloadWeight;
-        if (gunId == null || gunId.isEmpty() || !isGunIdInReloadConfig(gunId)) {
-            // Fallback for reload
-            reloadRange = SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
-            reloadWeight = SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading (fallback): Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
-            }
-        } else {
-            reloadRange = getReloadRangeFromConfig(gunId);
-            reloadWeight = getReloadWeightFromConfig(gunId);
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading: Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
-            }
-        }
-        ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
-        ResourceLocation dim = player.level().dimension().location();
-        SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)reloadRange, reloadWeight, null, "reload");
-        SoundAttractNetwork.INSTANCE.sendToServer(msg);
-    }
-
-    public static void handleGunshotFromClient(Player player, String gunId, String attachmentId) {
-        if (player == null || player.level().isClientSide()) return;
-        if (player.getPersistentData().getBoolean("tacz_reload_handled")) {
-            player.getPersistentData().remove("tacz_reload_handled");
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] Skipping fallback shooting because reload was just handled for Player={}", player.getName().getString());
-            }
-            return;
-        }
-        if (SoundAttractConfig.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("[TaczIntegration] Server: Received gunshot message from player={}, GunId={}, AttachmentId={}", player.getName().getString(), gunId, attachmentId);
-        }
-        ItemStack held = player.getMainHandItem();
-        if (held.isEmpty() || ForgeRegistries.ITEMS.getKey(held.getItem()) == null ||
-                !ForgeRegistries.ITEMS.getKey(held.getItem()).toString().equals(GUN_ITEM_ID)) {
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: Not a tacz:modern_kinetic_gun");
-            }
-            return;
-        }
-        CompoundTag tag = held.getTag();
-        if (tag == null || !tag.contains("GunId")) {
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: GunId tag missing");
-            }
-            return;
-        }
-        if (gunId == null || gunId.isEmpty() || !isGunIdInShootConfig(gunId)) {
-            // Fallback for shooting
-            double fallbackRange = SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
-            double fallbackWeight = SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
-            if (SoundAttractConfig.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting (fallback): Player={}, GunId={}, Range={}, Weight={}", player.getName().getString(), gunId, fallbackRange, fallbackWeight);
+        try {
+            if (player == null || player.level().isClientSide()) return;
+            player.getPersistentData().putBoolean("tacz_reload_handled", true);
+            double reloadRange;
+            double reloadWeight;
+            if (gunId == null || gunId.isEmpty() || !isGunIdInReloadConfig(gunId)) {
+                reloadRange = SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
+                reloadWeight = SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading (fallback): Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
+                }
+            } else {
+                reloadRange = getReloadRangeFromConfig(gunId);
+                reloadWeight = getReloadWeightFromConfig(gunId);
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading: Player={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
+                }
             }
             ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
             ResourceLocation dim = player.level().dimension().location();
-            SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)fallbackRange, fallbackWeight, null, "shoot");
-            SoundAttractNetwork.INSTANCE.sendToServer(msg);
-            return;
+            SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)reloadRange, reloadWeight, null, "reload");
+            SoundMessage.handle(msg, () -> null);
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.error("[TaczIntegration] Exception in handleReloadFromClient for player={}, gunId={}", player != null ? player.getName().getString() : "null", gunId, e);
         }
-        double gunRange = getGunRangeFromConfig(gunId);
-        double reduction = 0.0;
-        if (attachmentId != null && !attachmentId.isEmpty()) {
-            reduction = getAttachmentReductionFromConfig(attachmentId);
+    }
+
+    public static void handleGunshotFromClient(Player player, String gunId, String attachmentId) {
+        try {
+            if (player == null || player.level().isClientSide()) return;
+            if (player.getPersistentData().getBoolean("tacz_reload_handled")) {
+                player.getPersistentData().remove("tacz_reload_handled");
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] Skipping fallback shooting because reload was just handled for Player={}", player.getName().getString());
+                }
+                return;
+            }
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Server: Received gunshot message from player={}, GunId={}, AttachmentId={}", player.getName().getString(), gunId, attachmentId);
+            }
+            ItemStack held = player.getMainHandItem();
+            if (held.isEmpty() || ForgeRegistries.ITEMS.getKey(held.getItem()) == null ||
+                    !ForgeRegistries.ITEMS.getKey(held.getItem()).toString().equals(GUN_ITEM_ID)) {
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: Not a tacz:modern_kinetic_gun");
+                }
+                return;
+            }
+            CompoundTag tag = held.getTag();
+            if (tag == null || !tag.contains("GunId")) {
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] handleGunshotFromClient: GunId tag missing");
+                }
+                return;
+            }
+            if (gunId == null || gunId.isEmpty() || !isGunIdInShootConfig(gunId)) {
+                double fallbackRange = SoundAttractConfig.TACZ_SHOOT_RANGE_CACHE;
+                double fallbackWeight = SoundAttractConfig.TACZ_SHOOT_WEIGHT_CACHE;
+                if (SoundAttractConfig.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting (fallback): Player={}, GunId={}, Range={}, Weight={}", player.getName().getString(), gunId, fallbackRange, fallbackWeight);
+                }
+                ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
+                ResourceLocation dim = player.level().dimension().location();
+                SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)fallbackRange, fallbackWeight, null, "shoot");
+                SoundMessage.handle(msg, () -> null);
+                return;
+            }
+            double gunRange = getGunRangeFromConfig(gunId);
+            double reduction = 0.0;
+            if (attachmentId != null && !attachmentId.isEmpty()) {
+                reduction = getAttachmentReductionFromConfig(attachmentId);
+            }
+            double finalRange = Math.max(0, gunRange - reduction);
+            double finalWeight = getGunWeightFromConfig(gunId);
+            if (SoundAttractConfig.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting: Player={}, GunId={}, AttachmentId={}, Range={}, Weight={}", player.getName().getString(), gunId, attachmentId, finalRange, finalWeight);
+            }
+            ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
+            ResourceLocation dim = player.level().dimension().location();
+            SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)finalRange, finalWeight, null, "shoot");
+            SoundMessage.handle(msg, () -> null);
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.error("[TaczIntegration] Exception in handleGunshotFromClient for player={}, gunId={}, attachmentId={}", player != null ? player.getName().getString() : "null", gunId, attachmentId, e);
         }
-        double finalRange = Math.max(0, gunRange - reduction);
-        double finalWeight = getGunWeightFromConfig(gunId);
-        if (SoundAttractConfig.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting: Player={}, GunId={}, AttachmentId={}, Range={}, Weight={}", player.getName().getString(), gunId, attachmentId, finalRange, finalWeight);
-        }
-        ResourceLocation soundRL = new ResourceLocation(SOUND_ID);
-        ResourceLocation dim = player.level().dimension().location();
-        SoundMessage msg = new SoundMessage(soundRL, player.getX(), player.getY(), player.getZ(), dim, java.util.Optional.of(player.getUUID()), (int)finalRange, finalWeight, null, "shoot");
-        SoundAttractNetwork.INSTANCE.sendToServer(msg);
     }
 
     private static boolean isGunIdInReloadConfig(String gunId) {
@@ -146,12 +150,10 @@ public class TaczIntegrationEvents {
     }
 
     private static double getReloadRangeFromConfig(String gunId) {
-        // For now, use the global reload range
         return com.example.soundattract.config.SoundAttractConfig.TACZ_RELOAD_RANGE_CACHE;
     }
 
     private static double getReloadWeightFromConfig(String gunId) {
-        // For now, use the global reload weight
         return com.example.soundattract.config.SoundAttractConfig.TACZ_RELOAD_WEIGHT_CACHE;
     }
 

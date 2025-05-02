@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.sound.PlaySoundEvent;
 import net.minecraftforge.event.TickEvent;
@@ -16,6 +17,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
+@OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class TaczIntegrationClientEvents {
     private static final String GUN_ITEM_ID = "tacz:modern_kinetic_gun";
@@ -51,8 +53,8 @@ public class TaczIntegrationClientEvents {
 
     @SubscribeEvent
     public static void onMouseInput(InputEvent.MouseButton event) {
-        if (event.getAction() == 1) return; // Only handle PRESS (0=PRESS, 1=RELEASE)
-        if (event.getButton() != 0) return; // Only handle left mouse button
+        if (event.getAction() == 1) return; 
+        if (event.getButton() != 0) return; 
         if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[TaczIntegration] Client: Mouse left button pressed!");
         }
@@ -99,7 +101,6 @@ public class TaczIntegrationClientEvents {
                 ForgeRegistries.ITEMS.getKey(held.getItem()).toString().equals(GUN_ITEM_ID)) {
             CompoundTag tag = held.getTag();
             String gunId = ForgeRegistries.ITEMS.getKey(held.getItem()).toString();
-            // Always send reload message, no cooldown suppression
             SoundAttractNetwork.INSTANCE.sendToServer(new TaczReloadMessage(gunId));
         }
     }

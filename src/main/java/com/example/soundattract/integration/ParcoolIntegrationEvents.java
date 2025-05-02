@@ -31,7 +31,6 @@ public class ParcoolIntegrationEvents {
                 }
             });
         } catch (Exception e) {
-            // Parcool API not present, safe to ignore
         }
     }
 
@@ -80,7 +79,6 @@ public class ParcoolIntegrationEvents {
             );
             SoundAttractNetwork.INSTANCE.sendToServer(msg);
         } catch (Exception e) {
-            // Parcool API not present, safe to ignore
         }
     }
 }

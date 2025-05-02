@@ -32,7 +32,6 @@ public class VanillaIntegrationEvents {
         double z = player.getZ();
         Optional<java.util.UUID> uuid = Optional.of(player.getUUID());
 
-        // Sprinting
         if (player.isSprinting()) {
             if (player instanceof ServerPlayer) {
                 sendVanillaSound("VanillaSprint", "minecraft:entity.player.sprint", x, y, z, dim, uuid, 10, 1.2, 1.0, 1.0);
@@ -110,18 +109,6 @@ public class VanillaIntegrationEvents {
                 double _range = range;
                 double _weight = weight;
                 String id = soundId != null ? soundId : "";
-                if (_range <= 0 || _weight <= 0) {
-                    if (id.contains("tacz:gun")) {
-                        _range = com.example.soundattract.config.SoundAttractConfig.taczShootRange.get();
-                        _weight = com.example.soundattract.config.SoundAttractConfig.taczShootWeight.get();
-                    } else if (id.contains("tacz:reload")) {
-                        _range = com.example.soundattract.config.SoundAttractConfig.taczReloadRange.get();
-                        _weight = com.example.soundattract.config.SoundAttractConfig.taczReloadWeight.get();
-                    } else {
-                        _range = 32.0;
-                        _weight = 1.0;
-                    }
-                }
                 if (se != null) {
                     com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] addSound: soundId={} | range={} | weight={} | pos=({}, {}, {}) | dim={}", soundId, _range, _weight, x, y, z, dim);
                     com.example.soundattract.SoundTracker.addSound(se, pos, dimString, _range, _weight, lifetime);

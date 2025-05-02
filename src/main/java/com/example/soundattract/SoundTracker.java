@@ -48,7 +48,6 @@ public class SoundTracker {
             this.range = range;
             this.weight = weight;
         }
-        // For backward compatibility
         public SoundRecord(SoundEvent sound, BlockPos pos, int lifetime, String dimensionKey, double range, double weight) {
             this(sound, sound != null && sound.getLocation() != null ? sound.getLocation().toString() : null, pos, lifetime, dimensionKey, range, weight);
         }
@@ -120,7 +119,6 @@ public class SoundTracker {
 
     public static synchronized void addSound(SoundEvent se, BlockPos pos, String dimensionKey, double range, double weight, int lifetime, String explicitSoundId) {
         String soundId = se != null && se.getLocation() != null ? se.getLocation().toString() : explicitSoundId;
-        // PATCH: Always allow voice chat sound, bypass whitelist
         if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
             && (soundId == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundId))
             && (soundId == null || !soundId.equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID.toString()))) {

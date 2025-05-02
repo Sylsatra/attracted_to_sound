@@ -92,7 +92,7 @@ public class SoundAttractConfig {
             scanCooldownTicks = builder.comment("Mob scan cooldown in ticks").defineInRange("scanCooldownTicks", 15, 1, 100);
             minTpsForScanCooldown = builder.comment("Min TPS for scan cooldown").defineInRange("minTpsForScanCooldown", 10.0, 1.0, 20.0);
             maxTpsForScanCooldown = builder.comment("Max TPS for scan cooldown").defineInRange("maxTpsForScanCooldown", 20.0, 1.0, 20.0);
-            arrivalDistance = builder.comment("Arrival distance for sound").defineInRange("arrivalDistance", 8.0, 0.1, 10.0);
+            arrivalDistance = builder.comment("Arrival distance for sound").defineInRange("arrivalDistance", 6.0, 0.1, 10.0);
             mobMoveSpeed = builder.comment("Mob movement speed").defineInRange("mobMoveSpeed", 1.0, 0.01, 10.0);
             soundSwitchRatio = builder.comment("Sound switch ratio, the lower the easier for the mob to switch target").defineInRange("soundSwitchRatio", 0.3, 0.0, 1.0);
             builder.pop();
@@ -624,6 +624,17 @@ public class SoundAttractConfig {
             this.volume = volume;
             this.pitch = pitch;
         }
+    }
+
+    // Utility to get sound config (range/weight) by soundId string
+    public static SoundConfig getSoundConfigForId(String soundId) {
+        if (soundId == null) return null;
+        for (Map.Entry<SoundEvent, SoundConfig> entry : SOUND_CONFIGS_CACHE.entrySet()) {
+            if (entry.getKey() != null && soundId.equals(entry.getKey().getLocation().toString())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     public static void bakeConfig() {

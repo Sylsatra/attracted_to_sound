@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.network.NetworkEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.world.entity.LivingEntity;
@@ -23,7 +24,7 @@ public class SoundMessage {
     private final int range;
     private final double weight;
     private final String animatorClass;
-    private final String taczType; // "shoot" or "reload" or null
+    private final String taczType;
 
     public static final ResourceLocation VOICE_CHAT_SOUND_ID = new ResourceLocation(SoundAttractMod.MOD_ID, "voice_chat");
 
@@ -87,60 +88,94 @@ public class SoundMessage {
     }
 
     public static void handle(SoundMessage msg, Supplier<NetworkEvent.Context> ctx) {
-        String soundIdStr = msg.soundId != null ? msg.soundId.toString() : null;
-        if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
-            && (soundIdStr == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundIdStr))
-            && (msg.soundId == null || !msg.soundId.equals(VOICE_CHAT_SOUND_ID))) {
-            ctx.get().setPacketHandled(true);
-            return;
-        }
-        ctx.get().enqueueWork(() -> {
-            ServerPlayer sender = ctx.get().getSender(); 
-            Level serverLevel = null;
-
-            if (sender != null) {
-                 serverLevel = sender.server.getLevel(sender.level().dimension());
-            } else if (ctx.get().getDirection().getReceptionSide().isServer()) {
-
-                 net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
-                 if (server != null) {
-                     serverLevel = server.getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, msg.dimension));
-                 }
+        try {
+            String soundIdStr = msg.soundId != null ? msg.soundId.toString() : null;
+            if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
+                && (soundIdStr == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundIdStr))
+                && (msg.soundId == null || !msg.soundId.equals(VOICE_CHAT_SOUND_ID))) {
+                if (ctx != null && ctx.get() != null) ctx.get().setPacketHandled(true);
+                return;
             }
-
-            if (serverLevel == null) {
-                 return;
-            }
-
-            if (!serverLevel.dimension().location().equals(msg.dimension)) {
-                 return;
-            }
-
-            BlockPos pos = BlockPos.containing(msg.x, msg.y, msg.z);
-            // Fallback: If position is (0,0,0), try to use sender's position if available
-            if (pos.getX() == 0 && pos.getY() == 0 && pos.getZ() == 0 && sender != null) {
-                pos = sender.blockPosition();
-                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Fallback to sender position {} for sound {}", pos, msg.soundId);
-                }
-            }
-            String dimString = msg.dimension.toString();
-            int lifetime = SoundAttractConfig.soundLifetimeTicks.get();
-
-            if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
-                if (msg.range > 0) {
-                    SoundTracker.addSound(null, pos, dimString, msg.range, msg.weight, lifetime, VOICE_CHAT_SOUND_ID.toString());
+            Runnable logic = () -> {
+                ServerPlayer sender = null;
+                ServerLevel serverLevel = null;
+                if (ctx != null && ctx.get() != null && ctx.get().getSender() != null && ctx.get().getSender() instanceof ServerPlayer) {
+                    sender = (ServerPlayer) ctx.get().getSender();
+                    serverLevel = sender.serverLevel();
+                    if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                        com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Using sender's world: {}", serverLevel);
+                    }
+                } else if (ctx != null && ctx.get() != null && ctx.get().getDirection().getReceptionSide().isServer()) {
+                    net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+                    if (server != null) {
+                        serverLevel = server.getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, msg.dimension));
+                        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Using context dimension: {}", msg.dimension);
+                        }
+                    }
                 } else {
+                    net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+                    if (server != null) {
+                        serverLevel = server.getLevel(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, msg.dimension));
+                        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                            com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Fallback: Using server world for dimension {}: {}", msg.dimension, serverLevel);
+                        }
+                    }
                 }
-            } else {
-                 SoundEvent se = ForgeRegistries.SOUND_EVENTS.getValue(msg.soundId);
-                 double range = msg.range;
-                 double weight = msg.weight;
-                 String id = msg.soundId != null ? msg.soundId.toString() : "";
-                 SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
-            }
 
-        });
-        ctx.get().setPacketHandled(true);
+                if (serverLevel == null) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.warn("[SoundMessage] serverLevel is null for dimension: {}", msg.dimension);
+                    return;
+                }
+
+                if (!serverLevel.dimension().location().equals(msg.dimension)) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.warn("[SoundMessage] serverLevel dimension mismatch: {} != {}", serverLevel.dimension().location(), msg.dimension);
+                    return;
+                }
+
+                BlockPos pos = BlockPos.containing(msg.x, msg.y, msg.z);
+                if (pos.getX() == 0 && pos.getY() == 0 && pos.getZ() == 0 && sender != null) {
+                    pos = sender.blockPosition();
+                    if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                        com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Fallback to sender position {} for sound {}", pos, msg.soundId);
+                    }
+                }
+                String dimString = msg.dimension.toString();
+                int lifetime = SoundAttractConfig.soundLifetimeTicks.get();
+
+                if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
+                    if (msg.range > 0) {
+                        SoundTracker.addSound(null, pos, dimString, msg.range, msg.weight, lifetime, VOICE_CHAT_SOUND_ID.toString());
+                    }
+                } else {
+                    SoundEvent se = ForgeRegistries.SOUND_EVENTS.getValue(msg.soundId);
+                    double range = msg.range;
+                    double weight = msg.weight;
+                    String id = msg.soundId != null ? msg.soundId.toString() : "";
+
+                    if (range < 0 && msg.soundId != null) {
+                        SoundAttractConfig.SoundConfig config = SoundAttractConfig.getSoundConfigForId(msg.soundId.toString());
+                        if (config != null) {
+                            range = config.range;
+                            weight = config.weight;
+                            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+                                com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Overriding range/weight for {} from nonPlayerSoundIdList: range={}, weight={}", msg.soundId, range, weight);
+                            }
+                        }
+                    }
+
+                    SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
+                }
+            };
+            if (ctx != null && ctx.get() != null) {
+                ctx.get().enqueueWork(logic);
+                ctx.get().setPacketHandled(true);
+            } else {
+                logic.run();
+            }
+        } catch (Exception e) {
+            com.example.soundattract.SoundAttractMod.LOGGER.error("[SoundMessage] Exception in handle for soundId={}", msg.soundId, e);
+            if (ctx != null && ctx.get() != null) ctx.get().setPacketHandled(true);
+        }
     }
 }

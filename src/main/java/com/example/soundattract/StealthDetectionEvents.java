@@ -200,7 +200,6 @@ public class StealthDetectionEvents {
                 return parts[0].toUpperCase();
             }
         }
-        // Fallback for dyed leather armor
         for (ItemStack stack : player.getArmorSlots()) {
             if (stack.isEmpty()) continue;
             if (stack.getItem() instanceof ArmorItem armor && armor.getMaterial() == net.minecraft.world.item.ArmorMaterials.LEATHER) {
