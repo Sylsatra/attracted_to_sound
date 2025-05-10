@@ -857,8 +857,6 @@ public class SoundAttractConfig {
     public static final ForgeConfigSpec.DoubleValue standingDetectionRangeCamouflage = COMMON.standingDetectionRangeCamouflage;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> camouflageSets = COMMON.camouflageSets;
 
-    // --- Stealth & Camouflage static references ---
-    // (removed duplicate assignments to fix compilation error)
 
     public static final ForgeConfigSpec.DoubleValue groupDistance = COMMON.groupDistance;
     public static final ForgeConfigSpec.IntValue maxLeaders = COMMON.maxLeaders;
