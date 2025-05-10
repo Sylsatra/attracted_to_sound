@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "soundattract",
+	"version": "${version}",
+	"name": "Sound Attract Mod",
+	"description": "This mod makes mobs follow sounds, and player can camouflage to hide from mobs",
+	"authors": [
+		"Sylsatra"
+	],
+	"contact": {
+		"homepage": "https://www.curseforge.com/minecraft/mc-mods/attract-to-sound",
+		"sources": "https://github.com/Sylsatra/attract_to_sound"
+	},
+	"license": "GPL-3.0",
+	"icon": "assets/soundattract/attract-to-sound-mod-logo.jpg",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.example.soundattract.SoundAttractMod"
+		],
+		"client": [
+			"com.example.soundattract.SoundAttractModClient"
+		],
+		"voicechat": [
+			"com.example.soundattract.integration.SoundAttractVoiceChatPlugin"
+		]
+	},
+	"mixins": [
+		"soundattract.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.16.14",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"voicechat": ">=1.20.1-2.5.30",
+		"another-mod": "*"
+	}
+}
