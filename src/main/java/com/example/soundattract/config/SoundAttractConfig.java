@@ -21,6 +21,25 @@ import java.util.function.Supplier;
 
 public class SoundAttractConfig {
 
+    public static ForgeConfigSpec.IntValue stealthCheckInterval;
+    public static ForgeConfigSpec.IntValue detectionLightLowThreshold;
+    public static ForgeConfigSpec.DoubleValue detectionLightLowMultiplier;
+    public static ForgeConfigSpec.IntValue detectionLightMidThreshold;
+    public static ForgeConfigSpec.DoubleValue detectionLightMidMultiplier;
+    public static ForgeConfigSpec.DoubleValue detectionNightMultiplier;
+    public static ForgeConfigSpec.BooleanValue camouflagePartialMatching;
+    public static ForgeConfigSpec.DoubleValue camouflageArmorPieceWeight;
+    public static ForgeConfigSpec.DoubleValue camouflageColorSimilarityWeight;
+    public static ForgeConfigSpec.IntValue camouflageColorSimilarityThreshold;
+    public static ForgeConfigSpec.DoubleValue camouflageBlockMatchWeight;
+    public static ForgeConfigSpec.BooleanValue camouflageDistanceScaling;
+    public static ForgeConfigSpec.DoubleValue camouflageDistanceMax;
+    public static ForgeConfigSpec.DoubleValue camouflageDistanceMinEffectiveness;
+    public static ForgeConfigSpec.BooleanValue camouflageMovementPenalty;
+    public static ForgeConfigSpec.DoubleValue camouflageSprintingPenalty;
+    public static ForgeConfigSpec.DoubleValue camouflageWalkingPenalty;
+
+
     public static class Common {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> nonPlayerSoundIdList; 
@@ -84,6 +103,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
 
         Common(ForgeConfigSpec.Builder builder) {
+
             builder.push("General");
             debugLogging = builder
                     .comment("Enable aggresive debug logging for Sound Attract mod")
@@ -364,7 +384,26 @@ public class SoundAttractConfig {
             crawlDetectionRangeCamouflage = builder.comment("Crawl detection range with camouflage").defineInRange("crawlDetectionRangeCamouflage", 2.0, 0.0, 128.0);
             standingDetectionRange = builder.comment("Standing detection range").defineInRange("standingDetectionRange", 32.0, 0.0, 128.0);
             standingDetectionRangeCamouflage = builder.comment("Standing detection range with camouflage").defineInRange("standingDetectionRangeCamouflage", 16.0, 0.0, 128.0);
-            camouflageSets = builder.comment("Camouflage sets. Format: color;helmet;chestplate;leggings;boots[;block1;block2;...]")
+
+            stealthCheckInterval = builder.comment("Interval (in ticks) between stealth detection scans.").defineInRange("stealthCheckInterval", 10, 1, 100);
+            detectionLightLowThreshold = builder.comment("Threshold for low light level (inclusive). Below or equal to this, use detectionLightLowMultiplier.").defineInRange("detectionLightLowThreshold", 7, 0, 15);
+            detectionLightLowMultiplier = builder.comment("Detection range multiplier for low light.").defineInRange("detectionLightLowMultiplier", 0.7, 0.0, 1.0);
+            detectionLightMidThreshold = builder.comment("Threshold for mid light level (inclusive). Below or equal to this, use detectionLightMidMultiplier.").defineInRange("detectionLightMidThreshold", 12, 0, 15);
+            detectionLightMidMultiplier = builder.comment("Detection range multiplier for mid light.").defineInRange("detectionLightMidMultiplier", 0.85, 0.0, 1.0);
+            detectionNightMultiplier = builder.comment("Detection range multiplier at night.").defineInRange("detectionNightMultiplier", 0.45, 0.0, 1.0);
+            camouflagePartialMatching = builder.comment("If true, partial matching of camouflage armor pieces is allowed.").define("camouflagePartialMatching", true);
+            camouflageArmorPieceWeight = builder.comment("Weight for each matching camouflage armor piece (0-1).").defineInRange("camouflageArmorPieceWeight", 0.25, 0.0, 1.0);
+            camouflageColorSimilarityWeight = builder.comment("Weight for color similarity in camouflage calculation (0-1).").defineInRange("camouflageColorSimilarityWeight", 0.5, 0.0, 1.0);
+            camouflageColorSimilarityThreshold = builder.comment("Threshold for color similarity (lower = more strict match, up to 255).").defineInRange("camouflageColorSimilarityThreshold", 48, 0, 255);
+            camouflageBlockMatchWeight = builder.comment("Weight for matching adjacent blocks in camouflage calculation (0-1).").defineInRange("camouflageBlockMatchWeight", 0.15, 0.0, 1.0);
+            camouflageDistanceScaling = builder.comment("If true, camouflage effectiveness scales with distance.").define("camouflageDistanceScaling", true);
+            camouflageDistanceMax = builder.comment("Maximum distance for camouflage scaling.").defineInRange("camouflageDistanceMax", 16.0, 1.0, 128.0);
+            camouflageDistanceMinEffectiveness = builder.comment("Minimum camouflage effectiveness at max distance (0-1).").defineInRange("camouflageDistanceMinEffectiveness", 0.3, 0.0, 1.0);
+            camouflageMovementPenalty = builder.comment("If true, movement reduces camouflage effectiveness.").define("camouflageMovementPenalty", true);
+            camouflageSprintingPenalty = builder.comment("Penalty multiplier for sprinting (0-1, lower = more penalty).").defineInRange("camouflageSprintingPenalty", 0.4, 0.0, 1.0);
+            camouflageWalkingPenalty = builder.comment("Penalty multiplier for walking (0-1, lower = more penalty).").defineInRange("camouflageWalkingPenalty", 0.15, 0.0, 1.0);
+
+            camouflageSets = builder.comment("Camouflage sets. Add more by appending new entries to the list. Each entry is: colorHex;helmetId;chestplateId;leggingsId;bootsId;[optional block ids...]. Use full item IDs for vanilla/modded armor and blocks.\nExample: '232323;minecraft:netherite_helmet;minecraft:netherite_chestplate;minecraft:netherite_leggings;minecraft:netherite_boots;minecraft:obsidian;minecraft:blackstone' adds Netherite armor camo for obsidian/blackstone. See documentation for details.")
                 .defineListAllowEmpty("camouflageSets", Arrays.asList(
                     // White
                     "F9FFFE;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:snow_block;minecraft:white_wool;minecraft:quartz_block;minecraft:calcite;minecraft:diorite;minecraft:bone_block;minecraft:powder_snow;minecraft:wool;minecraft:white_concrete;minecraft:white_terracotta;minecraft:white_glazed_terracotta",
@@ -817,6 +856,10 @@ public class SoundAttractConfig {
     public static final ForgeConfigSpec.DoubleValue standingDetectionRange = COMMON.standingDetectionRange;
     public static final ForgeConfigSpec.DoubleValue standingDetectionRangeCamouflage = COMMON.standingDetectionRangeCamouflage;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> camouflageSets = COMMON.camouflageSets;
+
+    // --- Stealth & Camouflage static references ---
+    // (removed duplicate assignments to fix compilation error)
+
     public static final ForgeConfigSpec.DoubleValue groupDistance = COMMON.groupDistance;
     public static final ForgeConfigSpec.IntValue maxLeaders = COMMON.maxLeaders;
     public static final ForgeConfigSpec.IntValue maxGroupSize = COMMON.maxGroupSize;

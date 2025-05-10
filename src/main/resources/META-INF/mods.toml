@@ -3,7 +3,7 @@ loaderVersion="[47,)"
 license="GPLv3"
 [[mods]]
 modId="soundattract" 
-version="2.0.3" 
+version="2.0.4" 
 logoFile="attract-to-sound-mod-logo.jpg"
 displayName="Sound Attract Mod" 
 authors="Sylsatra" 
