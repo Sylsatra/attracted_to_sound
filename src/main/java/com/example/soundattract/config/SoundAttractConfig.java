@@ -102,6 +102,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue mufflingAreaRadius;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
 
+        public final ForgeConfigSpec.DoubleValue taczAttachmentReductionDefault;
         Common(ForgeConfigSpec.Builder builder) {
 
             builder.push("General");
@@ -584,6 +585,8 @@ public class SoundAttractConfig {
                     if (parts.length != 2) return false;
                     try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
                 });
+            taczAttachmentReductionDefault = builder.comment("Default reduction value for Tacz attachments if the attachment id is not in the list.")
+                .defineInRange("taczAttachmentReductionDefault", 0.0, -300.0, 300.0);
             builder.pop();
 
         }
@@ -598,6 +601,7 @@ public class SoundAttractConfig {
         final Pair<Common, ForgeConfigSpec> specPair = new ForgeConfigSpec.Builder().configure(Common::new);
         COMMON_SPEC = specPair.getRight();
         COMMON = specPair.getLeft();
+        taczAttachmentReductionDefault = COMMON.taczAttachmentReductionDefault;
     }
 
     public static List<String> ATTRACTED_ENTITIES_CACHE = new ArrayList<>();
@@ -831,6 +835,7 @@ public class SoundAttractConfig {
     public static final ForgeConfigSpec.IntValue taczShootWeight = COMMON.taczShootWeight;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> taczGunShootDecibels = COMMON.taczGunShootDecibels;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> taczAttachmentReductions = COMMON.taczAttachmentReductions;
+public static ForgeConfigSpec.DoubleValue taczAttachmentReductionDefault;
     public static final ForgeConfigSpec.DoubleValue leaderGroupRadius = COMMON.leaderGroupRadius;
     public static final ForgeConfigSpec.IntValue woolBlockRangeReduction = COMMON.woolBlockRangeReduction;
     public static final ForgeConfigSpec.DoubleValue woolBlockWeightReduction = COMMON.woolBlockWeightReduction;

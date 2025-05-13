@@ -102,7 +102,7 @@ public class TaczIntegrationEvents {
                 reduction = getAttachmentReductionFromConfig(attachmentId);
             }
             double finalRange = Math.max(0, gunRange - reduction);
-            double finalWeight = getGunWeightFromConfig(gunId);
+            double finalWeight = finalRange / 10.0;
             if (SoundAttractConfig.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting: Player={}, GunId={}, AttachmentId={}, Range={}, Weight={}", player.getName().getString(), gunId, attachmentId, finalRange, finalWeight);
             }
@@ -181,13 +181,13 @@ public class TaczIntegrationEvents {
     }
 
     private static double getAttachmentReductionFromConfig(String attachmentId) {
-        if (attachmentId == null || attachmentId.isEmpty()) return 0.0;
+        if (attachmentId == null || attachmentId.isEmpty()) return com.example.soundattract.config.SoundAttractConfig.taczAttachmentReductionDefault.get();
         String normalizedAttachmentId = attachmentId.trim().toLowerCase();
         for (ResourceLocation rl : com.example.soundattract.config.SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.keySet()) {
             if (rl.toString().trim().toLowerCase().equals(normalizedAttachmentId)) {
                 return com.example.soundattract.config.SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(rl);
             }
         }
-        return 0.0;
+        return com.example.soundattract.config.SoundAttractConfig.taczAttachmentReductionDefault.get();
     }
 }
