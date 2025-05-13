@@ -33,53 +33,69 @@ public class SoundAttractConfigData {
 
     // === General ===
     /**
-     * If true, enables detailed debug logging for the Sound Attract mod. Useful for troubleshooting or development.
+     * If true, enables detailed debug logging for the Sound Attract mod.
+     * Useful for troubleshooting or development. Has no effect on gameplay.
      * Default: false
+     * Recommended: false for normal use, true only if you want to see debug logs in your console.
      */
     public boolean debugLogging = false;
 
     /**
-     * The lifetime of a sound event in ticks (20 ticks = 1 second). Higher values mean mobs will be attracted to sounds for longer.
+     * The lifetime of a sound event in ticks (20 ticks = 1 second).
+     * Higher values mean mobs will be attracted to sounds for longer.
      * Default: 200 (10 seconds)
+     * Recommended: 40–400. Minimum: 1. Maximum: 1200.
+     * Lower values = mobs lose interest faster. Higher = mobs may travel farther for old sounds.
      */
     public int soundLifetimeTicks = 200;
 
     /**
-     * The cooldown between mob sound scans in ticks (20 ticks = 1 second). Lower values mean mobs scan for sounds more frequently.
+     * The cooldown between mob sound scans in ticks (20 ticks = 1 second).
+     * Lower values mean mobs scan for sounds more frequently (more responsive but higher CPU usage).
      * Default: 20 (1 second)
+     * Recommended: 10–60. Minimum: 1. Maximum: 200.
      */
     public int scanCooldownTicks = 20;
 
     /**
-     * Minimum server TPS (ticks per second) at which the scan cooldown is applied. If TPS drops below this, scanning slows down.
+     * Minimum server TPS (ticks per second) at which the scan cooldown is applied.
+     * If TPS drops below this, scanning slows down to reduce lag.
      * Default: 10.0
+     * Recommended: 5.0–15.0. Minimum: 1.0. Maximum: 20.0.
      */
     public double minTpsForScanCooldown = 10.0;
 
     /**
-     * Maximum server TPS (ticks per second) at which the scan cooldown is applied. If TPS is at or above this, scanning is at normal speed.
+     * Maximum server TPS (ticks per second) at which the scan cooldown is applied.
+     * If TPS is at or above this, scanning is at normal speed.
      * Default: 20.0
+     * Recommended: 15.0–20.0. Minimum: 10.0. Maximum: 20.0.
      */
+    public double maxTpsForScanCooldown = 20.0;
 
     /**
      * The ratio used to determine if a mob should switch to a new sound target while pursuing a sound.
      * If the new sound's range is greater than the current target's range multiplied by this ratio,
      * the mob (leader, edge, or deserter) will switch to the new target. This also updates group members if the leader switches.
      * Default: 0.5
+     * Recommended: 0.1–1.0. Minimum: 0.01. Maximum: 2.0.
+     * Lower = mobs switch more easily to new sounds. Higher = mobs stick to their current target longer.
      */
     public double soundSwitchRatio = 0.5;
-
-    public double maxTpsForScanCooldown = 20.0;
 
     /**
      * The distance (in blocks) at which mobs consider themselves to have "arrived" at a sound source.
      * Default: 6.0
+     * Recommended: 2.0–16.0. Minimum: 0.5. Maximum: 64.0.
+     * Lower values = mobs must get closer to the sound. Higher = mobs stop farther away.
      */
     public double arrivalDistance = 6.0;
 
     /**
-     * The movement speed multiplier for mobs attracted to sounds. 1.0 is normal speed, higher values make mobs move faster to sounds.
+     * The movement speed multiplier for mobs attracted to sounds.
+     * 1.0 is normal speed, higher values make mobs move faster to sounds.
      * Default: 1.0
+     * Recommended: 0.5–2.0. Minimum: 0.1. Maximum: 10.0.
      */
     public double mobMoveSpeed = 1.0;
 
@@ -105,35 +121,39 @@ public class SoundAttractConfigData {
      * If true, enables experimental "edge mob smart behavior".
      * This may cause instability or bugs and is intended for advanced users or testing.
      * Default: false
+     * Recommended: false for normal use, true only if you want to help test edge mob logic.
      */
     public boolean edgeMobSmartBehavior = false;
 
     /**
      * The size (in blocks) of each spatial partition (cell/chunk) used for both sound detection and mob grouping.
-     * This controls how the world is divided into regions for optimized sound and mob logic.
-     * A value of 16 matches the default Minecraft chunk size (16x16 blocks).
      * Increasing this value means each partition covers a larger area, which can improve performance but may reduce precision.
      * Decreasing it makes partitions smaller and more precise, but may be less efficient.
      *
      * Example: If set to 32, both the sound system and mob group system will process events in 32x32 block regions.
      * Default: 16 (standard chunk size).
+     * Recommended: 8–64. Minimum: 4. Maximum: 128.
      */
     public int spatialPartitionSize = 16;
 
     /**
      * Maximum distance (in blocks) for mobs to be considered part of the same group.
+     * Default: 32.0
+     * Recommended: 8–64. Minimum: 1. Maximum: 128.
      */
     public double groupDistance = 32.0;
 
     /**
      * Maximum number of mobs allowed in a single group (cell).
      * Default: 128
+     * Recommended: 16–256. Minimum: 1. Maximum: 1024.
      */
     public int maxGroupSize = 128;
 
     /**
      * Number of angular sectors used for edge mob selection logic. Affects how mobs are distributed on the "edge" of a group.
      * Default: 6
+     * Recommended: 4–12. Minimum: 1. Maximum: 32.
      */
     public int numEdgeSectors = 6;
     // === Sound ===
@@ -145,7 +165,8 @@ public class SoundAttractConfigData {
      * - soundId: The resource location of the sound event (e.g., "minecraft:block.lever.click")
      * - range: The maximum distance (in blocks) at which mobs can hear this sound
      * - weight: How strongly mobs are attracted to this sound (higher = more attractive)
-     * Example: "minecraft:block.lever.click;5;3" means lever click is heard up to 5 blocks and has a weight of 3.
+     * Example: "minecraft:block.lever.click;6;1.0"
+     * Range recommended: 1–128. Weight recommended: 0.1–100.
      * You can add custom modded sounds here as well.
      */
     public List<String> nonPlayerSoundIdList = new ArrayList<>(List.of(
@@ -650,6 +671,12 @@ public class SoundAttractConfigData {
      * Default: 128.0
      */
     public double taczShootRange = 128.0;
+
+    /**
+     * The base attachment reduction applied to all Tacz gunshots, regardless of specific attachment.
+     * Default: 0.0 (no reduction)
+     */
+    public double taczBaseAttachmentReduction = 0.0;
 
     /**
      * The fallback "weight" for Tacz gun shoot sounds, if no specific value is found for a gun.

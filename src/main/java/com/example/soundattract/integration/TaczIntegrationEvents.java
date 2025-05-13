@@ -89,9 +89,8 @@ public class TaczIntegrationEvents {
             if (player == null || player.getWorld().isClient()) return;
 
             double reloadRange;
-            double reloadWeight;
-            reloadRange = getReloadRangeFromConfig(gunId);
-            reloadWeight = getReloadWeightFromConfig(gunId);
+reloadRange = getReloadRangeFromConfig(gunId);
+double reloadWeight = reloadRange / 10.0; 
             if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
                 com.example.soundattract.SoundAttractMod.LOGGER.info("[TaczIntegration] Reloading: PlayerEntity={}, GunId={}, ReloadRange={}, ReloadWeight={}", player.getName().getString(), gunId, reloadRange, reloadWeight);
             }
@@ -171,12 +170,20 @@ public class TaczIntegrationEvents {
 
             double gunRange = getGunRangeFromConfig(gunId);
             double reduction = 0.0;
-            if (attachmentId != null && !attachmentId.isEmpty()) {
-                reduction = getAttachmentReductionFromConfig(attachmentId);
-            }
+double baseAttachmentReduction = 0.0;
+try {
+    baseAttachmentReduction = com.example.soundattract.SoundAttractMod.CONFIG.taczBaseAttachmentReduction;
+} catch (Exception e) {
+    baseAttachmentReduction = 0.0;
+}
+if (attachmentId != null && !attachmentId.isEmpty()) {
+    reduction = getAttachmentReductionFromConfig(attachmentId);
+}
+reduction += baseAttachmentReduction;
 
-            double finalRange = Math.max(0, gunRange - reduction);
-            double finalWeight = getGunWeightFromConfig(gunId);
+
+double finalRange = Math.max(0, gunRange - reduction);
+double finalWeight = finalRange / 10.0;
             if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
                 com.example.soundattract.SoundAttractMod.LOGGER.info("[TaczIntegration] Shooting: PlayerEntity={}, GunId={}, AttachmentId={}, Range={}, Weight={}", player.getName().getString(), gunId, attachmentId, finalRange, finalWeight);
             }
