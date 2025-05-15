@@ -81,12 +81,12 @@ public class SoundAttractionEvents {
             boolean attractionGoalExists = mob.goalSelector.getAvailableGoals().stream()
                     .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
             if (!attractionGoalExists) {
-                mob.goalSelector.addGoal(2, new AttractionGoal(mob, moveSpeed));
+                mob.goalSelector.addGoal(10, new AttractionGoal(mob, moveSpeed));
             }
             boolean followLeaderGoalExists = mob.goalSelector.getAvailableGoals().stream()
                     .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof FollowLeaderGoal);
             if (!followLeaderGoalExists) {
-                mob.goalSelector.addGoal(3, new FollowLeaderGoal(mob, moveSpeed));
+                mob.goalSelector.addGoal(11, new FollowLeaderGoal(mob, moveSpeed));
             }
         }
     }
