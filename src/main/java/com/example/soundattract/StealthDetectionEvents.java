@@ -28,6 +28,8 @@ import java.util.Locale;
 public class StealthDetectionEvents {
     private static final Map<Player, Double> camoCache = new HashMap<>();
     private static final Map<Player, Long> camoCacheTick = new HashMap<>();
+    private static final Map<Mob, Integer> mobOutOfRangeTicks = new HashMap<>();
+    private static final int GRACE_TICKS = 40; 
 private static int getStealthCheckInterval() {
     return SoundAttractConfig.stealthCheckInterval.get();
 }
@@ -53,12 +55,20 @@ private static int getStealthCheckInterval() {
                             int maxX = minX + 15, maxZ = minZ + 15;
                             for (Mob mob : level.getEntitiesOfClass(Mob.class, new net.minecraft.world.phys.AABB(minX, 0, minZ, maxX, 256, maxZ))) {
                                 if (mob.getTarget() instanceof Player targetPlayer && targetPlayer == player) {
-                                    double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
-                                    double dist = mob.distanceTo(player);
-                                    if (dist > detectionRange) {
-                                        mob.setTarget(null);
-                                    }
-                                }
+    double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
+    double dist = mob.distanceTo(player);
+    if (dist > detectionRange) {
+        int ticks = mobOutOfRangeTicks.getOrDefault(mob, 0) + 1;
+        if (ticks >= GRACE_TICKS) {
+            mob.setTarget(null);
+            mobOutOfRangeTicks.remove(mob);
+        } else {
+            mobOutOfRangeTicks.put(mob, ticks);
+        }
+    } else {
+        mobOutOfRangeTicks.remove(mob);
+    }
+}
                             }
                         }
                     }
