@@ -16,6 +16,7 @@ public class SoundAttractMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        com.example.soundattract.ai.MobCellAssignmentHooks.register();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             if (CONFIG != null && CONFIG.debugLogging) LOGGER.info("[DEBUG] Registered FabricSimpleNbtSync on LOGICAL SERVER");
             com.example.soundattract.network.FabricSimpleNbtSync.registerServerReceiver(LOGGER);
@@ -105,7 +106,17 @@ public class SoundAttractMod implements ModInitializer {
     com.example.soundattract.integration.TaczIntegrationEvents.register();
     com.example.soundattract.integration.VanillaIntegrationEvents.register();
 
+    final long[] lastTickTime = {System.nanoTime()};
+    final double[] tickTimeAvg = {50000000.0};
+    final double alpha = 0.05;
     net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
+        long now = System.nanoTime();
+        long elapsed = now - lastTickTime[0];
+        lastTickTime[0] = now;
+        double tickTime = elapsed / 20.0;
+        tickTimeAvg[0] = tickTimeAvg[0] * (1.0 - alpha) + tickTime * alpha;
+        double tps = Math.min(20.0, 1_000_000_000.0 / tickTimeAvg[0]);
+        if (CONFIG != null) CONFIG.lastKnownTps = tps;
         for (net.minecraft.server.world.ServerWorld level : server.getWorlds()) {
             SoundAttractionEvents.onServerTick(level);
         }

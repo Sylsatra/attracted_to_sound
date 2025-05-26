@@ -32,6 +32,7 @@ public class SoundAttractConfigData {
 
 
     // === General ===
+
     /**
      * If true, enables detailed debug logging for the Sound Attract mod.
      * Useful for troubleshooting or development. Has no effect on gameplay.
@@ -47,7 +48,7 @@ public class SoundAttractConfigData {
      * Recommended: 40–400. Minimum: 1. Maximum: 1200.
      * Lower values = mobs lose interest faster. Higher = mobs may travel farther for old sounds.
      */
-    public int soundLifetimeTicks = 200;
+    public int soundLifetimeTicks = 120;
 
     /**
      * The cooldown between mob sound scans in ticks (20 ticks = 1 second).
@@ -72,6 +73,53 @@ public class SoundAttractConfigData {
      * Recommended: 15.0–20.0. Minimum: 10.0. Maximum: 20.0.
      */
     public double maxTpsForScanCooldown = 20.0;
+
+     /**
+     * The number of spatial cells to process per server tick for mob group updates.
+     * Higher values = faster updates but more CPU usage. Lower values = less lag but slower group response.
+     * Default: 40
+     * Recommended: 10–100. Minimum: 1.
+     */
+    public int cellsPerTick = 40;
+
+    /**
+     * The number of mobs to process per cell per tick for group assignment.
+     * Higher values = faster grouping but more CPU usage. Lower values = less lag but slower group response.
+     * Default: 35
+     * Recommended: 10–50. Minimum: 1.
+     */
+    public int mobsPerCellPerTick = 35;
+
+    /**
+     * Minimum number of cells to process per tick (adaptive batching).
+     * Default: 5
+     */
+    public int minCellsPerTick = 5;
+    /**
+     * Maximum number of cells to process per tick (adaptive batching).
+     * Default: 100
+     */
+    public int maxCellsPerTick = 100;
+    /**
+     * Minimum number of mobs per cell per tick (adaptive batching).
+     * Default: 10
+     */
+    public int minMobsPerCellPerTick = 10;
+    /**
+     * Maximum number of mobs per cell per tick (adaptive batching).
+     * Default: 100
+     */
+    public int maxMobsPerCellPerTick = 100;
+
+    /**
+     * The most recent known TPS value for adaptive batching.
+     * Should be updated by the mod at runtime.
+     */
+    public double lastKnownTps = 20.0;
+    /**
+     * Optional: Supplier for real-time TPS (set by mod at runtime).
+     */
+    public java.util.function.Supplier<Double> serverTpsSupplier = null;
 
     /**
      * The ratio used to determine if a mob should switch to a new sound target while pursuing a sound.

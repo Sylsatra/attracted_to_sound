@@ -49,17 +49,16 @@ public class SoundTracker {
 }
 
 private static int getGridRadiusForRange(double range, int partitionSize) {
-    // The lowest tier is always radius 1 (3x3=9 grid)
     if (range < 8) return 1;
     for (int i = 1; i <= 20; i++) {
         if (range < 8 + 16 * i) {
-            return i + 1; // radius increases by 1 each tier
+            return i + 1;
         }
     }
-    return 21; // max radius for very large ranges
+    return 21;
 }
 
-private static java.util.Set<Long> getCoveredCells(BlockPos pos, double range, int partitionSize) {
+public static java.util.Set<Long> getCoveredCells(BlockPos pos, double range, int partitionSize) {
     java.util.Set<Long> cells = new java.util.HashSet<>();
     int gridRadius = getGridRadiusForRange(range, partitionSize);
     int baseX = pos.getX() / partitionSize;
@@ -85,7 +84,7 @@ private static java.util.Set<Long> getCoveredCells(BlockPos pos, double range, i
         }
     }
 
-    private static final List<SoundRecord> RECENT_SOUNDS = new ArrayList<>();
+    public static final List<SoundRecord> RECENT_SOUNDS = new ArrayList<>();
 
     private static final int GRID_SIZE = 16; 
     private static final Map<String, Map<Long, List<SoundRecord>>> SPATIAL_SOUNDS = new HashMap<>();

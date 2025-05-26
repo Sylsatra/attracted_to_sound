@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Goal.class)
 public abstract class GoalMixin {
-    @Inject(method = "method_6266", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "shouldContinue", at = @At("HEAD"), cancellable = true)
     private void soundattract$cancelTargetRetention(CallbackInfoReturnable<Boolean> cir) {
         if ((Object)this instanceof ActiveTargetGoal activeTargetGoal) {
             try {

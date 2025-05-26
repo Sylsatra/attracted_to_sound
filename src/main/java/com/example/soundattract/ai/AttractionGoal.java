@@ -173,6 +173,7 @@ public class AttractionGoal extends Goal {
 
     @Override
     public void tick() {
+        if (mob.getWorld().isClient()) return;
         boolean isLeader = com.example.soundattract.ai.MobGroupManager.getLeader(mob) == mob;
         boolean isEdge = com.example.soundattract.ai.MobGroupManager.isEdgeMobEntity(mob);
         boolean isDeserter = com.example.soundattract.ai.MobGroupManager.isDeserter(mob);

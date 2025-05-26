@@ -29,6 +29,8 @@ public class SoundAttractionEvents {
     private static final double WALKING_SPEED_SQ = 0.216 * 0.216;
 
     public static void onServerTick(ServerWorld serverWorld) {
+        com.example.soundattract.ai.MobGroupManager.scheduleNearbyCellsForPlayers(serverWorld, serverWorld.getTime());
+        com.example.soundattract.DynamicScanCooldownManager.tickScheduler(serverWorld, serverWorld.getTime());
         long tickStart = System.nanoTime();
     if (com.example.soundattract.SoundAttractMod.CONFIG == null) {
         com.example.soundattract.SoundAttractMod.LOGGER.error("[SoundAttractionEvents] CONFIG is null in onServerTick! Skipping tick.");
@@ -182,6 +184,10 @@ public class SoundAttractionEvents {
             }
             com.example.soundattract.DynamicScanCooldownManager.update(serverWorld.getTime(), mobEntities.size());
             SoundTracker.tick();
+
+            for (com.example.soundattract.SoundTracker.SoundRecord sound : com.example.soundattract.SoundTracker.RECENT_SOUNDS) {
+                com.example.soundattract.ai.MobGroupManager.scheduleCellsForSound(sound.pos, sound.range, serverWorld, serverWorld.getTime());
+            }
         } catch (Exception e) {
             com.example.soundattract.SoundAttractMod.LOGGER.error("[SoundAttractionEvents] Exception in onServerTick", e);
         }

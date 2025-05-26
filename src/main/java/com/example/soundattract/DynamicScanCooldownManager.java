@@ -2,6 +2,10 @@ package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfigData;
 
+import com.example.soundattract.ai.AdaptiveScanScheduler;
+import com.example.soundattract.ai.MobGroupManager;
+import net.minecraft.server.world.ServerWorld;
+
 public class DynamicScanCooldownManager {
     private static volatile double lastTps = 20.0; 
 
@@ -26,6 +30,15 @@ public class DynamicScanCooldownManager {
 
     private static long lastCheckTime = System.currentTimeMillis();
     private static long lastTickCount = 0;
+
+    private static final int[] DEFAULT_TIER_SHIFTS = {0, 1, 2, 3};
+    public static AdaptiveScanScheduler scheduler = new AdaptiveScanScheduler(currentScanCooldownTicks, DEFAULT_TIER_SHIFTS);
+
+    public static void tickScheduler(ServerWorld level, long currentTick) {
+        scheduler.tick(currentTick, task -> {
+            MobGroupManager.updateCellGroup(task.cellKey, level);
+        });
+    }
 
     public static void update(long totalTickCount, int mobCount) {
 

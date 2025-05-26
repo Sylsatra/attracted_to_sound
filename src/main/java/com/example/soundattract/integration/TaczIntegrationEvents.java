@@ -110,17 +110,14 @@ double reloadWeight = reloadRange / 10.0;
 
     public static void handleGunshotFromClient(PlayerEntity player, String gunId, String attachmentId) {
     if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
-    
-}
-    if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
         com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] handleGunshotFromClient: Using gunId='{}', attachmentId='{}' for config lookup", gunId, attachmentId);
+        com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG_SERVER] handleGunshotFromClient CALLED: player={}, gunId={}, attachmentId={}, isClient={}", player != null ? player.getName().getString() : "null", gunId, attachmentId, player != null && player.getWorld().isClient());
+        if (player != null) {
+            ItemStack held = player.getMainHandStack();
+            com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG_SERVER] Held item: {} | NBT: {}", held.getItem(), held.getNbt());
+        }
+        com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] handleGunshotFromClient ENTRY: player={}, gunId={}, attachmentId={}, isClient={}", player != null ? player.getName().getString() : "null", gunId, attachmentId, player != null && player.getWorld().isClient());
     }
-    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG_SERVER] handleGunshotFromClient CALLED: player={}, gunId={}, attachmentId={}, isClient={}", player != null ? player.getName().getString() : "null", gunId, attachmentId, player != null && player.getWorld().isClient());
-    if (player != null) {
-        ItemStack held = player.getMainHandStack();
-        com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG_SERVER] Held item: {} | NBT: {}", held.getItem(), held.getNbt());
-    }
-    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] handleGunshotFromClient ENTRY: player={}, gunId={}, attachmentId={}, isClient={}", player != null ? player.getName().getString() : "null", gunId, attachmentId, player != null && player.getWorld().isClient());
     if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
         com.example.soundattract.SoundAttractMod.LOGGER.info("[TaczIntegrationEvents] handleGunshotFromClient ENTRY for player: {} gunId: {} attachmentId: {}", player != null ? player.getName().getString() : "null", gunId, attachmentId);
     }

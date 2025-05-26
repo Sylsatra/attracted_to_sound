@@ -62,6 +62,7 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public void tick() {
+        if (mob.getWorld().isClient()) return;
         if (leader == null) return;
         if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return;
         if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
