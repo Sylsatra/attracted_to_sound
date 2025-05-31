@@ -718,7 +718,7 @@ public class StealthDetectionEvents {
             if (!colorAdded) {
                 ResourceLocation itemIdRL = ForgeRegistries.ITEMS.getKey(item);
                 if (itemIdRL != null) {
-                    Integer mappedColorValue = SoundAttractConfig.customArmorColors.get(itemIdRL.toString());
+                    Integer mappedColorValue = SoundAttractConfig.customArmorColors.get(itemIdRL);
                     if (mappedColorValue != null) {
                         colors.add(mappedColorValue);
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
