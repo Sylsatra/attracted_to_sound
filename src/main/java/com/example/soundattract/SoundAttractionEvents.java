@@ -2,55 +2,153 @@ package com.example.soundattract;
 
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
-import com.example.soundattract.config.SoundAttractConfig;
-import net.minecraft.core.BlockPos;
+import com.example.soundattract.config.SoundAttractConfig; // Your config class
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap; // Import ServerPlayer
+import java.util.stream.Collectors; // Import EntityType
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntityType; // Import AABB
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent; // For getting EntityType from ResourceLocation
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraft.core.registries.BuiltInRegistries;
-import java.util.Optional;
-import java.util.UUID;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.registries.ForgeRegistries;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractionEvents {
 
-    private enum PlayerAction {
-        IDLE, CRAWLING, SNEAKING, WALKING, SPRINTING, SPRINT_JUMPING
+    // --- Queueing Mechanism for Goal Additions ---
+    private static final Map<Mob, List<GoalDefinition>> PENDING_GOAL_ADDITIONS = new ConcurrentHashMap<>();
+
+    private static class GoalDefinition {
+        final int priority;
+        final Goal goalInstance;
+        final Class<? extends Goal> goalClass;
+
+        GoalDefinition(int priority, Goal goalInstance) {
+            this.priority = priority;
+            this.goalInstance = goalInstance;
+            this.goalClass = goalInstance.getClass();
+        }
     }
 
-    private static final double IDLE_THRESHOLD_SQ = 0.001 * 0.001;
-    private static final double CRAWLING_THRESHOLD_SQ = 0.03 * 0.03;
-    private static final double SNEAKING_SPEED_SQ = 0.066 * 0.066;
-    private static final double WALKING_SPEED_SQ = 0.216 * 0.216;
+    private static void scheduleAddGoal(Mob mob, int priority, Goal goal) {
+        PENDING_GOAL_ADDITIONS.computeIfAbsent(mob, k -> new ArrayList<>()).add(new GoalDefinition(priority, goal));
+    }
+    // --- End Queueing Mechanism ---
+
+    // --- For Mob Counting Optimization ---
+    private static long lastMobCountUpdateTime_ServerTick = -1;
+    private static int cachedAttractedMobCount_ServerTick = 0;
+    private static Set<EntityType<?>> CACHED_ATTRACTED_ENTITY_TYPES = null;
+    // Store a mutable copy for comparison
+    private static List<String> lastKnownAttractedEntitiesConfig_Copy = null;
+    // --- End Mob Counting Optimization ---
+
+
+    private static Set<EntityType<?>> getCachedAttractedEntityTypes() {
+        // Get the list from config (likely List<? extends String>)
+        List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.attractedEntities.get();
+        // Create a mutable List<String> copy for comparison and storing
+        List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
+
+        if (CACHED_ATTRACTED_ENTITY_TYPES == null || lastKnownAttractedEntitiesConfig_Copy == null || !lastKnownAttractedEntitiesConfig_Copy.equals(currentConfigListMutableCopy)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get() && CACHED_ATTRACTED_ENTITY_TYPES != null) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Attracted entities config changed, rebuilding EntityType cache.");
+            }
+            // Stream directly from the getter's result
+            CACHED_ATTRACTED_ENTITY_TYPES = currentConfigListFromGetter.stream()
+                    .map(idStr -> {
+                        try {
+                            return ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                        } catch (Exception e) {
+                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for attracted entity type in config: {}", idStr, e);
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            lastKnownAttractedEntitiesConfig_Copy = currentConfigListMutableCopy; // Store the new mutable copy
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Built attracted EntityType cache with {} types.", CACHED_ATTRACTED_ENTITY_TYPES.size());
+            }
+        }
+        return CACHED_ATTRACTED_ENTITY_TYPES;
+    }
+
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase == TickEvent.Phase.END) {
-            ServerLevel serverLevel = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().overworld();
-            java.util.Set<String> attractedTypes = new java.util.HashSet<>();
-            for (Object o : com.example.soundattract.config.SoundAttractConfig.attractedEntities.get()) {
-                attractedTypes.add(o.toString());
+            if (net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer() == null ||
+                net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().overworld() == null) {
+                return;
             }
-            int mobCount = 0;
-            for (Mob mob : serverLevel.getEntitiesOfClass(Mob.class, serverLevel.getWorldBorder().getCollisionShape().bounds())) {
-                String mobTypeId = mob.getType().builtInRegistryHolder().key().location().toString();
-                if (attractedTypes.contains(mobTypeId)) {
-                    mobCount++;
+            ServerLevel serverLevel = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().overworld();
+            long currentTime = serverLevel.getGameTime();
+            int mobCountForCooldownManager;
+
+            int mobCountUpdateInterval = SoundAttractConfig.COMMON.groupUpdateInterval.get();
+            mobCountUpdateInterval = Math.max(20, mobCountUpdateInterval);
+
+            if (currentTime - lastMobCountUpdateTime_ServerTick >= mobCountUpdateInterval || lastMobCountUpdateTime_ServerTick == -1) {
+                int currentMobCount = 0;
+                Set<Mob> countedMobsInTick = new HashSet<>();
+                Set<EntityType<?>> attractedEntityTypes = getCachedAttractedEntityTypes();
+
+                if (!attractedEntityTypes.isEmpty()) {
+                    for (ServerPlayer player : serverLevel.players()) {
+                        int simDistanceBlocks = player.server.getPlayerList().getViewDistance() * 16;
+                        AABB playerSimArea = player.getBoundingBox().inflate(simDistanceBlocks);
+                        List<Mob> mobsNearPlayer = serverLevel.getEntitiesOfClass(Mob.class, playerSimArea);
+
+                        for (Mob mob : mobsNearPlayer) {
+                            if (mob.isAlive() && !mob.isRemoved() && attractedEntityTypes.contains(mob.getType())) {
+                                if (countedMobsInTick.add(mob)) {
+                                    currentMobCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+                cachedAttractedMobCount_ServerTick = currentMobCount;
+                lastMobCountUpdateTime_ServerTick = currentTime;
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Updated attracted mob count for DynamicScanCooldownManager: {}", cachedAttractedMobCount_ServerTick);
                 }
             }
-            com.example.soundattract.DynamicScanCooldownManager.update(serverLevel.getGameTime(), mobCount);
+            mobCountForCooldownManager = cachedAttractedMobCount_ServerTick;
+
+            com.example.soundattract.DynamicScanCooldownManager.update(currentTime, mobCountForCooldownManager);
             SoundTracker.tick();
+
+            if (!PENDING_GOAL_ADDITIONS.isEmpty()) {
+                Iterator<Map.Entry<Mob, List<GoalDefinition>>> iterator = PENDING_GOAL_ADDITIONS.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<Mob, List<GoalDefinition>> entry = iterator.next();
+                    Mob mob = entry.getKey();
+                    List<GoalDefinition> goalsToAdd = entry.getValue();
+
+                    if (mob.isAlive() && mob.level() != null && !mob.isRemoved()) {
+                        for (GoalDefinition def : goalsToAdd) {
+                            boolean goalExists = mob.goalSelector.getAvailableGoals().stream()
+                                    .anyMatch(wrappedGoal -> def.goalClass.isInstance(wrappedGoal.getGoal()));
+                            if (!goalExists) {
+                                mob.goalSelector.addGoal(def.priority, def.goalInstance);
+                                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Added goal {} to mob {}", def.goalClass.getSimpleName(), mob.getName().getString());
+                                }
+                            }
+                        }
+                    }
+                    iterator.remove();
+                }
+            }
         }
     }
 
@@ -59,65 +157,32 @@ public class SoundAttractionEvents {
         if (event.phase == TickEvent.Phase.END && !event.level.isClientSide()) {
             if (event.level instanceof ServerLevel serverLevel) {
                 SoundTracker.pruneIrrelevantSounds(serverLevel);
-                com.example.soundattract.DynamicScanCooldownManager.update(serverLevel.getServer().getTickCount(), 0);
                 com.example.soundattract.ai.MobGroupManager.updateGroups(serverLevel);
             }
         }
     }
 
     @SubscribeEvent
-    public static void onEntityJoinWorld(EntityJoinLevelEvent event) {
-        if (event.getEntity() instanceof Mob mob) {
-            ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
-            if (entityId == null) return;
-
-            String entityIdStr = entityId.toString();
-            if (!SoundAttractConfig.attractedEntities.get().contains(entityIdStr)) {
-                return;
-            }
-
-            double moveSpeed = SoundAttractConfig.mobMoveSpeed.get();
-
-            boolean attractionGoalExists = mob.goalSelector.getAvailableGoals().stream()
-                    .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
-            if (!attractionGoalExists) {
-                mob.goalSelector.addGoal(10, new AttractionGoal(mob, moveSpeed));
-            }
-            boolean followLeaderGoalExists = mob.goalSelector.getAvailableGoals().stream()
-                    .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof FollowLeaderGoal);
-            if (!followLeaderGoalExists) {
-                mob.goalSelector.addGoal(11, new FollowLeaderGoal(mob, moveSpeed));
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+    public static void onMobJoinLevel(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (event.getLevel().isClientSide()) return;
-        java.util.Set<String> attractedTypes = new java.util.HashSet<>();
-        for (Object o : com.example.soundattract.config.SoundAttractConfig.attractedEntities.get()) {
-            attractedTypes.add(o.toString());
-        }
-        String mobTypeId = mob.getType().builtInRegistryHolder().key().location().toString();
-        if (attractedTypes.contains(mobTypeId)) {
-            com.example.soundattract.ai.MobGroupManager.updateGroups((ServerLevel)event.getLevel());
-        }
-    }
 
-    public static class SoundMapping {
-        public final ResourceLocation soundEvent;
-        public final int range;
-        public final double weight;
-
-        public SoundMapping(ResourceLocation soundEvent, int range, double weight) {
-            this.soundEvent = soundEvent;
-            this.range = range;
-            this.weight = weight;
+        Set<EntityType<?>> attractedEntityTypes = getCachedAttractedEntityTypes();
+        if (!attractedEntityTypes.contains(mob.getType())) {
+            return;
         }
 
-        public static SoundMapping forAnimator(Class<?> animatorClass) {
-            return null;
+        double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
+
+        scheduleAddGoal(mob, 10, new AttractionGoal(mob, moveSpeed));
+        scheduleAddGoal(mob, 11, new FollowLeaderGoal(mob, moveSpeed));
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Scheduled goals for mob {} of type {}", mob.getName().getString(), EntityType.getKey(mob.getType()));
+        }
+
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            com.example.soundattract.ai.MobGroupManager.updateGroups(serverLevel);
         }
     }
 }

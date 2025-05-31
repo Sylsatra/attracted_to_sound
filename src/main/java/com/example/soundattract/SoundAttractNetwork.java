@@ -11,7 +11,7 @@ public class SoundAttractNetwork {
 
     public static void register() {
         INSTANCE = NetworkRegistry.ChannelBuilder
-            .named(new ResourceLocation(SoundAttractMod.MOD_ID, "network"))
+            .named(ResourceLocation.fromNamespaceAndPath(SoundAttractMod.MOD_ID, "network"))
             .networkProtocolVersion(() -> PROTOCOL_VERSION)
             .clientAcceptedVersions(PROTOCOL_VERSION::equals)
             .serverAcceptedVersions(PROTOCOL_VERSION::equals)

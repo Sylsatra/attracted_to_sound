@@ -19,46 +19,48 @@ public class MobGroupManager {
     private static long lastGroupUpdateTime = -1;
     private static final int RELAY_SOUND_TTL = 40; 
     private static final int RELAY_SOUND_RATE_LIMIT = 20; 
-    private static final double LEADER_RADIUS = SoundAttractConfig.leaderGroupRadius.get();
-    private static final int MAX_LEADERS = SoundAttractConfig.maxLeaders.get();
-    private static final int MAX_GROUP_SIZE = SoundAttractConfig.maxGroupSize.get();
-    private static final double LEADER_SPACING = SoundAttractConfig.leaderSpacingMultiplier.get();
     private static final double STICKY_RADIUS_MARGIN = 2.0; 
     private static long lastCleanupTime = -1;
     private static final Object cleanupLock = new Object();
     private static Map<Mob, Set<Mob>> lastEdgeMobMap = new HashMap<>(); 
 
     public static class SoundRelay {
+        public final String soundId; 
         public final double x, y, z, range, weight;
         public final long timestamp;
         public final int hash;
-        public SoundRelay(double x, double y, double z, double range, double weight, long timestamp) {
+        public SoundRelay(String soundId, double x, double y, double z, double range, double weight, long timestamp) {
+            this.soundId = soundId;
             this.x = x; this.y = y; this.z = z; this.range = range; this.weight = weight; this.timestamp = timestamp;
-            this.hash = Objects.hash((int)x, (int)y, (int)z, (int)range, (int)(weight*100));
+            this.hash = Objects.hash(soundId, (int)x, (int)y, (int)z, (int)range, (int)(weight*100));
         }
         @Override
         public boolean equals(Object o) {
+            if (this == o) return true;
             if (!(o instanceof SoundRelay other)) return false;
-            return this.hash == other.hash && Math.abs(this.timestamp - other.timestamp) < RELAY_SOUND_TTL;
+            return this.hash == other.hash && 
+                   Objects.equals(this.soundId, other.soundId) &&
+                   Math.abs(this.x - other.x) < 0.1 && Math.abs(this.y - other.y) < 0.1 && Math.abs(this.z - other.z) < 0.1 && 
+                   Math.abs(this.range - other.range) < 0.1 && Math.abs(this.weight - other.weight) < 0.01 && 
+                   Math.abs(this.timestamp - other.timestamp) < RELAY_SOUND_TTL;
         }
         @Override
         public int hashCode() { return hash; }
     }
 
     public static boolean isEdgeMob(Mob mob) {
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
+        if (SoundAttractConfig.COMMON.debugLogging.get())
+            SoundAttractMod.LOGGER.info("[isEdgeMob] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
         Mob leader = getLeader(mob);
         if (leader == mob) {
-            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} is its own leader (not edge)", mob.getName().getString());
+            if (SoundAttractConfig.COMMON.debugLogging.get())
+                SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} is its own leader (not edge)", mob.getName().getString());
             return false;
         }
         Set<Mob> edgeSet = lastEdgeMobMap.get(leader);
         boolean isEdge = edgeSet != null && edgeSet.contains(mob);
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} edge result: {} (from cache)", mob.getName().getString(), isEdge);
-        return isEdge;
+        if (SoundAttractConfig.COMMON.debugLogging.get())
+            SoundAttractMod.LOGGER.info("[isEdgeMob] Mob {} is {}edge mob for leader {}", mob.getName().getString(), isEdge ? "" : "NOT ", leader.getName().getString()); return isEdge;
     }
 
     private static void cleanupStaleEntries(ServerLevel level) {
@@ -91,20 +93,21 @@ public class MobGroupManager {
     }
 
     public static void updateGroups(ServerLevel level) {
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] updateGroups called at game time {}", level.getGameTime());
         long time = level.getGameTime();
-        int scanCooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
-        int groupAssignInterval = Math.max(1, scanCooldown / 2);
-        if (lastGroupUpdateTime >= 0 && time - lastGroupUpdateTime < groupAssignInterval) return;
+        if (time - lastGroupUpdateTime < SoundAttractConfig.COMMON.groupUpdateInterval.get()) return;
         lastGroupUpdateTime = time;
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[MobGroupManager] Updating groups at time: " + time);
+        }
+        int scanCooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
 
         if (scanCooldown > 0 && (lastCleanupTime == -1 || time - lastCleanupTime > 10L * scanCooldown)) {
             cleanupStaleEntries(level);
             lastCleanupTime = time;
         }
 
-        List<String> attracted = SoundAttractConfig.attractedEntities.get().stream().map(Object::toString).toList();
+         Set<String> attracted = SoundAttractConfig.ATTRACTED_ENTITY_TYPES_CACHE;
         int simDistChunks = level.getServer().getPlayerList().getViewDistance();
         int simDistBlocks = simDistChunks * 16;
         Set<Mob> mobsSet = new HashSet<>();
@@ -119,8 +122,8 @@ public class MobGroupManager {
             ResourceLocation id = mob.getType().builtInRegistryHolder().key().location();
             allMobTypesLog.append(String.format("%s at (%.1f, %.1f, %.1f); ", id.toString(), mob.getX(), mob.getY(), mob.getZ()));
         }
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] All mobs present ({}): {}", mobs.size(), allMobTypesLog.toString());
+        if (SoundAttractConfig.COMMON.debugLogging.get())
+            SoundAttractMod.LOGGER.info("[MobGroupManager] All mobs present ({}): {}", mobs.size(), allMobTypesLog.toString());
         List<Mob> attractedMobs = new ArrayList<>();
         for (Mob mob : mobs) {
             ResourceLocation id = mob.getType().builtInRegistryHolder().key().location();
@@ -132,31 +135,52 @@ public class MobGroupManager {
         for (Mob mob : attractedMobs) {
             mobPosLog.append(String.format("%s at (%.1f, %.1f, %.1f); ", mob.getName().getString(), mob.getX(), mob.getY(), mob.getZ()));
         }
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get())
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Attracted mobs ({}): {}", attractedMobs.size(), mobPosLog.toString());
+        if (SoundAttractConfig.COMMON.debugLogging.get())
+            SoundAttractMod.LOGGER.info("[MobGroupManager] Attracted mobs ({}): {}", attractedMobs.size(), mobPosLog.toString());
         uuidToLeader.clear();
         leaders.clear();
         if (attractedMobs.isEmpty()) return;
-        Collections.shuffle(attractedMobs, new java.util.Random(level.getGameTime()));
-        double groupRadius = com.example.soundattract.config.SoundAttractConfig.groupDistance.get();
-        int maxLeaders = com.example.soundattract.config.SoundAttractConfig.maxLeaders.get();
-        int maxGroupSize = com.example.soundattract.config.SoundAttractConfig.maxGroupSize.get();
-        double leaderSpacing = groupRadius * com.example.soundattract.config.SoundAttractConfig.leaderSpacingMultiplier.get();
-        Set<Mob> assigned = new HashSet<>();
-        List<Mob> leaderList = new ArrayList<>();
-        for (Mob candidate : attractedMobs) {
-            if (leaderList.size() >= maxLeaders) break;
-            boolean tooClose = false;
-            for (Mob existingLeader : leaderList) {
-                if (candidate.distanceTo(existingLeader) < leaderSpacing) {
-                    tooClose = true;
-                    break;
+        for (Mob m : attractedMobs) {
+            if (SoundAttractConfig.getMatchingProfile(m) != null) {
+                leaders.add(new WeakReference<>(m));
+                uuidToLeader.put(m.getUUID(), m);
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[MobGroupManager] Profiled mob {} forced to leader",
+                                               m.getType().builtInRegistryHolder().key().location());            
                 }
             }
-            if (!tooClose && !assigned.contains(candidate)) {
-                leaderList.add(candidate);
-                assigned.add(candidate);
-                leaders.add(new WeakReference<>(candidate));
+        }
+        Collections.shuffle(attractedMobs, new java.util.Random(level.getGameTime()));
+        double groupRadius = SoundAttractConfig.COMMON.leaderGroupRadius.get();
+        int maxLeaders = SoundAttractConfig.COMMON.maxLeaders.get();
+        int maxGroupSize = SoundAttractConfig.COMMON.maxGroupSize.get();
+        double leaderSpacing = groupRadius * SoundAttractConfig.COMMON.leaderSpacingMultiplier.get();
+        Set<Mob> assigned = new HashSet<>();
+        List<Mob> leaderList = new ArrayList<>();
+        synchronized (leaders) {
+            leaders.removeIf(ref -> ref.get() == null || ref.get().isRemoved());
+            attractedMobs.sort(Comparator.comparingDouble(m -> -m.getHealth())); 
+
+            for (Mob potentialLeader : attractedMobs) {
+                if (leaders.size() >= SoundAttractConfig.COMMON.maxLeaders.get()) break;
+                if (leaders.stream().anyMatch(ref -> ref.get() == potentialLeader)) continue; 
+
+                boolean tooCloseToExistingLeader = false;
+                for (WeakReference<Mob> leaderRef : leaders) {
+                    Mob existingLeader = leaderRef.get();
+                    if (existingLeader != null && potentialLeader.distanceToSqr(existingLeader) < (SoundAttractConfig.COMMON.leaderGroupRadius.get() * SoundAttractConfig.COMMON.leaderSpacingMultiplier.get()) * (SoundAttractConfig.COMMON.leaderGroupRadius.get() * SoundAttractConfig.COMMON.leaderSpacingMultiplier.get())) {
+                        tooCloseToExistingLeader = true;
+                        break;
+                    }
+                }
+                if (!tooCloseToExistingLeader) {
+                    leaders.add(new WeakReference<>(potentialLeader));
+                    uuidToLeader.put(potentialLeader.getUUID(), potentialLeader); 
+                    leaderList.add(potentialLeader);
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info("[MobGroupManager] Promoted {} to LEADER", potentialLeader.getName().getString());
+                    }
+                }
             }
         }
         Map<Mob, List<Mob>> leaderToGroup = new HashMap<>();
@@ -178,8 +202,8 @@ public class MobGroupManager {
         for (Mob mob : attractedMobs) {
             if (!assigned.contains(mob)) {
                 deserterUuids.add(mob.getUUID());
-                if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                    com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Mob {} marked as DESERTER (not in any group)", mob.getName().getString());
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[MobGroupManager] Mob {} marked as DESERTER (not in any group)", mob.getName().getString());
                 }
             } else {
                 deserterUuids.remove(mob.getUUID());
@@ -187,9 +211,16 @@ public class MobGroupManager {
         }
         lastEdgeMobMap.clear();
         for (Mob leader : leaderList) {
-            List<Mob> group = leaderToGroup.get(leader);
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                List<Mob> g = leaderToGroup.getOrDefault(leader, Collections.emptyList());
+                SoundAttractMod.LOGGER.info(
+            "[MobGroupManager] Group for leader {} has {} members (radius {}).",
+            leader.getName().getString(), g.size(), groupRadius);
+                }
+            List<Mob> group = leaderToGroup.get(leader);   
             if (group == null) continue;
-            int sectors = com.example.soundattract.config.SoundAttractConfig.numEdgeSectors.get();
+
+            int sectors = SoundAttractConfig.COMMON.numEdgeSectors.get();
             int edgePerSector = 4;
             Map<Integer, List<Mob>> sectorToFarthestList = new HashMap<>();
             double leaderX = leader.getX(), leaderZ = leader.getZ();
@@ -225,10 +256,10 @@ public class MobGroupManager {
                 if (farthest != null) edgeMobs.add(farthest);
             }
             lastEdgeMobMap.put(leader, edgeMobs);
-            if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) { 
                 StringBuilder sb = new StringBuilder();
                 for (Mob edge : edgeMobs) sb.append(edge.getName().getString()).append(", ");
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Edge mobs for leader {}: {}", leader.getName().getString(), sb.toString());
+                SoundAttractMod.LOGGER.info("[MobGroupManager] Edge mobs for leader {}: {}", leader.getName().getString(), sb.toString());
             }
         }
         mobToRelayedSounds.entrySet().removeIf(e -> e.getKey().isRemoved());
@@ -239,7 +270,7 @@ public class MobGroupManager {
         List<Mob> allAttractedMobs = new ArrayList<>();
         for (Mob mob : level.getEntitiesOfClass(Mob.class, level.getWorldBorder().getCollisionShape().bounds())) {
             String mobId = mob.getType().builtInRegistryHolder().key().location().toString();
-            if (com.example.soundattract.config.SoundAttractConfig.attractedEntities.get().contains(mobId)) {
+            if (SoundAttractConfig.COMMON.attractedEntities.get().contains(mobId)) {
                 allAttractedMobs.add(mob);
             }
         }
@@ -249,8 +280,8 @@ public class MobGroupManager {
                 boolean isGrouped = leader != null && leader != mob;
                 if (!isGrouped) {
                     deserterUuids.add(mob.getUUID());
-                    if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
-                        com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Mob {} marked as DESERTER", mob.getName().getString());
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[MobGroupManager] Mob {} marked as DESERTER", mob.getName().getString());
                     }
                 } else {
                     deserterUuids.remove(mob.getUUID());
@@ -259,13 +290,13 @@ public class MobGroupManager {
         }
     }
 
-    public static void relaySoundToLeader(Mob mob, double x, double y, double z, double range, double weight, long timestamp) {
+    public static void relaySoundToLeader(Mob mob, String soundId, double x, double y, double z, double range, double weight, long timestamp) {
         Mob leader = getLeader(mob);
         if (leader == mob) return;
         Long lastRelay = mobLastRelayTime.get(mob);
         if (lastRelay != null && timestamp - lastRelay < RELAY_SOUND_RATE_LIMIT) return;
         mobLastRelayTime.put(mob, timestamp);
-        SoundRelay relay = new SoundRelay(x, y, z, range, weight, timestamp);
+        SoundRelay relay = new SoundRelay(soundId, x, y, z, range, weight, timestamp);
         List<SoundRelay> relays = mobToRelayedSounds.computeIfAbsent(leader, k -> new ArrayList<>());
         if (!relays.contains(relay)) {
             relays.add(relay);

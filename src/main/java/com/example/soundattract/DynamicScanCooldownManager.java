@@ -10,10 +10,10 @@ public class DynamicScanCooldownManager {
     private static final int HIGH_MOBCOUNT_THRESHOLD = 100;
 
     private static double getLowTps() {
-        return SoundAttractConfig.minTpsForScanCooldown.get();
+        return SoundAttractConfig.COMMON.minTpsForScanCooldown.get();
     }
     private static double getHighTps() {
-        return SoundAttractConfig.maxTpsForScanCooldown.get();
+        return SoundAttractConfig.COMMON.maxTpsForScanCooldown.get();
     }
 
     private static long lastCheckTime = System.currentTimeMillis();

@@ -19,7 +19,7 @@ public class VoiceChatIntegrationClient {
         Player clientPlayer = Minecraft.getInstance().player;
         Level clientWorld = Minecraft.getInstance().level;
 
-        if (clientPlayer == null || clientWorld == null || !SoundAttractConfig.VOICE_CHAT_DETECTION_ENABLED_CACHE) {
+        if (clientPlayer == null || clientWorld == null || !SoundAttractConfig.COMMON.enableVoiceChatIntegration.get()) {
             return;
         }
 

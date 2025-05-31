@@ -5,6 +5,8 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.BlockPos;
 import java.util.EnumSet;
+import java.util.stream.StreamSupport;
+import net.minecraft.world.entity.ai.goal.WrappedGoal;
 
 public class FollowLeaderGoal extends Goal {
     private final Mob mob;
@@ -14,7 +16,7 @@ public class FollowLeaderGoal extends Goal {
     private static final double MAX_DISTANCE = 12.0; 
     private Vec3 lastPos = null;
     private int stuckTicks = 0;
-    private int stuckThreshold = com.example.soundattract.config.SoundAttractConfig.scanCooldownTicks.get();
+    private int stuckThreshold = com.example.soundattract.config.SoundAttractConfig.COMMON.scanCooldownTicks.get();
     private int dynamicTickCounter = 0;
 
     public FollowLeaderGoal(Mob mob, double moveSpeed) {
@@ -24,14 +26,14 @@ public class FollowLeaderGoal extends Goal {
     }
 
     private double getGroupDistance() {
-        return com.example.soundattract.config.SoundAttractConfig.groupDistance.get();
+        return com.example.soundattract.config.SoundAttractConfig.COMMON.groupDistance.get(); 
     }
 
     @Override
     public boolean canUse() {
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false; 
-        boolean smartEdge = com.example.soundattract.config.SoundAttractConfig.edgeMobSmartBehavior.get();
+        boolean smartEdge = com.example.soundattract.config.SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         if (smartEdge && MobGroupManager.isEdgeMob(mob)) return false;
         if (!leader.isAlive()) return false;
         leaderAttractionGoal = null;
@@ -47,7 +49,16 @@ public class FollowLeaderGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (leader == null || !leader.isAlive()) return false;
+        leaderAttractionGoal = StreamSupport.stream(
+            leader.goalSelector.getRunningGoals().spliterator(), false)
+            .map(WrappedGoal::getGoal)
+            .filter(g -> g instanceof AttractionGoal)
+            .map(g -> (AttractionGoal) g)
+            .findFirst()
+            .orElse(null);
+
         if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return false;
+        if (leader.getNavigation().isDone()) return false;
         return true;
     }
 
@@ -55,10 +66,10 @@ public class FollowLeaderGoal extends Goal {
     public void tick() {
         if (leader == null) return;
         if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return;
-        if (com.example.soundattract.config.SoundAttractConfig.debugLogging.get()) {
+        if (com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info("[FollowLeaderGoal] Mob {} following leader {} (leader is pursuing sound)", mob.getName().getString(), leader.getName().getString());
         }
-        int scanCooldown = com.example.soundattract.config.SoundAttractConfig.scanCooldownTicks.get();
+        int scanCooldown = com.example.soundattract.config.SoundAttractConfig.COMMON.scanCooldownTicks.get();
         int updateInterval = Math.max(1, scanCooldown / 2);
         dynamicTickCounter = (dynamicTickCounter + 1) % updateInterval;
         if (dynamicTickCounter != 0) return;
@@ -73,7 +84,7 @@ public class FollowLeaderGoal extends Goal {
             }
         }
         if (soundPos == null) return;
-        double arrivalDistance = com.example.soundattract.config.SoundAttractConfig.arrivalDistance.get();
+        double arrivalDistance = com.example.soundattract.config.SoundAttractConfig.COMMON.arrivalDistance.get();
         long seed = mob.getUUID().getMostSignificantBits() ^ mob.getUUID().getLeastSignificantBits() ^ soundPos.hashCode();
         java.util.Random rand = new java.util.Random(seed);
         double angle = rand.nextDouble() * 2 * Math.PI;

@@ -28,44 +28,6 @@ import net.minecraft.world.phys.Vec3;
 @OnlyIn(Dist.CLIENT)
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractClientEvents {
-    public static void onParCoolAnimationInfo(Object event) {
-        if (!ModList.get().isLoaded("parcool")) return;
-        try {
-            Class<?> eventClass = Class.forName("com.alrex.parcool.api.unstable.animation.ParCoolAnimationInfoEvent");
-            if (!eventClass.isInstance(event)) return;
-            Object player = eventClass.getMethod("getPlayer").invoke(event);
-            Object animator = eventClass.getMethod("getAnimator").invoke(event);
-            if (player == null || animator == null) return;
-            if (!(player instanceof AbstractClientPlayer clientPlayer)) return;
-            String animatorClass = animator.getClass().getSimpleName();
-            SoundAttractionEvents.SoundMapping mapping = SoundAttractionEvents.SoundMapping.forAnimator(animator.getClass());
-            if (mapping == null) return;
-            ResourceLocation soundRL = mapping.soundEvent;
-            int range = mapping.range;
-            double weight = mapping.weight;
-            ResourceLocation dim = clientPlayer.level().dimension().location();
-            Optional<UUID> sourcePlayerUUID = Optional.of(clientPlayer.getUUID());
-            SoundMessage msg = new SoundMessage(soundRL, clientPlayer.getX(), clientPlayer.getY(), clientPlayer.getZ(), dim, sourcePlayerUUID, range, weight);
-            SoundAttractNetwork.INSTANCE.sendToServer(msg);
-        } catch (Exception ignored) {
-        }
-    }
-
-    public static void registerParcoolClientHandler() {
-        if (!ModList.get().isLoaded("parcool")) return;
-        try {
-            Class<?> eventClass = Class.forName("com.alrex.parcool.api.unstable.animation.ParCoolAnimationInfoEvent");
-            Method getHandlerList = eventClass.getMethod("getHandlerList");
-            Object handlerList = getHandlerList.invoke(null);
-            Method registerMethod = handlerList.getClass().getMethod("register", Object.class);
-            registerMethod.invoke(handlerList, new Object() {
-                public void onParCoolAnimationInfo(Object event) {
-                    SoundAttractClientEvents.onParCoolAnimationInfo(event);
-                }
-            });
-        } catch (Exception ignored) {
-        }
-    }
 
     @OnlyIn(Dist.CLIENT)
     @SubscribeEvent

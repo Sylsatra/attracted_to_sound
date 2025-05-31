@@ -1,16 +1,12 @@
 package com.example.soundattract.integration;
 
 import com.example.soundattract.SoundMessage;
-import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.SoundAttractNetwork;
+import java.util.Optional;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraft.resources.ResourceLocation;
-import java.util.Optional;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraftforge.registries.ForgeRegistries;
 
 public class VanillaIntegrationEvents {
     private static boolean wasSprinting = false;
@@ -78,7 +74,7 @@ public class VanillaIntegrationEvents {
 
     private static void sendVanillaSound(String animatorClass, String soundId, double x, double y, double z, ResourceLocation dim, Optional<java.util.UUID> uuid, int range, double weight, double volume, double pitch) {
         SoundMessage msg = new SoundMessage(
-            new ResourceLocation(soundId),
+            ResourceLocation.parse(soundId),
             x, y, z,
             dim,
             uuid,
@@ -99,13 +95,13 @@ public class VanillaIntegrationEvents {
             }
             net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(x, y, z);
             String dimString = dim.toString();
-            int lifetime = com.example.soundattract.config.SoundAttractConfig.soundLifetimeTicks.get();
-            if ((new ResourceLocation(soundId)).equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID)) {
+            int lifetime = com.example.soundattract.config.SoundAttractConfig.COMMON.soundLifetimeTicks.get();
+            if ((ResourceLocation.parse(soundId)).equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID)) {
                 if (range > 0) {
                     com.example.soundattract.SoundTracker.addSound(null, pos, dimString, range, weight, lifetime);
                 }
             } else {
-                net.minecraft.sounds.SoundEvent se = net.minecraftforge.registries.ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation(soundId));
+                net.minecraft.sounds.SoundEvent se = net.minecraftforge.registries.ForgeRegistries.SOUND_EVENTS.getValue(ResourceLocation.parse(soundId));
                 double _range = range;
                 double _weight = weight;
                 String id = soundId != null ? soundId : "";
