@@ -1,5 +1,6 @@
 {
   "key.soundattract.shoot": "射撃 (Tacz)",
   "key.soundattract.reload": "リロード (Tacz)",
-  "key.soundattract.tacz_category": "Taczコントロール"
+  "key.soundattract.tacz_category": "Taczコントロール",
+  "enchantment.soundattract.conceal": "隠匿"
 }

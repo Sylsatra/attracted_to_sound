@@ -1,7 +1,7 @@
 package com.example.soundattract;
 
 import net.fabricmc.api.ClientModInitializer;
-import com.example.soundattract.integration.TaczIntegrationClientEvents;
+import com.example.soundattract.integration.TaczIntegrationClientLogic;
 
 public class SoundAttractModClient implements ClientModInitializer {
     @Override
@@ -15,8 +15,5 @@ public class SoundAttractModClient implements ClientModInitializer {
     com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] TaczGunshotMessage.ID = {}", com.example.soundattract.integration.TaczGunshotMessage.ID);
     com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractModClient] onInitializeClient called");
 }
-
-        TaczIntegrationClientEvents.register();
-        com.example.soundattract.integration.TaczIntegrationClientKeybinds.register();
     }
 }

@@ -1,19 +1,217 @@
 package com.example.soundattract.config;
 
-import java.util.List;
-import java.util.ArrayList;
+import com.example.soundattract.SoundAttractMod;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.StringNbtReader;
+import net.minecraft.util.Identifier;
+import net.minecraft.entity.mob.MobEntity;
+import java.util.*;
+import java.util.stream.Collectors;
 
+/**
+ * Configuration data for the Sound Attract mod (Fabric).
+ * 
+ * This class now supports “mob profiles” in addition to existing sound and stealth settings.
+ * A “mob profile” entry is a semicolon-separated string of five parts:
+ *   1. profileName            (String)
+ *   2. mobIdString            (String, or "*" to match all)
+ *   3. nbtMatcherString       (String, optional NBT like "{IsAlpha:1b}", or blank)
+ *   4. soundOverridesString   (comma-separated list of “namespace:path:range:weight” entries)
+ *   5. detectionOverridesString (comma-separated list of “stance:value” entries, e.g. “standing:80.0”)
+ *
+ * Example raw entry:
+ *   "GreedyGoblin;minecraft:piglin;{IsAlpha:1b};minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0"
+ */
 public class SoundAttractConfigData {
+    // ====================
+    // === Mob Profiles ===
+    // ====================
+
+    /**
+     * Each entry here must be in the format:
+     *   "profileName;mobIdString;nbtMatcherString;soundOverrides;detectionOverrides"
+     * where:
+     *   - profileName: a unique identifier for your profile (for logging/reference).
+     *   - mobIdString: either a namespaced entity ID (e.g. "minecraft:zombie") or "*" to match any mob.
+     *   - nbtMatcherString: optional CompoundTag string (e.g. "{IsAlpha:1b}"), or blank if none.
+     *   - soundOverrides: comma-separated list of entries, each "namespace:path:range:weight". 
+     *       Example: "minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0"
+     *   - detectionOverrides: comma-separated list of "stance:value" pairs (stance ∈ [standing, sneaking, crawling]).
+     *       Example: "standing:40.0,sneaking:20.0,crawling:10.0"
+     *
+     * If the mobIdString is "*", the profile will match any mob (ignoring NBT if absent).  
+     * If nbtMatcherString is non-empty, it’s parsed by NbtHelper.parseNbt(...) into a CompoundTag matcher.
+     * If soundOverrides is blank or empty, then no overrides are applied for sounds.  
+     * If detectionOverrides is blank or empty, no stance overrides are applied.
+     */
+
+    // Transient cache of parsed MobProfile instances.
+    private List<MobProfile> cachedMobProfiles = null;
+
+    /**
+     * Returns a parsed, unmodifiable list of MobProfile objects derived from {@link #specialMobProfilesRaw}.
+     * Parses each raw entry on first access (lazy), and caches the result. If you modify
+     * specialMobProfilesRaw afterward, you can call {@link #invalidateMobProfileCache()} to force re-parse.
+     */
+    public List<MobProfile> getMobProfiles() {
+        if (cachedMobProfiles != null) {
+            return cachedMobProfiles;
+        }
+
+        List<MobProfile> list = new ArrayList<>();
+        for (String rawEntry : specialMobProfilesRaw) {
+            if (rawEntry == null || rawEntry.trim().isEmpty()) continue;
+
+            // Split into 5 semicolon-separated parts
+            String[] parts = rawEntry.trim().split(";", -1);
+            if (parts.length != 5) {
+                // Skip invalid lines or log a warning
+                SoundAttractMod.LOGGER.warn(
+                    "Skipping malformed mob profile entry: '{}'. Expected 5 semicolon-separated parts.",
+                    rawEntry
+                );
+                continue;
+            }
+
+            String profileName          = parts[0].trim();
+            String mobIdString          = parts[1].trim();
+            String nbtMatcherString     = parts[2].trim();
+            String soundOverridesString = parts[3].trim();
+            String detectionString      = parts[4].trim();
+
+            // 1) Parse NBT matcher (if any)
+            NbtCompound  parsedNbt = null;
+            if (!nbtMatcherString.isEmpty()) {
+                try {
+                    parsedNbt = StringNbtReader.parse(nbtMatcherString);
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn(
+                        "Failed to parse NBT matcher for mob profile '{}': {}. Error: {}",
+                        profileName, nbtMatcherString, e.getMessage()
+                    );
+                    parsedNbt = null;
+                }
+            }
+
+            // 2) Parse sound overrides → List<SoundOverride>
+            List<SoundOverride> soundOverrides = new ArrayList<>();
+            if (!soundOverridesString.isEmpty()) {
+                String[] overrideEntries = soundOverridesString.split(",");
+                for (String entry : overrideEntries) {
+                    String trimmed = entry.trim();
+                    if (trimmed.isEmpty()) continue;
+                    try {
+                        SoundOverride so = SoundOverride.parse(trimmed);
+                        soundOverrides.add(so);
+                    } catch (IllegalArgumentException e) {
+                        SoundAttractMod.LOGGER.warn(
+                            "Failed to parse SoundOverride '{}' for profile '{}': {}",
+                            trimmed, profileName, e.getMessage()
+                        );
+                    }
+                }
+            }
+
+            // 3) Parse detection overrides → Map<PlayerStance, Double>
+            Map<PlayerStance, Double> detectionOverrides = new HashMap<>();
+            if (!detectionString.isEmpty()) {
+                String[] stancePairs = detectionString.split(",");
+                for (String pair : stancePairs) {
+                    String trimmedPair = pair.trim();
+                    if (trimmedPair.isEmpty()) continue;
+
+                    String[] kv = trimmedPair.split(":", 2);
+                    if (kv.length != 2) {
+                        SoundAttractMod.LOGGER.warn(
+                            "Skipping malformed detection override '{}' in profile '{}'. Expected 'stance:value'.",
+                            trimmedPair, profileName
+                        );
+                        continue;
+                    }
+
+                    String stanceName = kv[0].trim().toLowerCase(Locale.ROOT);
+                    String valueStr    = kv[1].trim();
+                    Optional<PlayerStance> stanceOpt = PlayerStance.fromString(stanceName);
+                    if (stanceOpt.isEmpty()) {
+                        SoundAttractMod.LOGGER.warn(
+                            "Unknown PlayerStance '{}' in profile '{}'. Skipping.",
+                            stanceName, profileName
+                        );
+                        continue;
+                    }
+
+                    double val;
+                    try {
+                        val = Double.parseDouble(valueStr);
+                    } catch (NumberFormatException e) {
+                        SoundAttractMod.LOGGER.warn(
+                            "Invalid detection override value '{}' for stance '{}' in profile '{}'. Skipping.",
+                            valueStr, stanceName, profileName
+                        );
+                        continue;
+                    }
+
+                    detectionOverrides.put(stanceOpt.get(), val);
+                }
+            }
+
+            // 4) Construct and add MobProfile
+            try {
+                MobProfile mp = new MobProfile(
+                    profileName,
+                    mobIdString.isEmpty() ? "*" : mobIdString,
+                    nbtMatcherString.isEmpty() ? null : nbtMatcherString,
+                    soundOverrides,
+                    detectionOverrides
+                );
+                list.add(mp);
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn(
+                    "Failed to construct MobProfile for entry '{}': {}",
+                    rawEntry, e.getMessage()
+                );
+            }
+        }
+
+        // Cache as unmodifiable list
+        cachedMobProfiles = Collections.unmodifiableList(list);
+        return cachedMobProfiles;
+    }
+
+    /** Call this if you've changed {@link #specialMobProfilesRaw} at runtime, to force re-parsing. */
+    public void invalidateMobProfileCache() {
+        this.cachedMobProfiles = null;
+    }
+
+    // ===============
+    // === Sounds ===
+    // ===============
+
     public static class SoundConfig {
         public final String soundId;
         public final double range;
         public final double weight;
+
         public SoundConfig(String soundId, double range, double weight) {
             this.soundId = soundId;
             this.range = range;
             this.weight = weight;
         }
     }
+    /**
+ * Find and return the first MobProfile whose criteria match the given MobEntity.
+ * If no profile matches, returns null.
+ */
+    public MobProfile getMatchingProfile(MobEntity mob) {
+    // Iterate over all parsed MobProfile entries
+        for (MobProfile profile : getMobProfiles()) {
+            if (profile.matches(mob)) {
+                return profile;
+            }
+        }
+        return null;
+    }
+
 
     public SoundConfig getSoundConfigForId(String id) {
         if (id == null || nonPlayerSoundIdList == null) return null;
@@ -30,8 +228,9 @@ public class SoundAttractConfigData {
         return null;
     }
 
-
-    // === General ===
+    // ===================
+    // === General =======
+    // ===================
 
     /**
      * If true, enables detailed debug logging for the Sound Attract mod.
@@ -48,15 +247,15 @@ public class SoundAttractConfigData {
      * Recommended: 40–400. Minimum: 1. Maximum: 1200.
      * Lower values = mobs lose interest faster. Higher = mobs may travel farther for old sounds.
      */
-    public int soundLifetimeTicks = 120;
+    public int soundLifetimeTicks = 200;
 
     /**
      * The cooldown between mob sound scans in ticks (20 ticks = 1 second).
      * Lower values mean mobs scan for sounds more frequently (more responsive but higher CPU usage).
-     * Default: 20 (1 second)
+     * Default: 25 (~1 second)
      * Recommended: 10–60. Minimum: 1. Maximum: 200.
      */
-    public int scanCooldownTicks = 20;
+    public int scanCooldownTicks = 25;
 
     /**
      * Minimum server TPS (ticks per second) at which the scan cooldown is applied.
@@ -74,37 +273,40 @@ public class SoundAttractConfigData {
      */
     public double maxTpsForScanCooldown = 20.0;
 
-     /**
+    /**
      * The number of spatial cells to process per server tick for mob group updates.
      * Higher values = faster updates but more CPU usage. Lower values = less lag but slower group response.
-     * Default: 40
+     * Default: 30
      * Recommended: 10–100. Minimum: 1.
      */
-    public int cellsPerTick = 40;
-
-    /**
-     * The number of mobs to process per cell per tick for group assignment.
-     * Higher values = faster grouping but more CPU usage. Lower values = less lag but slower group response.
-     * Default: 35
-     * Recommended: 10–50. Minimum: 1.
-     */
-    public int mobsPerCellPerTick = 35;
+    public int cellsPerTick = 50;
 
     /**
      * Minimum number of cells to process per tick (adaptive batching).
      * Default: 5
      */
-    public int minCellsPerTick = 5;
+    public int minCellsPerTick = 25;
+
     /**
      * Maximum number of cells to process per tick (adaptive batching).
-     * Default: 100
+     * Default: 60
      */
     public int maxCellsPerTick = 100;
+
+    /**
+     * The number of mobs to process per cell per tick for group assignment.
+     * Higher values = faster grouping but more CPU usage. Lower values = less lag but slower group response.
+     * Default: 25
+     * Recommended: 10–50. Minimum: 1.
+     */
+    public int mobsPerCellPerTick = 55;
+
     /**
      * Minimum number of mobs per cell per tick (adaptive batching).
-     * Default: 10
+     * Default: 1
      */
-    public int minMobsPerCellPerTick = 10;
+    public int minMobsPerCellPerTick = 25;
+
     /**
      * Maximum number of mobs per cell per tick (adaptive batching).
      * Default: 100
@@ -116,6 +318,7 @@ public class SoundAttractConfigData {
      * Should be updated by the mod at runtime.
      */
     public double lastKnownTps = 20.0;
+
     /**
      * Optional: Supplier for real-time TPS (set by mod at runtime).
      */
@@ -125,11 +328,14 @@ public class SoundAttractConfigData {
      * The ratio used to determine if a mob should switch to a new sound target while pursuing a sound.
      * If the new sound's range is greater than the current target's range multiplied by this ratio,
      * the mob (leader, edge, or deserter) will switch to the new target. This also updates group members if the leader switches.
-     * Default: 0.5
+     * Default: 0.7
      * Recommended: 0.1–1.0. Minimum: 0.01. Maximum: 2.0.
      * Lower = mobs switch more easily to new sounds. Higher = mobs stick to their current target longer.
      */
-    public double soundSwitchRatio = 0.5;
+
+    public boolean useRangeInSoundSwitch = true;
+
+    public double soundSwitchRatio = 0.7;
 
     /**
      * The distance (in blocks) at which mobs consider themselves to have "arrived" at a sound source.
@@ -147,7 +353,9 @@ public class SoundAttractConfigData {
      */
     public double mobMoveSpeed = 1.0;
 
-    // === Mobs ===
+    // ================
+    // === Mobs =======
+    // ================
 
     /**
      * List of entity IDs (as strings) for mobs that will be attracted to sounds.
@@ -173,6 +381,8 @@ public class SoundAttractConfigData {
      */
     public boolean edgeMobSmartBehavior = false;
 
+    public int delayedRelayTicks = 2000;
+
     /**
      * The size (in blocks) of each spatial partition (cell/chunk) used for both sound detection and mob grouping.
      * Increasing this value means each partition covers a larger area, which can improve performance but may reduce precision.
@@ -182,14 +392,14 @@ public class SoundAttractConfigData {
      * Default: 16 (standard chunk size).
      * Recommended: 8–64. Minimum: 4. Maximum: 128.
      */
-    public int spatialPartitionSize = 16;
+    public int spatialPartitionSize = 24;
 
     /**
      * Maximum distance (in blocks) for mobs to be considered part of the same group.
      * Default: 32.0
      * Recommended: 8–64. Minimum: 1. Maximum: 128.
      */
-    public double groupDistance = 32.0;
+    public double groupDistance = 128.0;
 
     /**
      * Maximum number of mobs allowed in a single group (cell).
@@ -204,15 +414,17 @@ public class SoundAttractConfigData {
      * Recommended: 4–12. Minimum: 1. Maximum: 32.
      */
     public int numEdgeSectors = 6;
-    // === Sound ===
 
+    // ================
+    // === Sound =======
+    // ================
 
     /**
      * List of non-player sound IDs that mobs can be attracted to.
      * Each entry is in the format: "soundId;range;weight"
-     * - soundId: The resource location of the sound event (e.g., "minecraft:block.lever.click")
-     * - range: The maximum distance (in blocks) at which mobs can hear this sound
-     * - weight: How strongly mobs are attracted to this sound (higher = more attractive)
+     *   - soundId: The resource location of the sound event (e.g., "minecraft:block.lever.click")
+     *   - range: The maximum distance (in blocks) at which mobs can hear this sound
+     *   - weight: How strongly mobs are attracted to this sound (higher = more attractive)
      * Example: "minecraft:block.lever.click;6;1.0"
      * Range recommended: 1–128. Weight recommended: 0.1–100.
      * You can add custom modded sounds here as well.
@@ -312,7 +524,9 @@ public class SoundAttractConfigData {
         "cgm:entity.stun_grenade.ring;104;10"
     ));
 
+    // =========================
     // === SoundIdWhitelist ===
+    // =========================
 
     /**
      * Whitelist of sound IDs to process for mob attraction. Only sounds in this list will be checked, improving performance.
@@ -373,7 +587,6 @@ public class SoundAttractConfigData {
         "minecraft:block.shulker_box.open",
         "minecraft:block.shulker_box.close",
         "minecraft:block.bell.use",
-        "minecraft:block.bell.resonate",
         "minecraft:block.furnace.fire_crackle",
         "minecraft:entity.generic.explode",
         "minecraft:entity.firework_rocket.launch",
@@ -421,8 +634,10 @@ public class SoundAttractConfigData {
         "cgm:entity.stun_grenade.explosion",
         "cgm:entity.stun_grenade.ring"
     ));
-    
+
+    // =======================
     // === Block Muffling ===
+    // =======================
 
     /**
      * The radius (in blocks) around the path from sound source to mob to check for muffling blocks.
@@ -562,51 +777,64 @@ public class SoundAttractConfigData {
      */
     public double liquidBlockWeightReduction = 0.1;
 
-    // === Stealth Detection Settings ===
+    // ===============================
+    // === Stealth Detection Settings ==
+    // ===============================
 
     // -- General/Performance --
-    /** How often (in ticks) to check mob stealth detection. Higher = less CPU, lower = more responsive. Default: 10 */
-    public int stealthCheckInterval = 10;
-
-    // -- Light & Night Modifiers --
-    /** Light level below which mobs have a harder time detecting players. Default: 7 */
-    public int detectionLightLowThreshold = 7;
-    /** Detection range multiplier if player is in low light. Default: 0.7 */
-    public double detectionLightLowMultiplier = 0.7;
-    /** Light level for partial darkness penalty. Default: 12 */
-    public int detectionLightMidThreshold = 12;
-    /** Detection range multiplier if player is in mid light. Default: 0.85 */
-    public double detectionLightMidMultiplier = 0.85;
-    /** Detection range multiplier at night (13000-23000 ticks). Default: 0.45 */
-    public double detectionNightMultiplier = 0.45;
+    /** How often (in ticks) to check mob stealth detection. Higher = less CPU, lower = more responsive. Default: 30 */
+    public int stealthCheckInterval = 30;
 
     // -- Player Stance & Detection Ranges --
     /** Detection range for standing players. Default: 32.0 */
     public double standingDetectionRange = 32.0;
-    /** Detection range for standing players with camouflage. Default: 16.0 */
-    public double standingDetectionRangeCamouflage = 16.0;
-    /** Detection range for sneaking players. Default: 8.0 */
-    public double sneakDetectionRange = 8.0;
-    /** Detection range for sneaking camouflaged players. Default: 4.0 */
-    public double sneakDetectionRangeCamouflage = 4.0;
+    /** Detection range for standing players with camouflage. Default: 1.0 */
+    public double standingDetectionRangeCamouflage = 1.0;
+    /** Detection range for sneaking players. Default: 12.0 */
+    public double sneakDetectionRange = 12.0;
+    /** Detection range for sneaking camouflaged players. Default: 1.0 */
+    public double sneakDetectionRangeCamouflage = 1.0;
     /** Detection range for crawling players. Default: 4.0 */
     public double crawlDetectionRange = 4.0;
-    /** Detection range for crawling camouflaged players. Default: 2.0 */
-    public double crawlDetectionRangeCamouflage = 2.0;
-    /** Base range for mobs to detect any sound. Default: 16.0 */
-    public double baseDetectionRange = 16.0;
+    /** Detection range for crawling camouflaged players. Default: 1.0 */
+    public double crawlDetectionRangeCamouflage = 1.0;
 
-    // -- Camouflage System --
-    /** Enable partial camouflage: partial armor sets, similar colors, and partial block matches grant partial bonus. Default: true */
-    public boolean camouflagePartialMatching = true;
-    /** Weight for each matching armor piece (0.0 = no effect, 1.0 = full effect per piece). Default: 0.25 */
-    public double camouflageArmorPieceWeight = 0.25;
-    /** Weight for similar armor color (0.0 = exact match only, 1.0 = full bonus for similar colors). Default: 0.5 */
-    public double camouflageColorSimilarityWeight = 0.5;
-    /** Max color distance (RGB units) for "similar" color. Default: 48 */
-    public int camouflageColorSimilarityThreshold = 48;
-    /** Weight for each matching adjacent block (0.0 = no effect, 1.0 = full bonus per block). Default: 0.15 */
-    public double camouflageBlockMatchWeight = 0.15;
+    // -- New “Full” Stealth Modifiers --
+    /** Invisibility effect multiplier (multiplicative). Default: 0.1 */
+    public double invisibilityStealthFactor = 0.1;
+
+    /** The “neutral” light level at which there is zero net detection change. Default: 7.0 */
+    public double neutralLightLevel = 7.0;
+    /** How strongly (per light point above/below neutral) detection range is scaled. Default: 0.3 */
+    public double lightLevelSensitivity = 0.8;
+    /** Minimum allowed light‐factor (clamped). Default: 0.2 */
+    public double minLightFactor = 0.2;
+    /** Maximum allowed light‐factor (clamped). Default: 3.0 */
+    public double maxLightFactor = 3.0;
+
+    /** Whether holding items widens (penalizes) detection range. Default: true */
+    public boolean enableHeldItemPenalty = true;
+    /** Per‐held‐item factor: actual range ×= heldItemPenaltyFactor for each item. Default: 1.1 */
+    public double heldItemPenaltyFactor = 1.1;
+
+    /** Whether visibly enchanted armor/held items widen detection. Default: true */
+    public boolean enableEnchantmentPenalty = true;
+    /** Per‐enchanted‐armor‐piece factor: range ×= armorEnchantmentPenaltyFactor. Default: 1.15 */
+    public double armorEnchantmentPenaltyFactor = 1.15;
+    /** Per‐enchanted‐held‐item factor: range ×= heldItemEnchantmentPenaltyFactor. Default: 0.9 */
+    public double heldItemEnchantmentPenaltyFactor = 1.15;
+
+    /** Rain penalty multiplier: range ×= rainStealthFactor. Default: 0.8 */
+    public double rainStealthFactor = 0.8;
+    /** Thunder penalty multiplier: range ×= thunderStealthFactor. Default: 0.6 */
+    public double thunderStealthFactor = 0.6;
+
+    /** Squared‐velocity threshold above which the player is “moving.” Default: 0.003 */
+    public double movementThreshold = 0.003;
+    /** Multiplier when player is moving (and not sneak/crawl): range ×= movementStealthPenalty. Default: 0.9 */
+    public double movementStealthPenalty = 1.2;
+    /** Multiplier when player is stationary (and not sneak/crawl): range ×= stationaryStealthBonusFactor. Default: 1.1 */
+    public double stationaryStealthBonusFactor = 0.8;
 
     // -- Camouflage Scaling & Penalties --
     /** Enable distance scaling: camo is more effective at longer distances. Default: true */
@@ -622,50 +850,54 @@ public class SoundAttractConfigData {
     /** Penalty to camouflage factor when walking (0.0 = no penalty, 1.0 = full penalty). Default: 0.15 */
     public double camouflageWalkingPenalty = 0.15;
 
+    public int camouflageColorSimilarityThreshold = 70;
+
+
     // -- Camouflage Sets --
     /**
      * List of camouflage sets, each describing a color and the required armor and blocks for camouflage.
-     * Format: color;helmet;chestplate;leggings;boots;block1;block2;...
-     * Example: "F9FFFE;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:snow_block;minecraft:white_wool"
-     * Add more armor set for each color by adding another line in the list color;moddedhelmet;moddedchestplate;moddedleggings;moddedboots;moddedblock1;moddedblock2;...
-     * Players wearing the specified armor and standing on the listed blocks will be harder to detect.
+     * Format: color;helmet;chestplate;leggings;boots;block1;block2;…
+     * Example: "F9FFFE;minecraft:leather_helmet;…;minecraft:white_wool"
      */
     public List<String> camouflageSets = new ArrayList<>(List.of(
-        // White
-        "F9FFFE;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:snow_block;minecraft:white_wool;minecraft:quartz_block;minecraft:calcite;minecraft:diorite;minecraft:bone_block;minecraft:powder_snow;minecraft:wool;minecraft:white_concrete;minecraft:white_terracotta;minecraft:white_glazed_terracotta",
-        // Orange
-        "F9801D;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:orange_wool;minecraft:orange_terracotta;minecraft:acacia_planks;minecraft:honey_block;minecraft:pumpkin;minecraft:carved_pumpkin;minecraft:orange_concrete;minecraft:orange_glazed_terracotta;minecraft:mangrove_planks",
-        // Magenta
-        "C74EBD;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:magenta_wool;minecraft:magenta_terracotta;minecraft:purpur_block;minecraft:amethyst_block;minecraft:magenta_concrete;minecraft:magenta_glazed_terracotta;minecraft:shulker_box",
-        // Light Blue
-        "3AB3DA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:light_blue_wool;minecraft:light_blue_terracotta;minecraft:packed_ice;minecraft:ice;minecraft:blue_ice;minecraft:light_blue_concrete;minecraft:light_blue_glazed_terracotta;minecraft:prismarine;minecraft:prismarine_bricks",
-        // Yellow
-        "FED83D;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:yellow_wool;minecraft:yellow_terracotta;minecraft:sandstone;minecraft:smooth_sandstone;minecraft:end_stone;minecraft:sponge;minecraft:hay_block;minecraft:yellow_concrete;minecraft:yellow_glazed_terracotta",
-        // Lime
-        "80C71F;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:lime_wool;minecraft:lime_terracotta;minecraft:melon;minecraft:slime_block;minecraft:lime_concrete;minecraft:lime_glazed_terracotta;minecraft:leaves;minecraft:moss_block",
-        // Pink
-        "F38BAA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:pink_wool;minecraft:pink_terracotta;minecraft:brain_coral_block;minecraft:pink_concrete;minecraft:pink_glazed_terracotta;minecraft:peony;minecraft:pink_petals",
-        // Gray
-        "474F52;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:gray_wool;minecraft:gray_terracotta;minecraft:polished_andesite;minecraft:stone;minecraft:cobblestone;minecraft:gravel;minecraft:deepslate;minecraft:gray_concrete;minecraft:gray_glazed_terracotta",
-        // Light Gray
-        "9D9D97;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:light_gray_wool;minecraft:light_gray_terracotta;minecraft:stone;minecraft:andesite;minecraft:calcite;minecraft:diorite;minecraft:light_gray_concrete;minecraft:light_gray_glazed_terracotta;minecraft:oxidized_copper",
-        // Cyan
-        "169C9C;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:cyan_wool;minecraft:cyan_terracotta;minecraft:prismarine;minecraft:warped_planks;minecraft:cyan_concrete;minecraft:cyan_glazed_terracotta;minecraft:oxidized_cut_copper",
-        // Purple
-        "8932B8;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:purple_wool;minecraft:purple_terracotta;minecraft:obsidian;minecraft:purpur_block;minecraft:crying_obsidian;minecraft:purple_concrete;minecraft:purple_glazed_terracotta;minecraft:chorus_flower",
-        // Blue
-        "3C44AA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:blue_wool;minecraft:blue_terracotta;minecraft:lapis_block;minecraft:blue_ice;minecraft:blue_concrete;minecraft:blue_glazed_terracotta;minecraft:warped_nylium;minecraft:soul_fire",
-        // Brown
-        "835432;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:brown_wool;minecraft:brown_terracotta;minecraft:dirt;minecraft:podzol;minecraft:coarse_dirt;minecraft:mud;minecraft:brown_concrete;minecraft:brown_glazed_terracotta;minecraft:rooted_dirt",
-        // Green
-        "5E7C16;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:green_wool;minecraft:green_terracotta;minecraft:moss_block;minecraft:grass_block;minecraft:leaves;minecraft:vine;minecraft:green_concrete;minecraft:green_glazed_terracotta;minecraft:cactus;minecraft:bamboo",
-        // Red
-        "B02E26;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:red_wool;minecraft:red_terracotta;minecraft:netherrack;minecraft:red_sand;minecraft:red_concrete;minecraft:red_glazed_terracotta;minecraft:crimson_nylium;minecraft:nether_wart_block;minecraft:cherry_leaves",
-        // Black
-        "1D1D21;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots;minecraft:black_wool;minecraft:black_terracotta;minecraft:coal_block;minecraft:deepslate;minecraft:black_concrete;minecraft:black_glazed_terracotta;minecraft:obsidian;minecraft:basalt;minecraft:sculk"
+    // White
+    "F9FFFE;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Orange
+    "F9801D;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Magenta
+    "C74EBD;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Light Blue
+    "3AB3DA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Yellow
+    "FED83D;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Lime
+    "80C71F;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Pink
+    "F38BAA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Gray
+    "474F52;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Light Gray
+    "9D9D97;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Cyan
+    "169C9C;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Purple
+    "8932B8;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Blue
+    "3C44AA;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Brown
+    "835432;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Green
+    "5E7C16;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Red
+    "B02E26;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots",
+    // Black
+    "1D1D21;minecraft:leather_helmet;minecraft:leather_chestplate;minecraft:leather_leggings;minecraft:leather_boots"
     ));
 
+
+    // ==========================
     // === Voice Chat Integration ===
+    // ==========================
 
     /**
      * If true, enables integration with Simple Voice Chat mod. Sounds from players using voice chat will attract mobs.
@@ -683,15 +915,17 @@ public class SoundAttractConfigData {
      * The range (in blocks) at which mobs can hear players speaking normally in voice chat.
      * Default: 24
      */
-    public int voiceChatNormalRange = 24;
+    public int voiceChatNormalRange = 32;
 
     /**
      * The "weight" of voice chat sounds. Higher values make mobs more likely to be attracted to voice chat.
      * Default: 9.0
      */
-    public double voiceChatWeight = 9.0;
+    public double voiceChatWeight = 50.0;
 
+    // =====================
     // === Tacz Integration ===
+    // =====================
 
     /**
      * If true, enables integration with Tacz mod for custom gun sounds.
@@ -781,5 +1015,10 @@ public class SoundAttractConfigData {
         "tacz:muzzle_silencer_phantom_s1;30.0",
         "tacz:muzzle_compensator_trident;-2.0",
         "tacz:deagle_golden_long_barrel;-1.0"
+    ));
+
+    public List<String> specialMobProfilesRaw = new ArrayList<>(List.of(
+        "GreedyGoblin;minecraft:piglin;;minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0",
+        "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
     ));
 }

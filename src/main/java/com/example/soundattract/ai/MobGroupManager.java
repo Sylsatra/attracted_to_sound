@@ -10,7 +10,8 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import com.example.soundattract.SoundAttractMod;
 import java.lang.ref.WeakReference;
-import java.util.UUID;
+import net.minecraft.registry.Registries;
+
 import net.minecraft.world.World;
 
 public class MobGroupManager {
@@ -55,7 +56,10 @@ public class MobGroupManager {
         @Override
         public int hashCode() { return hash; }
     }
-
+    private static boolean isAttractedType(MobEntity mob) {
+        String id = Registries.ENTITY_TYPE.getId(mob.getType()).toString();
+        return SoundAttractMod.CONFIG.attractedEntities.contains(id);
+    }
     public static boolean isEdgeMobEntity(MobEntity mob) {
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging)
             com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMobEntity] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
@@ -157,6 +161,9 @@ public class MobGroupManager {
                     if (uuid.getLeastSignificantBits() == uuidLsb) {
                         MobEntity mob = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(uuid);
                         if (mob != null && mob.isAlive()) {
+                            if (!isAttractedType(mob)) {
+                                continue;
+                            }
                             net.minecraft.util.Identifier id = net.minecraft.registry.Registries.ENTITY_TYPE.getId(mob.getType());
                             mobIdMap.put(mob, id);
                             if (attracted.contains(id.toString())) {
@@ -199,6 +206,16 @@ public class MobGroupManager {
         }
         uuidToLeader.clear();
         leaders.clear();
+        for (MobEntity m : attractedMobEntities) {
+            if (SoundAttractMod.CONFIG.getMatchingProfile(m) != null) {
+                leaders.add(new WeakReference<>(m));
+                uuidToLeader.put(m.getUuid(), m);
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info("[MobGroupManager] Profiled mob {} forced to leader",
+                                            Registries.ENTITY_TYPE.getId(m.getType()));
+                }
+            }
+        }
         if (attractedMobEntities.isEmpty()) return;
         double groupRadius = com.example.soundattract.SoundAttractMod.CONFIG.groupDistance;
         int maxGroupSize = com.example.soundattract.SoundAttractMod.CONFIG.maxGroupSize;
@@ -216,20 +233,23 @@ public class MobGroupManager {
             List<MobEntity> group = entry.getValue();
             if (group.isEmpty()) continue;
             for (MobEntity mob : group) {
-                MobEntity nearestLeader = null;
+                MobEntity currentLeader = uuidToLeader.get(mob.getUuid());
+                MobEntity nearestLeader = currentLeader != null && currentLeader.isAlive() ? currentLeader : null;
                 double nearestDistSq = Double.MAX_VALUE;
-                for (MobEntity leader : assignedLeaders) {
-                    double distSq = mob.squaredDistanceTo(leader);
-                    if (distSq <= groupRadius * groupRadius && distSq < nearestDistSq) {
-                        nearestLeader = leader;
-                        nearestDistSq = distSq;
-                    }
-                }
                 if (nearestLeader == null) {
-                    assignedLeaders.add(mob);
-                    leaders.add(new WeakReference<>(mob));
-                    leaderCount++;
-                    nearestLeader = mob;
+                    for (MobEntity leader : assignedLeaders) {
+                        double distSq = mob.squaredDistanceTo(leader);
+                        if (distSq <= groupRadius * groupRadius && distSq < nearestDistSq) {
+                            nearestLeader = leader;
+                            nearestDistSq = distSq;
+                        }
+                    }
+                    if (nearestLeader == null) {
+                        assignedLeaders.add(mob);
+                        leaders.add(new WeakReference<>(mob));
+                        leaderCount++;
+                        nearestLeader = mob;
+                    }
                 }
                 uuidToLeader.put(mob.getUuid(), nearestLeader);
                 leaderToGroup.computeIfAbsent(nearestLeader, k -> new ArrayList<>()).add(mob);
@@ -306,10 +326,10 @@ public class MobGroupManager {
         List<MobEntity> allAttractedMobEntities = new ArrayList<>();
         Box worldBox = new Box(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
         for (MobEntity mob : level.getEntitiesByClass(MobEntity.class, worldBox, m -> true)) {
-            String mobId = net.minecraft.registry.Registries.ENTITY_TYPE.getId(mob.getType()).toString();
-            if (com.example.soundattract.SoundAttractMod.CONFIG.attractedEntities.contains(mobId)) {
-                allAttractedMobEntities.add(mob);
+            if (!isAttractedType(mob)) {
+                continue;
             }
+                allAttractedMobEntities.add(mob);
         }
         synchronized (deserterUuids) {
             for (MobEntity mob : allAttractedMobEntities) {
@@ -380,10 +400,10 @@ public class MobGroupManager {
             if (uuidSet.contains(uuid.getLeastSignificantBits())) {
                 MobEntity mob = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(uuid);
                 if (mob != null && mob.isAlive()) {
-                    String id = net.minecraft.registry.Registries.ENTITY_TYPE.getId(mob.getType()).toString();
-                    if (attracted.contains(id)) {
-                        mobsInCell.add(mob);
+                    if (!isAttractedType(mob)) {
+                        continue;
                     }
+                    mobsInCell.add(mob);
                 }
             }
         }

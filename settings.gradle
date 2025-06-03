@@ -1,12 +1,10 @@
 pluginManagement {
-	repositories {
-		maven {
-			name = 'Fabric'
-			url = 'https://maven.fabricmc.net/'
-		}
-		mavenCentral()
-		gradlePluginPortal()
-	}
+  repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { name = 'MavenForge'; url = 'https://maven.minecraftforge.net/' }
+        maven { name = 'SpongePowered'; url = 'https://repo.spongepowered.org/maven/' }
+  }
 }
 
-rootProject.name = 'soundattract'
+rootProject.name = 'soundattract' 

@@ -1,5 +1,6 @@
 {
   "key.soundattract.shoot": "射击（Tacz）",
   "key.soundattract.reload": "装弹（Tacz）",
-  "key.soundattract.tacz_category": "Tacz 控制"
+  "key.soundattract.tacz_category": "Tacz 控制",
+  "enchantment.soundattract.conceal": "附魔隐藏"
 }

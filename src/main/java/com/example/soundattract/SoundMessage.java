@@ -97,8 +97,7 @@ public class SoundMessage {
 
     public static void handle(SoundMessage msg, net.minecraft.server.network.ServerPlayerEntity sender) {
     if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
-    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] SoundMessage.handle called for soundId: {} | range: {} | weight: {} | pos: ({}, {}, {}) | dim: {} | sender: {}", msg.soundId, msg.range, msg.weight, msg.x, msg.y, msg.z, msg.dimension, sender != null ? sender.getName().getString() : "null");
-}
+    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] SoundMessage.handle called for soundId: {} | range: {} | weight: {} | pos: ({}, {}, {}) | dim: {} | sender: {}", msg.soundId, msg.range, msg.weight, msg.x, msg.y, msg.z, msg.dimension, sender != null ? sender.getName().getString() : "null");}
         try {
             String soundIdStr = msg.soundId != null ? msg.soundId.toString() : null;
             if (!SoundAttractMod.CONFIG.soundIdWhitelist.isEmpty()
@@ -142,13 +141,12 @@ public class SoundMessage {
     }
     if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
     SoundAttractMod.LOGGER.info("[DEBUG_SERVER] Received gunshot SoundMessage: gunId={}, fireMode={}, ammo={}, raw='{}'", gunId, fireMode, ammo, msg.taczType);
-}
-}
+        }
+    }
 
         if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
             if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
-    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] About to call SoundTracker.addSound for VOICE_CHAT_SOUND_ID at pos=({}, {}, {}), dim={}, range={}, weight={}", pos.getX(), pos.getY(), pos.getZ(), dimString, msg.range, msg.weight);
-}
+    com.example.soundattract.SoundAttractMod.LOGGER.info("[DEBUG] About to call SoundTracker.addSound for VOICE_CHAT_SOUND_ID at pos=({}, {}, {}), dim={}, range={}, weight={}", pos.getX(), pos.getY(), pos.getZ(), dimString, msg.range, msg.weight);}
                 if (msg.range > 0) {
                     SoundTracker.addSound(null, pos, dimString, msg.range, msg.weight, lifetime, VOICE_CHAT_SOUND_ID.toString());
                 }
@@ -167,9 +165,9 @@ public class SoundMessage {
             SoundAttractMod.LOGGER.info("[SoundMessage] Overriding range/weight for {} from nonPlayerSoundIdList: range={}, weight={}", msg.soundId, range, weight);
         }
     }
-}
+} 
 
-SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
+    SoundTracker.addSound(se, pos, dimString, range, weight, lifetime, msg.soundId.toString());
             }
         } catch (Exception e) {
             com.example.soundattract.SoundAttractMod.LOGGER.error("[SoundMessage] Exception in handle for soundId={}", msg.soundId, e);

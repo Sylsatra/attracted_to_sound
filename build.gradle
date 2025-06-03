@@ -3,66 +3,68 @@ plugins {
 	id 'maven-publish'
 }
 
-version = project.mod_version
-group = project.maven_group
-
-base {
-    archivesName = 'fabric_soundattractmod_1.20.1'
-}
+group = "${maven_group}"
+version = "${mod_version}"
+archivesBaseName = "${archives_base_name}"
 
 repositories {
-    maven { url = 'https://api.modrinth.com/maven' }
-    maven { url = 'https://maven.maxhenkel.de/repository/public' }
-    maven { url = 'https://maven.fabricmc.net/' }
-} 
+    mavenCentral()
+    maven { url = "https://maven.fabricmc.net/" }           // Fabric/Loom/Mappings
+    maven { url = "https://api.modrinth.com/maven" }        // TacZ / simple-voice-chat
+    maven { url = "https://maven.maxhenkel.de/repository/public" } // voicechat API
+}
 
 dependencies {
-    implementation "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
-    modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_version}"
-    implementation 'com.google.code.gson:gson:2.10.1'
-	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-	modImplementation "net.fabricmc.fabric-api:fabric-networking-api-v1:1.3.13+13a40c6677"
+    // ── 1) Minecraft + Yarn mappings ───────────────────────────────────────────
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings  "net.fabricmc:yarn:1.20.1+build.10:v2"
+
+    // ── 2) Fabric Loader + Fabric API ────────────────────────────────────────
+    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.92.5+1.20.1"
+    constraints {
+        implementation("net.fabricmc.fabric-api:fabric-sound-api-v1:1.0.18+fce6070377") {
+            because "Ensure compatibility with Fabric API 0.92.5+1.20.1"
+        }
+    }
+    // ── 3) Voice-chat integration (if you’re using it) ─────────────────────────
+    implementation      "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
+    modRuntimeOnly     "maven.modrinth:simple-voice-chat:fabric-${voicechat_version}"
 }
 
+// ── 3) Inject the version‐string into fabric.mod.json ────────────────────────
 processResources {
-	inputs.property "version", project.version
-
-	filesMatching("fabric.mod.json") {
-		expand "version": inputs.properties.version
-	}
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": inputs.properties.version
+    }
 }
 
-tasks.withType(JavaCompile).configureEach {
-	it.options.release = 17
-}
-
-java {
-
-	withSourcesJar()
-
-	sourceCompatibility = JavaVersion.VERSION_17
+// ── 4) Compile and target Java 17 bytecode ──────────────────────────────────
+java { 
+ 
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_17
 	targetCompatibility = JavaVersion.VERSION_17
 }
 
+// ── 5) Include LICENSE in the JAR ──────────────────────────────────────────
 jar {
-	inputs.property "archivesName", project.base.archivesName
-
-	from("LICENSE") {
-		rename { "${it}_${inputs.properties.archivesName}"}
-	}
+    inputs.property "archivesName", project.archivesBaseName
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}" }
+    }
 }
 
+// ── 6) (Optional) Publishing block ─────────────────────────────────────────
 publishing {
-	publications {
-		create("mavenJava", MavenPublication) {
-			artifactId = project.archives_base_name
-			from components.java
-		}
-	}
-
-	repositories {
-	}
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archivesBaseName
+            from components.java
+        }
+    }
+    repositories {
+        // configure your Maven repo here if needed
+    }
 }
