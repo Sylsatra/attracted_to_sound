@@ -43,9 +43,14 @@ public class SoundAttractClientEvents {
         }
 
         if (event.getSound() instanceof AbstractSoundInstance soundInstance) {
-            ResourceLocation soundRL = soundInstance.getLocation();
+                        ResourceLocation soundRL = soundInstance.getLocation();
             if (soundRL == null || soundRL.equals(SoundMessage.VOICE_CHAT_SOUND_ID)) {
                 return;
+            }
+            // Skip sounds that are not on the whitelist (if a whitelist is defined).
+            if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
+                    && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundRL)) {
+                return; // Not approved – do not send any packet.
             }
 
             SoundEvent se = BuiltInRegistries.SOUND_EVENT.get(soundRL);

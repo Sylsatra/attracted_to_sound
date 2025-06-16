@@ -6,9 +6,11 @@ import com.example.soundattract.enchantment.ModEnchantments;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -179,11 +181,13 @@ public class StealthDetectionEvents {
         lastStealthCheckTick = gameTime;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            AABB levelBounds = new AABB(
-                    level.getWorldBorder().getMinX(), level.getMinBuildHeight(), level.getWorldBorder().getMinZ(),
-                    level.getWorldBorder().getMaxX(), level.getMaxBuildHeight(), level.getWorldBorder().getMaxZ()
-            );
-            for (Mob mob : level.getEntitiesOfClass(Mob.class, levelBounds, entity -> entity.isAlive() && entity.getTarget() instanceof Player)) {
+            int simDistBlocks = level.getServer().getPlayerList().getViewDistance() * 16;
+            Set<Mob> mobsToCheck = new HashSet<>();
+            for (net.minecraft.server.level.ServerPlayer serverPlayer : level.players()) {
+                AABB scanArea = serverPlayer.getBoundingBox().inflate(simDistBlocks);
+                mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && entity.getTarget() instanceof Player));
+            }
+            for (Mob mob : mobsToCheck) {
                 Player playerTarget = (Player) mob.getTarget();
                 if (playerTarget.isCreative() || playerTarget.isSpectator()) {
                     mobOutOfRangeTicks.remove(mob);
@@ -718,7 +722,7 @@ public class StealthDetectionEvents {
             if (!colorAdded) {
                 ResourceLocation itemIdRL = ForgeRegistries.ITEMS.getKey(item);
                 if (itemIdRL != null) {
-                    Integer mappedColorValue = SoundAttractConfig.customArmorColors.get(itemIdRL.toString());
+                    Integer mappedColorValue = SoundAttractConfig.customArmorColors.get(itemIdRL);
                     if (mappedColorValue != null) {
                         colors.add(mappedColorValue);
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {

@@ -2,19 +2,19 @@ package com.example.soundattract;
 
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
-import com.example.soundattract.config.SoundAttractConfig; // Your config class
+import com.example.soundattract.config.SoundAttractConfig; 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap; // Import ServerPlayer
-import java.util.stream.Collectors; // Import EntityType
+import java.util.concurrent.ConcurrentHashMap; 
+import java.util.stream.Collectors; 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.EntityType; // Import AABB
+import net.minecraft.world.entity.EntityType; 
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent; // For getting EntityType from ResourceLocation
+import net.minecraftforge.event.entity.EntityJoinLevelEvent; 
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -22,7 +22,6 @@ import net.minecraftforge.registries.ForgeRegistries;
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class SoundAttractionEvents {
 
-    // --- Queueing Mechanism for Goal Additions ---
     private static final Map<Mob, List<GoalDefinition>> PENDING_GOAL_ADDITIONS = new ConcurrentHashMap<>();
 
     private static class GoalDefinition {
@@ -40,28 +39,21 @@ public class SoundAttractionEvents {
     private static void scheduleAddGoal(Mob mob, int priority, Goal goal) {
         PENDING_GOAL_ADDITIONS.computeIfAbsent(mob, k -> new ArrayList<>()).add(new GoalDefinition(priority, goal));
     }
-    // --- End Queueing Mechanism ---
 
-    // --- For Mob Counting Optimization ---
     private static long lastMobCountUpdateTime_ServerTick = -1;
     private static int cachedAttractedMobCount_ServerTick = 0;
     private static Set<EntityType<?>> CACHED_ATTRACTED_ENTITY_TYPES = null;
-    // Store a mutable copy for comparison
     private static List<String> lastKnownAttractedEntitiesConfig_Copy = null;
-    // --- End Mob Counting Optimization ---
 
 
     private static Set<EntityType<?>> getCachedAttractedEntityTypes() {
-        // Get the list from config (likely List<? extends String>)
         List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.attractedEntities.get();
-        // Create a mutable List<String> copy for comparison and storing
         List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
 
         if (CACHED_ATTRACTED_ENTITY_TYPES == null || lastKnownAttractedEntitiesConfig_Copy == null || !lastKnownAttractedEntitiesConfig_Copy.equals(currentConfigListMutableCopy)) {
             if (SoundAttractConfig.COMMON.debugLogging.get() && CACHED_ATTRACTED_ENTITY_TYPES != null) {
                 SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Attracted entities config changed, rebuilding EntityType cache.");
             }
-            // Stream directly from the getter's result
             CACHED_ATTRACTED_ENTITY_TYPES = currentConfigListFromGetter.stream()
                     .map(idStr -> {
                         try {
@@ -174,8 +166,8 @@ public class SoundAttractionEvents {
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
 
-        scheduleAddGoal(mob, 10, new AttractionGoal(mob, moveSpeed));
-        scheduleAddGoal(mob, 11, new FollowLeaderGoal(mob, moveSpeed));
+        scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
+        scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Scheduled goals for mob {} of type {}", mob.getName().getString(), EntityType.getKey(mob.getType()));

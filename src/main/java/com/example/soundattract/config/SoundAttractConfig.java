@@ -239,9 +239,9 @@ public class SoundAttractConfig {
             maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
                                 .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
             arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
-                                .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
+                                .defineInRange("arrivalDistance", 4.0, 1.0, 100.0);
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
-                                .defineInRange("mobMoveSpeed", 1.0, 0.1, 3.0);
+                                .defineInRange("mobMoveSpeed", 1.3, 0.1, 3.0);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                                 .defineInRange("maxSoundsTracked", 10, 1, 1000000);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
@@ -273,7 +273,19 @@ public class SoundAttractConfig {
                     "minecraft:vex", "minecraft:vindicator", "minecraft:witch",
                     "minecraft:wither_skeleton", "minecraft:zoglin", "minecraft:zombie", "minecraft:zombie_villager",
                     "scguns:cog_knight", "scguns:cog_minion", "scguns:blunderer", "scguns:hive", "scguns:dissident", "scguns:hornlin", "scguns:redcoat", "scguns:cog_knight",
-                    "scguns:sky_carrier", "scguns:supply_scamp", "scguns:swarm", "scguns:zombified_hornlin"
+                    "scguns:sky_carrier", "scguns:supply_scamp", "scguns:swarm", "scguns:zombified_hornlin",
+                    "spore:braiomil", "spore:braurei", "spore:brot", "spore:brute", "spore:busser", 
+                    "spore:inf_construct", "spore:delusioner", "spore:gastgaber", "spore:gazenbreacher",
+                    "spore:griefer", "spore:hevoker", "spore:hidenburg", "spore:howitzer", "spore:howler",
+                    "spore:hvindicator", "spore:illusion", "spore:inf_drownded", "spore:inf_evoker",
+                    "spore:inf_hazmat", "spore:husk", "spore:inf_pillager", "spore:inf_player",
+                    "spore:inf_villager", "spore:inf_vindicator", "spore:inf_wanderer", "spore:inf_witch",
+                    "spore:inf_human", "spore:inquisitor", "spore:jagd", "spore:knight",
+                    "spore:lacerator", "spore:leaper", "spore:mound", "spore:nuclea",
+                    "spore:ogre", "spore:plagued", "spore:proto", "spore:reconstructor",
+                    "spore:scamper", "spore:scavenger", "spore:scent", "spore:sieger", "spore:specter",
+                    "spore:spitter", "spore:stalker", "spore:thorn", "spore:umarmed", "spore:usurper",
+                    "spore:verva", "spore:vigil", "spore:volatile", "spore:wendigo"
                 ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
             builder.pop();
 
@@ -812,18 +824,20 @@ public class SoundAttractConfig {
                     "tacz:ai_awp;170.0", "suffuse:aw50;173.0", "suffuse:gm6;172.0",
                     "suffuse:m200;173.0", "suffuse:xm7;165.0", "suffuse:qbu191;164.0",
                     "suffuse:n4;161.0", "suffuse:qbz951;160.0", "suffuse:ash12;165.0",
-                    "suffuse:aks74u;157.0", "suffuse:qbz951s;160.0", "suffuse:qbz192;159.0",
+                    "suffuse:qbz951s;160.0", "suffuse:qbz192;159.0",
                     "suffuse:an94;161.0", "tacz:sks_tactical;159.0", "tacz:ak47;159.0",
                     "tacz:type_81;158.0", "tacz:qbz_95;160.0", "tacz:hk416d;161.0",
                     "tacz:m4a1;159.0", "tacz:m16a1;159.0", "tacz:hk_g3;161.0",
                     "tacz:m16a4;159.0", "tacz:mk14;162.0", "tacz:scar_l;161.0",
                     "tacz:scar_h;162.0", "tacz:aug;160.0", "tacz:db_short;165.0",
                     "tacz:db_long;166.0", "tacz:m870;165.0", "tacz:aa12;161.0",
-                    "tacz:ump45;158.0", "tacz:hk_mp5a5;158.0", "suffuse:ump45;158.0",
+                    "tacz:ump45;158.0", "tacz:hk_mp5a5;158.0",
                     "tacz:uzi;157.0", "suffuse:pp19;157.0", "tacz:vector45;158.0",
                     "tacz:p90;156.0", "tacz:rpg7;180.0", "tacz:m320;172.0",
                     "suffuse:m79;172.0", "suffuse:pkp;165.0", "tacz:m249;165.0",
-                    "tacz:rpk;164.0"
+                    "tacz:rpk;164.0", "tacz:minigun:165.0", "tacz:g36k;135.0",
+                    "tacz:spr15hb;140.0", "tacz:springfield1873:161.0", "tacz:b93r;125.0",
+                    "tacz:glock_17;125.0"
                 ), obj -> {
                     if (!(obj instanceof String str)) return false;
                     String[] parts = str.split(";", 2);
@@ -836,14 +850,14 @@ public class SoundAttractConfig {
                     "tacz:muzzle_brake_pioneer;-3.0",
                     "tacz:muzzle_brake_cyclone_d2;-3.0",
                     "tacz:muzzle_brake_trex;-5.0",
-                    "tacz:muzzle_silencer_mirage;30.0",
-                    "tacz:muzzle_silencer_vulture;30.0",
-                    "tacz:muzzle_silencer_knight_qd;30.0",
+                    "tacz:muzzle_silencer_mirage;35.0",
+                    "tacz:muzzle_silencer_vulture;45.0",
+                    "tacz:muzzle_silencer_knight_qd;40.0",
                     "tacz:muzzle_silencer_ursus;30.0",
                     "tacz:muzzle_silencer_ptilopsis;30.0",
                     "tacz:muzzle_silencer_phantom_s1;30.0",
                     "tacz:muzzle_compensator_trident;-2.0",
-                    "tacz:deagle_golden_long_barrel;-1.0"
+                    "tacz:deagle_golden_long_barrel;20.0"
                 ), obj -> {
                     if (!(obj instanceof String str)) return false;
                     String[] parts = str.split(";", 2);

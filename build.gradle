@@ -70,12 +70,10 @@ minecraft {
                 }
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', project.property('mod_id')
-            // No longer need to set refMapRemappingFile here if set in configureEach
         }
-        data { // This one already had it
+        data { 
             workingDirectory project.file('run-data')
             args '--mod', project.property('mod_id'), '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
-            // property 'mixin.env.refMapRemappingFile' is already here, or covered by configureEach
         }
     }
 }
@@ -95,7 +93,7 @@ repositories {
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${project.property('minecraft_version')}-${project.property('forge_version')}"
+        minecraft "net.minecraftforge:forge:${project.property('minecraft_version')}-${project.property('forge_version')}"
     compileOnly "de.maxhenkel.voicechat:voicechat-api:2.5.27"
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-1.20.1-2.5.27")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
