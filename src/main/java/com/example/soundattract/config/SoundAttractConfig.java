@@ -239,9 +239,9 @@ public class SoundAttractConfig {
             maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
                                 .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
             arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
-                                .defineInRange("arrivalDistance", 4.0, 1.0, 100.0);
+                                .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
-                                .defineInRange("mobMoveSpeed", 1.3, 0.1, 3.0);
+                                .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                                 .defineInRange("maxSoundsTracked", 10, 1, 1000000);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")

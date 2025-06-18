@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.BlockGetter;
 
 public class SoundTracker {
 
@@ -285,22 +286,24 @@ public class SoundTracker {
                 double rangeMultiplier = NO_MUFFLING_RANGE;
                 double weightMultiplier = NO_MUFFLING_WEIGHT;
 
-                if (isCustomWool(blockState, block) || blockState.is(BlockTags.WOOL)) {
+                if (isCustomWool(blockState, block, level, currentPos)) { 
                     rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorWool.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorWool.get(); 
-                } else if (isCustomLiquid(block)) {
+                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorWool.get();
+                } else if (isCustomLiquid(blockState, block, level, currentPos)) { 
                     rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorLiquid.get();
                     weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorLiquid.get();
-                } else if (isCustomThin(blockState, block)) {
+                } else if (isCustomThin(blockState, block, level, currentPos)) { 
                     rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorThin.get();
                     weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorThin.get();
-                } else if (isCustomSolid(blockState, block)) { 
+                } else if (isCustomSolid(blockState, block, level, currentPos)) { 
                     rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorSolid.get();
                     weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorSolid.get();
-                } else if (isCustomNonSolid(blockState, block)) { 
+                } else if (isCustomNonSolid(blockState, block, level, currentPos)) { 
                     rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorNonSolid.get();
                     weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorNonSolid.get();
-                } 
+                }
+                else if (blockState.isAir()) {
+                }
                 currentRange *= rangeMultiplier;
                 currentWeight *= weightMultiplier;
                 blocksHit++;
@@ -338,26 +341,87 @@ public class SoundTracker {
         }
         return false;
     }
-    private static boolean isCustomWool(BlockState state, Block block) {
-        return isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customWoolBlocks.get().stream().map(String::valueOf).toList());
+
+    private static boolean safeBlockStateCheck(BlockState state, Level level, BlockPos pos, java.util.function.BiPredicate<BlockState, BlockGetter> check, boolean defaultValueOnNPE) {
+        if (level == null || pos == null) { 
+            SoundAttractMod.LOGGER.warn("safeBlockStateCheck called with null level or pos for block {}. Defaulting.", BuiltInRegistries.BLOCK.getKey(state.getBlock()));
+            return defaultValueOnNPE;
+        }
+        try {
+
+            return check.test(state, level); 
+                                        
+        } catch (NullPointerException npe) {
+            SoundAttractMod.LOGGER.warn("A NullPointerException occurred during a block state check for block {} at {}. This might be a mod incompatibility. Defaulting.", BuiltInRegistries.BLOCK.getKey(state.getBlock()), pos, npe);
+            return defaultValueOnNPE;
+        } catch (Exception e) { 
+            SoundAttractMod.LOGGER.error("An unexpected error occurred during a block state check for block {} at {}. Defaulting.", BuiltInRegistries.BLOCK.getKey(state.getBlock()), pos, e);
+            return defaultValueOnNPE;
+        }
     }
-    private static boolean isCustomSolid(BlockState state, Block block) {
-        return isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customSolidBlocks.get().stream().map(String::valueOf).toList()) || state.isSolidRender(null, null);
+
+    private static boolean isCustomWool(BlockState state, Block block, Level level, BlockPos pos) {
+        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customWoolBlocks.get().stream().map(String::valueOf).toList())) {
+            return true;
+        }
+
+        try {
+            return state.is(BlockTags.WOOL);
+        } catch (Exception e) { 
+            SoundAttractMod.LOGGER.warn("Exception checking BlockTags.WOOL for block {} at {}. Defaulting to false.", BuiltInRegistries.BLOCK.getKey(block), pos, e);
+            return false;
+        }
     }
-    private static boolean isCustomNonSolid(BlockState state, Block block) {
-        return isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customNonSolidBlocks.get().stream().map(String::valueOf).toList()) || !state.isSolid();
+
+    private static boolean isCustomSolid(BlockState state, Block block, Level level, BlockPos pos) {
+        if  (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customSolidBlocks.get().stream().map(String::valueOf).toList())) {
+            return true;
+        }
+        try {
+            return state.isSolidRender(level, pos);
+        } catch (NullPointerException npe) {
+            SoundAttractMod.LOGGER.warn("NPE in state.isSolidRender() for block {} at {}. Defaulting to solid.", BuiltInRegistries.BLOCK.getKey(block), pos, npe);
+            return true; 
+        }   catch (Exception e) {
+            SoundAttractMod.LOGGER.error("Error in state.isSolidRender() for block {} at {}. Defaulting to solid.", BuiltInRegistries.BLOCK.getKey(block), pos, e);
+            return true;
+        }
     }
-    private static boolean isCustomThin(BlockState state, Block block) {
-        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customThinBlocks.get().stream().map(String::valueOf).toList())) return true;
+
+    private static boolean isCustomNonSolid(BlockState state, Block block, Level level, BlockPos pos) {
+        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customNonSolidBlocks.get().stream().map(String::valueOf).toList())) {
+            return true; 
+        }
+        boolean isNormallySolid;
+        try {
+            isNormallySolid = state.isSolid();
+        } catch (NullPointerException npe) {
+            SoundAttractMod.LOGGER.warn("NPE in state.isSolid() for block {} at {}. Defaulting to solid (meaning not 'non-solid').", BuiltInRegistries.BLOCK.getKey(block), pos, npe);
+            isNormallySolid = true;
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.error("Error in state.isSolid() for block {} at {}. Defaulting to solid.", BuiltInRegistries.BLOCK.getKey(block), pos, e);
+            isNormallySolid = true;
+        }
+        return !isNormallySolid;
+    }
+    private static boolean isCustomThin(BlockState state, Block block, Level level, BlockPos pos) {
+        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customThinBlocks.get().stream().map(String::valueOf).toList())) {
+            return true;
+        }
         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         if (id == null) return false;
         String path = id.getPath();
-        return path.contains("pane") || path.contains("iron_bars") || path.contains("painting") || path.contains("fence") || path.contains("trapdoor") || path.contains("door") || path.contains("ladder") || path.contains("scaffolding") || path.contains("rail");
+        return path.contains("pane") || path.contains("iron_bars") || path.contains("painting") || path.contains("fence") ||
+               path.contains("trapdoor") || path.contains("door") || path.contains("ladder") || path.contains("scaffolding") ||
+               path.contains("rail");
     }
 
-    private static boolean isCustomLiquid(Block block) {
+    private static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) { // Added level, pos for signature consistency
         String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
-        return SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(blockId);
+        if (SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(blockId)) {
+            return true;
+        }
+        return false; 
     }
 
     public static void pruneIrrelevantSounds(Level level) {
