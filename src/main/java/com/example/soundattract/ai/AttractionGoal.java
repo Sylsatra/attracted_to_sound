@@ -2,6 +2,7 @@ package com.example.soundattract.ai;
 
 import com.example.soundattract.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.SoundAttractionEvents;
 import com.example.soundattract.SoundTracker;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
@@ -77,7 +78,10 @@ public class AttractionGoal extends Goal {
     private int scanCooldownTicks() {
         return DynamicScanCooldownManager.currentScanCooldownTicks;
     }
-
+    private boolean isMobEligible() {
+        java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = SoundAttractionEvents.getCachedAttractedEntityTypes();
+        return attractedTypes.contains(this.mob.getType());
+    }
     private double getArrivalDistance() {
         return SoundAttractConfig.COMMON.arrivalDistance.get();
     }
@@ -235,6 +239,9 @@ public class AttractionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (!isMobEligible()) {
+            return false;
+        }
         if (mob.isVehicle() || mob.isSleeping() || shouldSuppressTargeting()) return false;
         if (targetSoundPos == null || mob.getNavigation().isDone()) return false;
 

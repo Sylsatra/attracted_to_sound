@@ -222,6 +222,10 @@ public class SoundAttractConfig {
     public final ForgeConfigSpec.IntValue voiceChatNormalRange;
     public final ForgeConfigSpec.DoubleValue voiceChatWeight;
 
+    // --- FOV ---
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovExclusionList; 
+
     public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
@@ -649,6 +653,107 @@ public class SoundAttractConfig {
             builder.comment("====================================================================",
                             " Sound Attract Mod - Stealth & Detection Configuration",
                             "====================================================================").push("sound_attract_main");
+            builder.comment("--- Field of View Settings ---").push("fov");
+            fovOverrides = builder.comment(
+                    "A list of custom FOV (Field of View) overrides for specific mobs.",
+                    "This gives you direct control over the vision cone for any mob.",
+                    "Format: \"modid:mob_id, horizontal_fov, vertical_fov\"",
+                    "SPECIAL VALUE: A horizontal FOV of 360 or more grants the mob 360-degree vision (omni-directional).",
+                    "Any mob NOT in this list will use the default FOV (200 horizontal, 135 vertical)."
+            )
+            .defineList("customFovOverrides",
+                    List.of(
+                        // --- 360° OMNI-DIRECTIONAL VISION ---
+                        "minecraft:spider, 360.0, 360.0",
+                        "minecraft:cave_spider, 360.0, 360.0",
+
+                        // --- AERIAL VISION (Enhanced Vertical) ---
+                        "minecraft:phantom, 200.0, 280.0",
+                        "minecraft:vex, 200.0, 280.0",
+                        "minecraft:allay, 200.0, 280.0",
+                        "minecraft:bat, 20.0, 20.0",    
+                        "minecraft:parrot, 200.0, 280.0",
+                        "minecraft:ghast, 200.0, 280.0",
+                        "minecraft:blaze, 200.0, 280.0",
+
+                        // --- PREY VISION (Wide Horizontal) ---
+                        "minecraft:axolotl, 270.0, 90.0",
+                        "minecraft:camel, 270.0, 90.0",
+                        "minecraft:chicken, 270.0, 90.0",
+                        "minecraft:cow, 270.0, 90.0",
+                        "minecraft:donkey, 270.0, 90.0",
+                        "minecraft:goat, 270.0, 90.0",
+                        "minecraft:horse, 270.0, 90.0",
+                        "minecraft:mule, 270.0, 90.0",
+                        "minecraft:mooshroom, 270.0, 90.0",
+                        "minecraft:panda, 270.0, 90.0",
+                        "minecraft:pig, 270.0, 90.0",
+                        "minecraft:rabbit, 270.0, 90.0",
+                        "minecraft:sheep, 270.0, 90.0",
+                        "minecraft:sniffer, 270.0, 90.0",
+                        "minecraft:strider, 270.0, 90.0",
+                        "minecraft:turtle, 270.0, 90.0",
+                        "minecraft:villager, 270.0, 90.0",
+                        "minecraft:wandering_trader, 270.0, 90.0",
+                        "minecraft:slime, 270.0, 120.0",
+                        "minecraft:magma_cube, 270.0, 120.0",
+                        
+                        // --- AQUATIC PREY VISION (Wide Horizontal) ---
+                        "minecraft:cod, 300.0, 100.0",
+                        "minecraft:pufferfish, 300.0, 100.0",
+                        "minecraft:salmon, 300.0, 100.0",
+                        "minecraft:squid, 300.0, 100.0",
+                        "minecraft:glow_squid, 300.0, 100.0",
+                        "minecraft:tadpole, 300.0, 100.0",
+                        "minecraft:tropical_fish, 300.0, 100.0",
+
+                        // --- PREDATOR VISION (Focused Forward) ---
+                        "minecraft:cat, 140.0, 140.0",
+                        "minecraft:ocelot, 140.0, 140.0",
+                        "minecraft:wolf, 140.0, 140.0",
+                        "minecraft:polar_bear, 140.0, 140.0",
+                        "minecraft:fox, 140.0, 140.0",      
+                        "minecraft:frog, 140.0, 140.0",      
+
+                        // --- HUMANOID/STANDARD VISION ---
+                        "minecraft:zombie, 200.0, 135.0",
+                        "minecraft:husk, 200.0, 135.0",
+                        "minecraft:drowned, 200.0, 135.0",
+                        "minecraft:skeleton, 200.0, 135.0", 
+                        "minecraft:stray, 200.0, 135.0",
+                        "minecraft:pillager, 200.0, 135.0",
+                        "minecraft:vindicator, 200.0, 135.0",
+                        "minecraft:evoker, 200.0, 135.0",
+                        "minecraft:witch, 200.0, 135.0",
+                        "minecraft:piglin, 200.0, 135.0",
+                        "minecraft:piglin_brute, 200.0, 135.0",
+                        "minecraft:iron_golem, 200.0, 135.0",
+                        
+                        // --- SPECIAL CASES & MONSTROSITIES ---
+                        "minecraft:creeper, 90.0, 90.0",       
+                        "minecraft:enderman, 180.0, 240.0",     
+                        "minecraft:guardian, 320.0, 180.0",     
+                        "minecraft:elder_guardian, 320.0, 180.0",
+                        "minecraft:ravager, 160.0, 100.0",     
+                        "minecraft:hoglin, 160.0, 100.0",      
+                        "minecraft:zoglin, 160.0, 100.0",      
+                        "minecraft:shulker, 270.0, 45.0"       
+                    ),
+                    obj -> obj instanceof String);
+
+            fovExclusionList = builder.comment(
+                    "A list of mobs that will COMPLETELY IGNORE the FOV system.",
+                    "Use this for bosses or mobs from other mods with special AI that might break.",
+                    "Format: \"modid:mob_id\"",
+                    "Note: Certain vanilla mobs like the Warden are always excluded for stability and cannot be removed."
+            )
+            .defineList("fovExclusionList",
+                    List.of(
+                            "minecraft:warden"
+                    ),
+                    obj -> obj instanceof String);
+
+            builder.pop();
 
             builder.comment("General Stealth System Settings").push("general_stealth_settings");
             enableStealthMechanics = builder.comment("Master switch for all custom stealth mechanics. If false, mobs use vanilla detection (modified only by maxStealthDetectionRange if set).")

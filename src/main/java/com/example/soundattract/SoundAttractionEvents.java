@@ -46,7 +46,7 @@ public class SoundAttractionEvents {
     private static List<String> lastKnownAttractedEntitiesConfig_Copy = null;
 
 
-    private static Set<EntityType<?>> getCachedAttractedEntityTypes() {
+    public static Set<EntityType<?>> getCachedAttractedEntityTypes() {
         List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.attractedEntities.get();
         List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
 

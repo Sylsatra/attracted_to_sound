@@ -2,6 +2,7 @@ package com.example.soundattract;
 
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.FovEvents;
 import com.example.soundattract.enchantment.ModEnchantments;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
@@ -136,9 +137,18 @@ public class StealthDetectionEvents {
             return false;
         }
 
+        if (!FovEvents.isTargetInFov(mob, player, true)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info(
+                        "[StealthQuery] Player {} is IN RANGE for mob {} but OUTSIDE FOV. Denying detection.",
+                        player.getName().getString(), mob.getName().getString()
+                );
+            }
+            return false;
+        }
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
-                    "[StealthQuery] Player {} IS DETECTABLE by mob {} (in range).",
+                    "[StealthQuery] Player {} IS DETECTABLE by mob {} (in range and in FOV).",
                     player.getName().getString(), mob.getName().getString()
             );
         }

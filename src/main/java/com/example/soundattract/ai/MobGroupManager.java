@@ -8,7 +8,6 @@ import java.util.*;
 import net.minecraft.resources.ResourceLocation;
 import com.example.soundattract.SoundAttractMod;
 import java.lang.ref.WeakReference;
-import java.util.UUID;
 
 public class MobGroupManager {
     private static final Map<UUID, Mob> uuidToLeader = Collections.synchronizedMap(new HashMap<>());
@@ -107,7 +106,7 @@ public class MobGroupManager {
             lastCleanupTime = time;
         }
 
-         Set<String> attracted = SoundAttractConfig.ATTRACTED_ENTITY_TYPES_CACHE;
+        Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
         int simDistChunks = level.getServer().getPlayerList().getViewDistance();
         int simDistBlocks = simDistChunks * 16;
         Set<Mob> mobsSet = new HashSet<>();
@@ -126,8 +125,7 @@ public class MobGroupManager {
             SoundAttractMod.LOGGER.info("[MobGroupManager] All mobs present ({}): {}", mobs.size(), allMobTypesLog.toString());
         List<Mob> attractedMobs = new ArrayList<>();
         for (Mob mob : mobs) {
-            ResourceLocation id = mob.getType().builtInRegistryHolder().key().location();
-            if (attracted.contains(id.toString())) {
+            if (attractedEntityTypes.contains(mob.getType())) {
                 attractedMobs.add(mob);
             }
         }
