@@ -10,7 +10,6 @@ public class StealthUtils {
         try {
             Brain<?> brain = mob.getBrain();
             if (brain != null) {
-                // Core vanilla memories:
                 brain.forget(MemoryModuleType.ATTACK_TARGET);
                 brain.forget(MemoryModuleType.ANGRY_AT);
                 brain.forget(MemoryModuleType.HURT_BY);
@@ -18,7 +17,6 @@ public class StealthUtils {
                 brain.forget(MemoryModuleType.WALK_TARGET);
                 brain.forget(MemoryModuleType.LOOK_TARGET);
                 brain.forget(MemoryModuleType.INTERACTION_TARGET);
-                // Wipe out any memory with “target”/“anger”/“attacker” in its name:
                 brain.getMemories().keySet().forEach(memoryType -> {
                     String name = memoryType.toString().toLowerCase();
                     if (name.contains("target") || name.contains("anger") || name.contains("attacker")) {

@@ -1,6 +1,7 @@
 package com.example.soundattract;
 import net.minecraft.util.math.Box;
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.FovEvents;
 import com.example.soundattract.config.MobProfile;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.enchantment.ModEnchantments;
@@ -42,7 +43,6 @@ public static void register() {
             boolean isNight = world.getTimeOfDay() > 13000 && world.getTimeOfDay() < 23000;
             Set<MobEntity> mobs = new java.util.HashSet<>();
 
-            // Gather all mobs in a 3×3 chunk area around each player
             for (PlayerEntity player : world.getPlayers()) {
                 BlockPos playerPos = player.getBlockPos();
                 int playerChunkX = playerPos.getX() >> 4;
@@ -82,28 +82,38 @@ public static void register() {
                     }
                     LivingEntity target = mob.getTarget();
                     if (target == null) {
-                        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                            SoundAttractMod.LOGGER.warn("[StealthDetectionEvents] mob.getTarget() was null for mob {}", mob.getName().getString());
-                        }
                         continue;
                     }
                     if (target instanceof PlayerEntity player && target.isAlive()) {
+                        if (!FovEvents.isTargetInFov(mob, player, true)) {
+                            mob.setTarget(null);
+                            if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+                                SoundAttractMod.LOGGER.info(
+                                    "[StealthDetectionEvents] {} is not in FOV of {} → clearing target",
+                                    player.getName().getString(),
+                                    mob.getName().getString()
+                                );
+                            }
+                        } else {
                         double dist = mob.distanceTo(player);
 
-                        // ──────── REPLACE OLD RANGE COMPUTATION WITH NEW “FULL” ONE ────────
                         double detectionRange = computeFullDetectionRange(mob, player, world);
-                        if (!mob.canSee(player)) {
-                            detectionRange *= 0.5;
-                        }
-                        // ────────────────────────────────────────────────────────────────────
-
                         if (dist > detectionRange) {
                             mob.setTarget(null);
+                            if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+                                SoundAttractMod.LOGGER.info(
+                                    "[StealthDetectionEvents] {} is out of detection range ({}) for {} → clearing target",
+                                    player.getName().getString(),
+                                    String.format("%.2f", detectionRange),
+                                    mob.getName().getString()
+                                );
+                            }
                         }
                     }
-                } catch (Exception ex) {
-                    if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                        SoundAttractMod.LOGGER.error("[StealthDetectionEvents] Exception in mob tick: ", ex);
+                }
+            } catch (Exception ex) {
+                if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.error("[StealthDetectionEvents] Exception in mob tick: ", ex);
                     }
                 }
             }
@@ -111,11 +121,9 @@ public static void register() {
     });
 }
 
-// ────────────── NEW “FULL” DETECTION‐RANGE METHOD ───────────────────────────
 public static double computeFullDetectionRange(MobEntity mob,
                                                 PlayerEntity player,
                                                 net.minecraft.world.World level) {
-    // 1) Profile override
     MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
     PlayerStance stance = determinePlayerStance(player);
 
@@ -126,7 +134,6 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
 
-    // 2) Base vs. Camouflage
     double base, camo;
     if (stance == PlayerStance.CRAWLING) {
         base = SoundAttractMod.CONFIG.crawlDetectionRange;
@@ -139,7 +146,6 @@ public static double computeFullDetectionRange(MobEntity mob,
         camo = SoundAttractMod.CONFIG.standingDetectionRangeCamouflage;
     }
 
-    // 3) Camouflage factor
     CamouflageFactorResult camoResult;
     if (stance == PlayerStance.CRAWLING) {
         camoResult = getCrawlingCamouflageFactor(player, level);
@@ -150,14 +156,12 @@ public static double computeFullDetectionRange(MobEntity mob,
     }
     double factor = camoResult.factor;
 
-    // 4) Blend base/camo
     double range = (factor <= 0.0)
                  ? base
                  : (factor >= 1.0)
                    ? camo
                    : base - (base - camo) * factor;
 
-    // 5) Invisibility penalty
     if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.INVISIBILITY)) {
         double invisFactor = SoundAttractMod.CONFIG.invisibilityStealthFactor;
         range *= invisFactor;
@@ -171,14 +175,12 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
 
-    // 6) True light‐level calculation
     int effectiveLight = 0;
     BlockPos feet = player.getBlockPos();
     BlockPos eyes = feet.up();
     long dayTime = level.getTimeOfDay() % 24000L;
     boolean isDay = dayTime < 12000L;
 
-    // feet block light
     if (level.isChunkLoaded(feet)) {
         effectiveLight = Math.max(effectiveLight,
             level.getLightLevel(net.minecraft.world.LightType.BLOCK, feet));
@@ -187,7 +189,6 @@ public static double computeFullDetectionRange(MobEntity mob,
                 level.getLightLevel(net.minecraft.world.LightType.SKY, feet));
         }
     }
-    // eyes block light
     if (level.isChunkLoaded(eyes)) {
         effectiveLight = Math.max(effectiveLight,
             level.getLightLevel(net.minecraft.world.LightType.BLOCK, eyes));
@@ -196,7 +197,6 @@ public static double computeFullDetectionRange(MobEntity mob,
                 level.getLightLevel(net.minecraft.world.LightType.SKY, eyes));
         }
     }
-    // held block‐item emission
     for (ItemStack s : List.of(player.getMainHandStack(), player.getOffHandStack())) {
         if (s.getItem() instanceof net.minecraft.item.BlockItem bi) {
             BlockState def = bi.getBlock().getDefaultState();
@@ -223,7 +223,6 @@ public static double computeFullDetectionRange(MobEntity mob,
         );
     }
 
-    // 7) Held‐item penalty (now widens range if factor ≥ 1.0)
     if (SoundAttractMod.CONFIG.enableHeldItemPenalty) {
         int heldCount = 0;
         if (!player.getMainHandStack().isEmpty()) heldCount++;
@@ -243,9 +242,7 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
 
-    // 8) Enchantment penalty (armor + held items; now widens if factor ≥ 1.0)
     if (SoundAttractMod.CONFIG.enableEnchantmentPenalty) {
-        // armor pieces
         int enchantedArmorPieces = 0;
         for (ItemStack armor : player.getInventory().armor) {
             if (!armor.isEmpty() && armor.hasEnchantments() && !hasConcealmentEnchant(armor)) {
@@ -265,7 +262,6 @@ public static double computeFullDetectionRange(MobEntity mob,
             );
         }
 
-        // held items
         int enchantedHeldItems = 0;
         if (!player.getMainHandStack().isEmpty()
          && player.getMainHandStack().hasEnchantments()
@@ -291,9 +287,8 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
 
-    // 9) Rain & thunder (use multiplication to shrink when factor < 1.0)
     if (level.isSkyVisible(player.getBlockPos()) && level.isRaining()) {
-        double rf = SoundAttractMod.CONFIG.rainStealthFactor; // typically < 1.0 to shrink
+        double rf = SoundAttractMod.CONFIG.rainStealthFactor; 
         range *= rf;
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info(
@@ -304,7 +299,7 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
     if (level.isThundering()) {
-        double tf = SoundAttractMod.CONFIG.thunderStealthFactor; // typically < 1.0
+        double tf = SoundAttractMod.CONFIG.thunderStealthFactor; 
         range *= tf;
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info(
@@ -315,11 +310,10 @@ public static double computeFullDetectionRange(MobEntity mob,
         }
     }
 
-    // 10) Movement vs stationary
     boolean isMoving = player.getVelocity().lengthSquared() > SoundAttractMod.CONFIG.movementThreshold;
     if (stance != PlayerStance.SNEAKING && stance != PlayerStance.CRAWLING) {
         if (isMoving) {
-            double mPen = SoundAttractMod.CONFIG.movementStealthPenalty; // ≥ 1.0
+            double mPen = SoundAttractMod.CONFIG.movementStealthPenalty; 
             range *= mPen;
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
@@ -330,7 +324,7 @@ public static double computeFullDetectionRange(MobEntity mob,
                 );
             }
         } else {
-            double sBonus = SoundAttractMod.CONFIG.stationaryStealthBonusFactor; // ≥ 1.0
+            double sBonus = SoundAttractMod.CONFIG.stationaryStealthBonusFactor; 
             range *= sBonus;
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
@@ -345,9 +339,7 @@ public static double computeFullDetectionRange(MobEntity mob,
 
     return Math.max(0.0, range);
 }
-// ───────────────────────────────────────────────────────────────────────────────
 
-// ────────────── HELPER: determine current PlayerStance ───────────────────────
 private static PlayerStance determinePlayerStance(PlayerEntity player) {
     if (player.getPose().name().equalsIgnoreCase("SWIMMING")) {
         return PlayerStance.CRAWLING;
@@ -358,7 +350,6 @@ private static PlayerStance determinePlayerStance(PlayerEntity player) {
     }
 }
 
-// ────────────── HELPER: check for Conceal enchant ────────────────────────────
 private static boolean hasConcealmentEnchant(ItemStack stack) {
     if (stack.isEmpty() || !stack.hasEnchantments() || ModEnchantments.CONCEAL == null) {
         return false;
@@ -373,7 +364,6 @@ private static boolean hasConcealmentEnchant(ItemStack stack) {
     return EnchantmentHelper.getLevel(conceal, stack) > 0;
 }
 
-// ────────────── CAMOUFLAGE FACTOR METHODS ───────────────────────────────────
 
 private static double getStealthCamouflageFactor(PlayerEntity player, net.minecraft.world.World level, double mobDist) {
     boolean isCrawl = player.getPose().name().equalsIgnoreCase("SWIMMING");
@@ -403,13 +393,8 @@ private static boolean isPlayerMoving(PlayerEntity player) {
     return player.getVelocity().lengthSquared() > 0.001;
 }
 
-// ────────────── UPDATED “ADJACENT” CAMOUFLAGE ───────────────────────────────
 private static CamouflageFactorResult getAdjacentCamouflageFactor(PlayerEntity player, net.minecraft.world.World level) {
-    // Each slot has its own weight:
-    //   helmet  → 0.15
-    //   chest   → 0.35
-    //   leggings→ 0.25
-    //   boots   → 0.15
+
     final double[] slotWeights = { 0.15, 0.35, 0.25, 0.15 };
 
     List<?> camoSets = SoundAttractMod.CONFIG.camouflageSets;
@@ -441,7 +426,6 @@ private static CamouflageFactorResult getAdjacentCamouflageFactor(PlayerEntity p
             double w = slotWeights[i];
 
             if (playerArmorId != null && playerArmorId.equals(targetArmorId)) {
-                // exact match → add weight
                 score += w;
             } else {
                 ItemStack stack = player.getInventory().armor.get(i);
@@ -451,14 +435,12 @@ private static CamouflageFactorResult getAdjacentCamouflageFactor(PlayerEntity p
                     int dyedColor = dyeable.getColor(stack) & 0xFFFFFF;
                     String dyedHex = String.format("%06X", dyedColor);
                     if (!isColorSimilar(dyedHex, colorHex, threshold)) {
-                        // “vastly different” → subtract weight
                         score -= w;
                     }
                 }
             }
         }
 
-        // clamp to [0,1]
         score = Math.max(0.0, Math.min(1.0, score));
         bestScore = Math.max(bestScore, score);
     }
@@ -474,7 +456,6 @@ private static CamouflageFactorResult getSneakingCamouflageFactor(PlayerEntity p
 }
 
 private static CamouflageFactorResult getCrawlingCamouflageFactor(PlayerEntity player, net.minecraft.world.World level) {
-    // Only armor pieces—no block checks
     String[] equippedIds = new String[4];
     for (int slot = 0; slot < 4; slot++) {
         ItemStack stack = player.getInventory().armor.get(slot);
@@ -503,7 +484,6 @@ private static CamouflageFactorResult getCrawlingCamouflageFactor(PlayerEntity p
             double w = slotWeights[i];
 
             if (playerArmorId != null && playerArmorId.equals(targetArmorId)) {
-                // exact match → add weight
                 score += w;
             } else {
                 ItemStack stack = player.getInventory().armor.get(i);
@@ -513,14 +493,12 @@ private static CamouflageFactorResult getCrawlingCamouflageFactor(PlayerEntity p
                     int dyedColor = dyeable.getColor(stack) & 0xFFFFFF;
                     String dyedHex = String.format("%06X", dyedColor);
                     if (!isColorSimilar(dyedHex, colorHex, threshold)) {
-                        // “vastly different” → subtract weight
                         score -= w;
                     }
                 }
             }
         }
 
-        // clamp between 0 and 1
         score = Math.max(0.0, Math.min(1.0, score));
         bestScore = Math.max(bestScore, score);
     }
@@ -605,7 +583,6 @@ private static boolean isPlayerCamouflaged(PlayerEntity player, net.minecraft.wo
     return false;
 }
 
-// ────────────── COLOR‐SIMILARITY UTILITY ───────────────────────────────
 private static boolean isColorSimilar(String hex1, String hex2, int threshold) {
     try {
         int c1 = Integer.parseInt(hex1, 16);

@@ -18,7 +18,9 @@
 	"CrossbowAttackGoalMixin",
 	"RevengeGoalMixin",
 	"ProjectileAttackGoalMixin",
-	"CreeperIgniteGoalMixin"
+	"CreeperIgniteGoalMixin",
+	"MobEntitySeeMixin",
+	"LivingEntityDamageMixin"
 	],
 	"client": [
     	"SoundManagerMixin",
