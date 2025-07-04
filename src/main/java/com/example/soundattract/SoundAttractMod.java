@@ -4,58 +4,53 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.core.BlockPos;
-import com.example.soundattract.SoundTracker;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
-import net.minecraftforge.fml.ModList;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
     public static final String MOD_ID = "soundattract";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public SoundAttractMod(FMLJavaModLoadingContext fmlContext) {
-        IEventBus modEventBus = fmlContext.getModEventBus();
+    public SoundAttractMod() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        
         ModEnchantments.register(modEventBus);
-        modEventBus.register(this);
         modEventBus.addListener(this::onCommonSetup);
         modEventBus.addListener(SoundAttractMod::onClientSetup);
 
-        ModLoadingContext.get().registerConfig(
-            ModConfig.Type.COMMON,
-            SoundAttractConfig.COMMON_SPEC,
-            "soundattract-common.toml"
-        );
-
-        MinecraftForge.EVENT_BUS.register(
-            com.example.soundattract.integration.VanillaIntegrationEvents.class
-        );
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, "soundattract-common.toml");
+        
+        MinecraftForge.EVENT_BUS.register(new FovEvents());
+        MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
-        SoundAttractConfig.bakeConfig();
-        SoundAttractNetwork.register();
+        event.enqueueWork(() -> {
+            SoundAttractConfig.bakeConfig();
+            SoundAttractNetwork.register();
+        });
     }
 
     private static void onClientSetup(final FMLClientSetupEvent event) {
-        if (ModList.get().isLoaded("voicechat")) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                LOGGER.info("[SoundAttractMod] Registering VoiceChat integration on client setup");
+        event.enqueueWork(() -> {
+            if (ModList.get().isLoaded("voicechat")) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    LOGGER.info("[SoundAttractMod] Registering VoiceChat integration on client setup");
+                }
+                SoundAttractClientEvents.registerVoiceChatIntegration();
+            } else {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
+                }
             }
-            SoundAttractClientEvents.registerVoiceChatIntegration();
-        } else {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
-            }
-        }
+        });
     }
 }

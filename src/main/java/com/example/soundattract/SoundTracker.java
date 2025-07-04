@@ -460,7 +460,9 @@ public class SoundTracker {
         double bestSoundEffectiveWeight = 0;
 
         for (SoundRecord r : RECENT_SOUNDS) {
-
+            if (r == null || r.pos ==null) {
+                continue;
+            }
             String soundIdStr = r.soundId;                      
             ResourceLocation rl = soundIdStr != null            
                                   ? ResourceLocation.tryParse(soundIdStr)
@@ -506,6 +508,7 @@ public class SoundTracker {
         }
 
         if (bestSound != null) {
+            if (bestSound.pos == null) return null;
             return new SoundRecord(bestSound.sound, bestSound.soundId, bestSound.pos, bestSound.ticksRemaining, bestSound.dimensionKey, bestSoundEffectiveRange, bestSoundEffectiveWeight);
         }
 

@@ -1,6 +1,5 @@
 package com.example.soundattract;
 
-import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -9,8 +8,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -23,6 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * NOTE: This class is already correctly designed for the new system.
+ * It provides the low-level FOV checks that StealthDetectionEvents uses.
+ * No changes are required.
+ */
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
 public class FovEvents {
     public static final Logger LOGGER = LogManager.getLogger();
@@ -46,7 +50,13 @@ public class FovEvents {
         List<? extends String> exclusionList = SoundAttractConfig.COMMON.fovExclusionList.get();
         for (String entry : exclusionList) {
             try {
-                USER_EXCLUSION_CACHE.add(new ResourceLocation(entry.trim()));
+                // Use tryParse which returns null on failure instead of throwing
+                ResourceLocation loc = ResourceLocation.tryParse(entry.trim());
+                if (loc != null) {
+                    USER_EXCLUSION_CACHE.add(loc);
+                } else {
+                    LOGGER.warn("[FOV Config] Malformed exclusion entry, skipping: " + entry);
+                }
             } catch (Exception e) {
                 LOGGER.error("[FOV Config] Failed to parse exclusion entry: " + entry, e);
             }
@@ -62,7 +72,11 @@ public class FovEvents {
                     LOGGER.warn("[FOV Config] Malformed FOV override, skipping: " + entry);
                     continue;
                 }
-                ResourceLocation mobId = new ResourceLocation(parts[0].trim());
+                ResourceLocation mobId = ResourceLocation.tryParse(parts[0].trim());
+                if (mobId == null) {
+                    LOGGER.warn("[FOV Config] Malformed mob identifier in override, skipping: " + entry);
+                    continue;
+                }
                 double h = Double.parseDouble(parts[1].trim());
                 double v = Double.parseDouble(parts[2].trim());
                 CONFIG_FOV_CACHE.put(mobId, new FovData(h, v));
@@ -80,12 +94,10 @@ public class FovEvents {
         Entity target = event.getLookingEntity();
         if (target == null) return;
 
-
         if (!isTargetInFov(looker, target, false)) {
             event.setResult(Event.Result.DENY);
         }
     }
-
 
     @SubscribeEvent
     public static void onMobHurt(LivingHurtEvent event) {

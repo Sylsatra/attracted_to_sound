@@ -225,6 +225,7 @@ public class SoundAttractConfig {
     // --- FOV ---
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovExclusionList; 
+    
 
     public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Sound Attract Mod Configuration").push("general");

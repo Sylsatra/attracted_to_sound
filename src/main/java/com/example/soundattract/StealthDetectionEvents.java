@@ -35,6 +35,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class StealthDetectionEvents {
@@ -223,6 +224,9 @@ public class StealthDetectionEvents {
                                     "[TickCheck] Mob {} lost target {} due to stealth grace period timeout.",
                                     mob.getName().getString(), playerTarget.getName().getString()
                             );
+                        }
+                        if (mob.getBrain().hasMemoryValue(MemoryModuleType.ANGRY_AT)) {
+                            mob.getBrain().eraseMemory(MemoryModuleType.ANGRY_AT);
                         }
                         mob.setTarget(null);
                         mobOutOfRangeTicks.remove(mob);
