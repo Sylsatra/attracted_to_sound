@@ -4,41 +4,65 @@ import com.example.soundattract.config.SoundAttractConfig;
 
 public class DynamicScanCooldownManager {
     public static int currentScanCooldownTicks = 20;
-    private static final int MIN_COOLDOWN = 10;
-    private static final int DEFAULT_MAX_COOLDOWN = 60;
-    private static final int HIGH_MOBCOUNT_MAX_COOLDOWN = 100;
-    private static final int HIGH_MOBCOUNT_THRESHOLD = 100;
 
-    private static double getLowTps() {
-        return SoundAttractConfig.COMMON.minTpsForScanCooldown.get();
-    }
-    private static double getHighTps() {
-        return SoundAttractConfig.COMMON.maxTpsForScanCooldown.get();
-    }
+    private static final int MIN_COOLDOWN = 10; 
+    private static final int MAX_COOLDOWN = 120;
 
-    private static long lastCheckTime = System.currentTimeMillis();
+    private static long lastCheckTime = 0;
     private static long lastTickCount = 0;
 
+    private static double map(double value, double fromLow, double fromHigh, double toLow, double toHigh) {
+        value = Math.max(fromLow, Math.min(value, fromHigh));
+        return toLow + (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow);
+    }
+
+
     public static void update(long totalTickCount, int mobCount) {
+
+        double ticksPerMob = SoundAttractConfig.COMMON.cooldownTicksPerMob.get(); // You'll need to add this to your config
+        
+        double baseCooldown = MIN_COOLDOWN + (mobCount * ticksPerMob);
+
+        double tpsMultiplier = 1.0; 
         long now = System.currentTimeMillis();
-        long ticksElapsed = totalTickCount - lastTickCount;
-        long timeElapsed = now - lastCheckTime;
-        int maxCooldown = mobCount > HIGH_MOBCOUNT_THRESHOLD ? HIGH_MOBCOUNT_MAX_COOLDOWN : DEFAULT_MAX_COOLDOWN;
-        if (ticksElapsed > 0 && timeElapsed > 0) {
-            double tps = (ticksElapsed * 1000.0) / timeElapsed * 20.0;
-            double lowTps = getLowTps();
-            double highTps = getHighTps();
-            if (tps < lowTps || mobCount > HIGH_MOBCOUNT_THRESHOLD) {
-                currentScanCooldownTicks = Math.min(maxCooldown, currentScanCooldownTicks + 2);
-            } else if (tps > highTps && currentScanCooldownTicks > MIN_COOLDOWN) {
-                currentScanCooldownTicks = Math.max(MIN_COOLDOWN, currentScanCooldownTicks - 1);
+        
+        if (lastCheckTime > 0) {
+            long ticksElapsed = totalTickCount - lastTickCount;
+            long timeElapsedMs = now - lastCheckTime;
+
+            if (ticksElapsed > 0 && timeElapsedMs > 100) { 
+                double tps = (double) ticksElapsed * 1000.0 / timeElapsedMs;
+                
+                double lowTpsThreshold = SoundAttractConfig.COMMON.minTpsForScanCooldown.get();
+                double highTpsThreshold = SoundAttractConfig.COMMON.maxTpsForScanCooldown.get();
+
+                double maxMultiplier = 2.0; 
+                double minMultiplier = 0.8; 
+
+                if (tps < highTpsThreshold) { 
+                    tpsMultiplier = map(tps, lowTpsThreshold, highTpsThreshold, maxMultiplier, minMultiplier);
+                } else {
+                    tpsMultiplier = minMultiplier; 
+                }
             }
         }
+        
         lastCheckTime = now;
         lastTickCount = totalTickCount;
+
+        double targetCooldown = baseCooldown * tpsMultiplier;
+        
+        int clampedTarget = (int) Math.round(Math.max(MIN_COOLDOWN, Math.min(targetCooldown, MAX_COOLDOWN)));
+
+        if (currentScanCooldownTicks < clampedTarget) {
+            currentScanCooldownTicks++;
+        } else if (currentScanCooldownTicks > clampedTarget) {
+            currentScanCooldownTicks--;
+        }
     }
 
     public static boolean shouldScanThisTick(long mobId, long totalTickCount) {
-        return ((mobId + totalTickCount) % currentScanCooldownTicks) == 0;
+        int effectiveCooldown = Math.max(1, currentScanCooldownTicks);
+        return ((mobId + totalTickCount) % effectiveCooldown) == 0;
     }
 }

@@ -147,7 +147,7 @@ public class SoundMessage {
                             }
                             return;
                         }
-                        range  = 20;
+                        range  = 10;
                         weight = 1.0;
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(

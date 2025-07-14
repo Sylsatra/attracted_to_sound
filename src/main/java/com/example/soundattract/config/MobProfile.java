@@ -18,25 +18,28 @@ public class MobProfile {
     private final String profileName;
     private final String mobIdString;
     @Nullable
-    private final ResourceLocation mobId; 
+    private final ResourceLocation mobId;
     @Nullable
     private final CompoundTag nbtMatcher;
     private final List<SoundOverride> soundOverrides;
     private final Map<PlayerStance, Double> detectionOverrides;
+    private final boolean isValid;
 
-    public MobProfile(String profileName, String mobIdString, @Nullable String nbtMatcherString, 
+    public MobProfile(String profileName, String mobIdString, @Nullable String nbtMatcherString,
                       List<SoundOverride> soundOverrides, Map<PlayerStance, Double> detectionOverrides) {
         this.profileName = Objects.requireNonNull(profileName, "profileName cannot be null");
         this.mobIdString = Objects.requireNonNull(mobIdString, "mobIdString cannot be null");
-        
+        boolean profileIsValid = true;
         if ("*".equals(mobIdString)) {
             this.mobId = null;
         } else {
             this.mobId = ResourceLocation.tryParse(mobIdString);
             if (this.mobId == null) {
-                SoundAttractMod.LOGGER.warn("Invalid mobIdString for profile '{}': {}. Will not match specific mob type.", profileName, mobIdString);
+                SoundAttractMod.LOGGER.warn("Invalid mobIdString for profile '{}': {}. This profile will be disabled.", profileName, mobIdString);
+                profileIsValid = false;
             }
         }
+        this.isValid = profileIsValid;
 
         CompoundTag parsedNbt = null;
         if (nbtMatcherString != null && !nbtMatcherString.trim().isEmpty()) {
@@ -83,16 +86,26 @@ public class MobProfile {
 
     public Optional<SoundOverride> getSoundOverride(ResourceLocation soundId) {
         return soundOverrides.stream()
-                             .filter(override -> override.getSoundId().equals(soundId))
-                             .findFirst();
+                .filter(override -> override.getSoundId().equals(soundId))
+                .findFirst();
     }
 
     public boolean matches(Mob mob) {
-        if (this.mobId != null) {
-            ResourceLocation actualMobId = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType());
-            if (!this.mobId.equals(actualMobId)) {
-                 return false;
+        if (!this.isValid) {
+            return false;
+        }
+
+        if (this.mobId == null) {
+            if (this.nbtMatcher != null && !this.nbtMatcher.isEmpty()) {
+                CompoundTag mobNbt = mob.saveWithoutId(new CompoundTag());
+                return checkNbt(mobNbt, this.nbtMatcher);
             }
+            return true;
+        }
+
+        ResourceLocation actualMobId = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType());
+        if (!this.mobId.equals(actualMobId)) {
+            return false;
         }
 
         if (this.nbtMatcher != null && !this.nbtMatcher.isEmpty()) {
@@ -101,6 +114,7 @@ public class MobProfile {
                 return false;
             }
         }
+        
         return true;
     }
 
@@ -114,10 +128,8 @@ public class MobProfile {
                     return false;
                 }
             } else if (matcherNbt.getTagType(key) == net.minecraft.nbt.Tag.TAG_LIST) {
-
                 if (!mobNbt.getList(key, matcherNbt.getList(key, 0).getElementType()).equals(matcherNbt.getList(key, 0))) {
- 
-                     SoundAttractMod.LOGGER.trace("NBT list matching for key '{}' is currently basic. Profile: {}", key, profileName);
+                    SoundAttractMod.LOGGER.trace("NBT list matching for key '{}' is currently basic. Profile: {}", key, profileName);
                 }
             } else {
                 if (!mobNbt.get(key).equals(matcherNbt.get(key))) {
@@ -131,12 +143,12 @@ public class MobProfile {
     @Override
     public String toString() {
         return "MobProfile{" +
-               "profileName='" + profileName + '\'' +
-               ", mobIdString='" + mobIdString + '\'' +
-               (mobId != null ? ", mobId=" + mobId : "") +
-               (nbtMatcher != null ? ", nbtMatcher=" + nbtMatcher.getAsString() : "") +
-               ", soundOverrides=" + soundOverrides +
-               ", detectionOverrides=" + detectionOverrides +
-               '}';
+                "profileName='" + profileName + '\'' +
+                ", mobIdString='" + mobIdString + '\'' +
+                (mobId != null ? ", mobId=" + mobId : "") +
+                (nbtMatcher != null ? ", nbtMatcher=" + nbtMatcher.getAsString() : "") +
+                ", soundOverrides=" + soundOverrides +
+                ", detectionOverrides=" + detectionOverrides +
+                '}';
     }
 }

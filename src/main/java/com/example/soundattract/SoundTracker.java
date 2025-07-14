@@ -12,6 +12,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -65,60 +68,79 @@ public class SoundTracker {
     }
 
     private static final List<SoundRecord> RECENT_SOUNDS = new ArrayList<>();
+    private record GridKey3D(int x, int y, int z) {
 
-    private static final int GRID_SIZE = 16; 
-    private static final Map<String, Map<Long, List<SoundRecord>>> SPATIAL_SOUNDS = new HashMap<>();
+    }
+    private static final Map<String, Map<GridKey3D, List<SoundRecord>>> SPATIAL_SOUNDS = new HashMap<>();
+    private static final List<SoundRecord> LARGE_RANGE_SOUNDS = new ArrayList<>();
 
-    private static long gridKey(BlockPos pos) {
+    private static GridKey3D gridKey(BlockPos pos) {
         int x = pos.getX() >> 4;
+        int y = pos.getY() >> 4;
         int z = pos.getZ() >> 4;
-        return (((long)x) << 32) | (z & 0xFFFFFFFFL);
+        return new GridKey3D(x,y,z);
     }
 
-    private static final double LARGE_SOUND_RANGE_THRESHOLD = 16.0;
+    private static final ReadWriteLock lock = new ReentrantReadWriteLock();
+    private static final Lock readLock = lock.readLock();
+    private static final Lock writeLock = lock.writeLock();
+    private static final double LARGE_SOUND_RANGE_THRESHOLD = 64.0;
+
+    private static void addRecordToCollections(SoundRecord r) {
+        if (r.range > LARGE_SOUND_RANGE_THRESHOLD) {
+            LARGE_RANGE_SOUNDS.add(r);
+        } else {
+            SPATIAL_SOUNDS.computeIfAbsent(r.dimensionKey, d -> new HashMap<>()).computeIfAbsent(gridKey(r.pos), k -> new ArrayList<>()).add(r);
+        }
+    }
+
+    private static void removeRecordFromCollections(SoundRecord r) {
+        if (r.range > LARGE_SOUND_RANGE_THRESHOLD) {
+            LARGE_RANGE_SOUNDS.remove(r);
+        } else {
+            Map<GridKey3D, List<SoundRecord>> dimMap = SPATIAL_SOUNDS.get(r.dimensionKey);
+            if (dimMap != null) {
+                List<SoundRecord> list = dimMap.get(gridKey(r.pos));
+                if (list != null) {
+                    list.remove(r);
+                    if (list.isEmpty())
+                    dimMap.remove(gridKey(r.pos));
+                }
+                if (dimMap.isEmpty())
+                SPATIAL_SOUNDS.remove(r.dimensionKey);
+            }
+        }
+    }
 
     private static List<SoundRecord> getNearbySounds(String dim, BlockPos pos) {
-        Map<Long, List<SoundRecord>> dimMap = SPATIAL_SOUNDS.get(dim);
-        if (dimMap == null) return Collections.emptyList();
         List<SoundRecord> result = new ArrayList<>();
-
-        boolean hasLargeRange = false;
-        for (SoundRecord r : RECENT_SOUNDS) {
-            if (r.dimensionKey.equals(dim) && r.range > LARGE_SOUND_RANGE_THRESHOLD) {
-                hasLargeRange = true;
-                break;
-            }
-        }
-
-        if (hasLargeRange) {
-            for (SoundRecord r : RECENT_SOUNDS) {
-                if (r.dimensionKey.equals(dim) && r.range > LARGE_SOUND_RANGE_THRESHOLD) {
-                    result.add(r);
+        Map<GridKey3D, List<SoundRecord>> dimMap = SPATIAL_SOUNDS.get(dim);
+        if (dimMap != null) {
+            GridKey3D centerKey = gridKey(pos);
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        GridKey3D neighborKey = new GridKey3D(
+                            centerKey.x() + dx,
+                            centerKey.y() + dy,
+                            centerKey.z() + dz);
+                        List<SoundRecord> list = dimMap.get(neighborKey);
+                        if (list != null) {
+                            result.addAll(list);
+                        }
+                    }
                 }
             }
-            return result;
         }
-
-        long key = gridKey(pos);
-        for (long dx = -1; dx <= 1; dx++) {
-            for (long dz = -1; dz <= 1; dz++) {
-                long nk = ((key >> 32) + dx) << 32 | (((key & 0xFFFFFFFFL) + dz) & 0xFFFFFFFFL);
-                List<SoundRecord> list = dimMap.get(nk);
-                if (list != null) result.addAll(list);
+        for (SoundRecord r : LARGE_RANGE_SOUNDS) {
+            if (r.dimensionKey.equals(dim)) {
+                result.add(r);
             }
         }
         return result;
     }
 
-    private static void updateSpatialSounds() {
-        SPATIAL_SOUNDS.clear();
-        for (SoundRecord r : RECENT_SOUNDS) {
-            SPATIAL_SOUNDS.computeIfAbsent(r.dimensionKey, d -> new HashMap<>())
-                .computeIfAbsent(gridKey(r.pos), k -> new ArrayList<>()).add(r);
-        }
-    }
-
-    public static synchronized void addSound(SoundEvent se,
+    public static void addSound(SoundEvent se,
                                          BlockPos      pos,
                                          String        dimensionKey,
                                          double        range,
@@ -140,95 +162,116 @@ public class SoundTracker {
                 SoundAttractMod.LOGGER.debug("Sound {} not in whitelist, ignoring.", soundIdToUse);
             return;
         }
+        writeLock.lock();
+        try {
+            for (Iterator<SoundRecord> it = RECENT_SOUNDS.iterator(); it.hasNext(); ) {
+                SoundRecord existing = it.next();
+                if (existing.dimensionKey.equals(dimensionKey) &&
+                    existing.pos.equals(pos) &&
+                    Objects.equals(existing.soundId, soundIdToUse)) {
+                    if (existing.weight >= weight) {
+                        return;
+                    }
+                    it.remove();
+                    removeRecordFromCollections(existing);
+                    break;
+                }
+            }
 
-        for (Iterator<SoundRecord> it = RECENT_SOUNDS.iterator(); it.hasNext(); ) {
-            SoundRecord existing = it.next();
-            if (existing.dimensionKey.equals(dimensionKey) &&
-                existing.pos.equals(pos) &&
-                Objects.equals(existing.soundId, soundIdToUse)) {
-
-                if (existing.weight >= weight) {
-                    if (SoundAttractConfig.COMMON.debugLogging.get())
-                        SoundAttractMod.LOGGER.info(
-                            "[addSound] skipped weaker duplicate {} ({} ≤ {})",
-                            soundIdToUse, weight, existing.weight);
+            int cap = SoundAttractConfig.COMMON.maxSoundsTracked.get();
+            if (RECENT_SOUNDS.size() >= cap) {
+                SoundRecord worstRecord = null;
+                int worstRecordIndex = -1;
+                double minMetric = Double.MAX_VALUE;
+                for (int i = 0; i < RECENT_SOUNDS.size(); i ++) {
+                    SoundRecord current = RECENT_SOUNDS.get(i);
+                    double currentMetric = current.weight + (current.range/1000.0);
+                    if (currentMetric < minMetric) {
+                        minMetric = currentMetric;
+                        worstRecord = current;
+                        worstRecordIndex = i;
+                    }
+                }
+                double newMetric = weight + (range / 1000.0);
+                if (worstRecord != null && newMetric > minMetric) {
+                    RECENT_SOUNDS.remove(worstRecordIndex);
+                    removeRecordFromCollections(worstRecord);
+                } else {
                     return;
                 }
-                it.remove();
-                if (SoundAttractConfig.COMMON.debugLogging.get())
-                    SoundAttractMod.LOGGER.info(
-                        "[addSound] replaced weaker duplicate {} ({} → {})",
-                        soundIdToUse, existing.weight, weight);
-                break;
             }
+            SoundRecord record = new SoundRecord(se, soundIdToUse, pos, lifetime, dimensionKey, range, weight);
+            RECENT_SOUNDS.add(record);
+            addRecordToCollections(record);
+        } finally {
+            writeLock.unlock();
         }
-
-        if (SoundAttractConfig.COMMON.debugLogging.get())
-            SoundAttractMod.LOGGER.info("[addSound] stored {}  (range={}, weight={})",
-                                        loc, range, weight);
-
-        SoundRecord record = new SoundRecord(se, soundIdToUse, pos,
-                                         lifetime, dimensionKey,
-                                         range, weight);
-        RECENT_SOUNDS.add(record);
-
-
-        RECENT_SOUNDS.sort((a, b) -> {
-            int cmp = Double.compare(b.range, a.range);
-            if (Math.abs(a.range - b.range) < 5.0)      
-                cmp = Double.compare(b.weight, a.weight);
-            return cmp;
-        });
-
-        int cap = SoundAttractConfig.COMMON.maxSoundsTracked.get();
-        if (RECENT_SOUNDS.size() > cap) {
-            RECENT_SOUNDS.subList(cap, RECENT_SOUNDS.size()).clear();
-        }
-
-        updateSpatialSounds();
     }
 
-    public static synchronized void addSound(SoundEvent se, BlockPos pos, String dimensionKey, double range, double weight, int lifetime) {
+    public static void tick() {
+        writeLock.lock();
+        try {
+            Iterator<SoundRecord> iter = RECENT_SOUNDS.iterator();
+            while (iter.hasNext()){
+                SoundRecord r = iter.next();
+                r.ticksRemaining--;
+                if (r.ticksRemaining <=0) {
+                    iter.remove();
+                    removeRecordFromCollections(r);
+                }
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public static void addSound(SoundEvent se, BlockPos pos, String dimensionKey, double range, double weight, int lifetime) {
         addSound(se, pos, dimensionKey, range, weight, lifetime, null);
     }
 
-    public static synchronized void addSound(SoundEvent se, BlockPos pos, String dimensionKey) {
+    public static void addSound(SoundEvent se, BlockPos pos, String dimensionKey) {
         int lifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
         addSound(se, pos, dimensionKey, 16.0, 1.0, lifetime);
     }
 
-    public static synchronized void addVirtualSound(BlockPos pos, String dimensionKey, double range, double weight, int lifetime, UUID sourcePlayer, String animationClass) {
-        RECENT_SOUNDS.removeIf(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight < weight);
-        boolean higherExists = RECENT_SOUNDS.stream().anyMatch(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight > weight);
-        if (!higherExists) {
-            RECENT_SOUNDS.removeIf(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight == weight);
-            RECENT_SOUNDS.add(new VirtualSoundRecord(pos, lifetime, dimensionKey, range, weight, sourcePlayer, animationClass));
-            updateSpatialSounds();
+    public static void addVirtualSound(BlockPos pos, String dimensionKey, double range, double weight, int lifetime, UUID sourcePlayer, String animationClass) {
+        writeLock.lock();
+        try {
+            RECENT_SOUNDS.removeIf(r -> {
+                boolean shouldRemove = r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight < weight;
+                if (shouldRemove) {
+                    removeRecordFromCollections(r);
+                }
+                return shouldRemove;
+            });
+
+            boolean strongerOrEqualExists = RECENT_SOUNDS.stream().anyMatch(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight >= weight);
+
+            if (!strongerOrEqualExists) {
+                VirtualSoundRecord record = new VirtualSoundRecord(pos, lifetime, dimensionKey, range, weight, sourcePlayer, animationClass);
+                RECENT_SOUNDS.add(record);
+                addRecordToCollections(record);
+            }
+        } finally {
+            writeLock.unlock();
         }
     }
 
-    public static synchronized void tick() {
-        Iterator<SoundRecord> iter = RECENT_SOUNDS.iterator();
-        while (iter.hasNext()) {
-            SoundRecord r = iter.next();
-            r.ticksRemaining--;
-            if (r.ticksRemaining <= 0) {
-                iter.remove();
+    public static void removeSoundAt(BlockPos pos, String dimensionKey) {
+        writeLock.lock();
+        try {
+            Iterator<SoundRecord> iter = RECENT_SOUNDS.iterator();
+            while (iter.hasNext()) {
+                SoundRecord r = iter.next();
+                if (r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey)) {
+                    iter.remove();
+                    removeRecordFromCollections(r);
+                    break;
+                }
             }
+        } finally {
+            writeLock.unlock();
         }
-        updateSpatialSounds();
-    }
-
-    public static synchronized void removeSoundAt(BlockPos pos, String dimensionKey) {
-        Iterator<SoundRecord> iter = RECENT_SOUNDS.iterator();
-        while (iter.hasNext()) {
-            SoundRecord r = iter.next();
-            if (r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey)) {
-                iter.remove();
-                break;
-            }
-        }
-        updateSpatialSounds();
     }
 
     private static class RaycastCacheKey {
@@ -250,7 +293,7 @@ public class SoundTracker {
             return mobPos.hashCode() ^ soundPos.hashCode() ^ soundId.hashCode();
         }
     }
-    private static final Map<RaycastCacheKey, double[]> RAYCAST_CACHE = new WeakHashMap<>();
+    private static final Map<RaycastCacheKey, double[]> RAYCAST_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static final double NO_MUFFLING_RANGE = 1.0;
     private static final double NO_MUFFLING_WEIGHT = 1.0;
@@ -424,94 +467,73 @@ public class SoundTracker {
         return false; 
     }
 
-    public static void pruneIrrelevantSounds(Level level) {
-        if (RECENT_SOUNDS.isEmpty()) return;
-        List<net.minecraft.world.entity.Mob> mobs = level.getEntitiesOfClass(net.minecraft.world.entity.Mob.class, level.getWorldBorder().getCollisionShape().bounds());
-        Iterator<SoundRecord> iter = RECENT_SOUNDS.iterator();
-        while (iter.hasNext()) {
-            SoundRecord sound = iter.next();
-            if (sound.ticksRemaining > 5) continue;
-            boolean inRange = false;
-            for (net.minecraft.world.entity.Mob mob : mobs) {
-                if (!mob.isAlive()) continue;
-                BlockPos mobPos = mob.blockPosition();
-                String soundId = sound.soundId != null ? sound.soundId : (sound.sound != null && sound.sound.getLocation() != null ? sound.sound.getLocation().toString() : "unknown");
-                double[] muffled = applyBlockMuffling(level, sound.pos, mobPos, sound.range, sound.weight, soundId);
-                double range = muffled[0];
-                double distSqr = mobPos.distSqr(sound.pos);
-                if (distSqr <= range * range) {
-                    inRange = true;
-                    break;
-                }
-            }
-            if (!inRange) iter.remove();
-        }
-        updateSpatialSounds();
+ public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos) {
+  readLock.lock();
+  try {
+   String dimensionKey = level.dimension().location().toString();
+   List<SoundRecord> nearbySounds = getNearbySounds(dimensionKey, mobPos);
+   if (nearbySounds.isEmpty()) {
+    return null;
+   }
+   com.example.soundattract.config.MobProfile profile = SoundAttractConfig.getMatchingProfile(mob);
+   SoundRecord bestSound = null;
+   double highestWeight = -1.0;
+   double closestDistSqr = Double.MAX_VALUE;
+   double bestSoundEffectiveRange = 0;
+   double bestSoundEffectiveWeight = 0;
+   double noveltyBonusValue = SoundAttractConfig.COMMON.soundNoveltyBonusWeight.get();
+   int noveltyTicks = SoundAttractConfig.COMMON.soundNoveltyTimeTicks.get();
+   int maxLifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
+
+   for (SoundRecord r : nearbySounds) {
+    if (r == null || r.pos == null) {
+     continue;
     }
-
-    public static synchronized SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos) {
-        String dimensionKey = level.dimension().location().toString();
-        com.example.soundattract.config.MobProfile profile = SoundAttractConfig.getMatchingProfile(mob);
-
-        SoundRecord bestSound = null;
-        double highestWeight = -1.0;
-        double closestDistSqr = Double.MAX_VALUE;
-        double bestSoundEffectiveRange = 0;
-        double bestSoundEffectiveWeight = 0;
-
-        for (SoundRecord r : RECENT_SOUNDS) {
-            if (r == null || r.pos ==null) {
-                continue;
-            }
-            String soundIdStr = r.soundId;                      
-            ResourceLocation rl = soundIdStr != null            
-                                  ? ResourceLocation.tryParse(soundIdStr)
-                                  : null;
-
-            if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
-                && (rl == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl))) {
-                continue;                                      
-            }
-
-            if (SoundAttractConfig.COMMON.debugLogging.get())
-                SoundAttractMod.LOGGER.info("[findNearest] considering {}", rl);
-
-            double effectiveInitialRange  = r.range;
-            double effectiveInitialWeight = r.weight;
-
-            if (profile != null && soundIdStr != null) {
-                Optional<SoundOverride> ov = profile.getSoundOverride(rl);
-                if (ov.isPresent()) {
-                    effectiveInitialRange  = ov.get().getRange();
-                    effectiveInitialWeight = ov.get().getWeight();
-                }
-            }
-
-            double[] muffled = applyBlockMuffling(level, r.pos, mobPos,
-                                                  effectiveInitialRange, effectiveInitialWeight,
-                                                  soundIdStr != null ? soundIdStr : "unknown");
-
-            double muffledRange = muffled[0];
-            double muffledWeight = muffled[1];
-            double distSqr = mobPos.distSqr(r.pos);
-            double rangeSqr = muffledRange * muffledRange;
-            if (distSqr > rangeSqr) {
-                continue;
-            }
-            if (muffledWeight > highestWeight || (Math.abs(muffledWeight - highestWeight) < 0.001 && distSqr < closestDistSqr)) {
-                highestWeight = muffledWeight;
-                closestDistSqr = distSqr;
-                bestSound = r;
-                bestSoundEffectiveRange = muffledRange;
-                bestSoundEffectiveWeight = muffledWeight;
-            }
-        }
-
-        if (bestSound != null) {
-            if (bestSound.pos == null) return null;
-            return new SoundRecord(bestSound.sound, bestSound.soundId, bestSound.pos, bestSound.ticksRemaining, bestSound.dimensionKey, bestSoundEffectiveRange, bestSoundEffectiveWeight);
-        }
-
-        return null;
+    String soundIdStr = r.soundId;
+    ResourceLocation rl = soundIdStr != null ? ResourceLocation.tryParse(soundIdStr) : null;
+    if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && (rl == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl))) {
+     continue;
     }
+    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+     SoundAttractMod.LOGGER.info("[findNearest] considering {}", rl);
+    }
+    double effectiveInitialRange = r.range;
+    double effectiveInitialWeight = r.weight;
+    if (profile != null && soundIdStr != null) {
+     Optional<SoundOverride> ov = profile.getSoundOverride(rl);
+     if (ov.isPresent()) {
+      effectiveInitialRange = ov.get().getRange();
+      effectiveInitialWeight = ov.get().getWeight();
+     }
+    }
+    double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effectiveInitialRange, effectiveInitialWeight, soundIdStr != null ? soundIdStr : "unknown");
+    double muffledRange = muffled[0];
+    double muffledWeight = muffled[1];
+    double distSqr = mobPos.distSqr(r.pos);
+    double rangeSqr = muffledRange * muffledRange;
+    if (distSqr > rangeSqr) {
+     continue;
+    }
+    double noveltyBonus = 0.0;
+    if (r.ticksRemaining > (maxLifetime - noveltyTicks)) {
+        noveltyBonus = noveltyBonusValue;
+    }
+    double finalComparisonWeight = muffledWeight + noveltyBonus;
+    if (finalComparisonWeight  > highestWeight || (Math.abs(finalComparisonWeight  - highestWeight) < 0.001 && distSqr < closestDistSqr)) {
+     highestWeight = finalComparisonWeight;
+     closestDistSqr = distSqr;
+     bestSound = r;
+     bestSoundEffectiveRange = muffledRange;
+     bestSoundEffectiveWeight = muffledWeight;
+    }
+   }
+   if (bestSound != null) {
+    if (bestSound.pos == null) return null;
+    return new SoundRecord(bestSound.sound, bestSound.soundId, bestSound.pos, bestSound.ticksRemaining, bestSound.dimensionKey, bestSoundEffectiveRange, bestSoundEffectiveWeight);
+   }
+   return null;
+  } finally {
+   readLock.unlock();
+  }
+ }
 }

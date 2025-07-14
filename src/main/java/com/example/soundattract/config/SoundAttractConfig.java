@@ -39,6 +39,7 @@ public class SoundAttractConfig {
     public static boolean TACZ_ENABLED_CACHE = false;
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE       = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();    
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
@@ -105,12 +106,15 @@ public class SoundAttractConfig {
     public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior;
     public final ForgeConfigSpec.IntValue soundLifetimeTicks;
     public final ForgeConfigSpec.IntValue scanCooldownTicks;
+    public final ForgeConfigSpec.DoubleValue cooldownTicksPerMob;
     public final ForgeConfigSpec.DoubleValue minTpsForScanCooldown;
     public final ForgeConfigSpec.DoubleValue maxTpsForScanCooldown;
     public final ForgeConfigSpec.DoubleValue arrivalDistance;
     public final ForgeConfigSpec.DoubleValue mobMoveSpeed;
     public final ForgeConfigSpec.IntValue maxSoundsTracked;
     public final ForgeConfigSpec.DoubleValue soundSwitchRatio;
+    public final ForgeConfigSpec.DoubleValue soundNoveltyBonusWeight;
+    public final ForgeConfigSpec.IntValue soundNoveltyTimeTicks;
 
     // --- Group AI Settings ---
     public final ForgeConfigSpec.IntValue maxGroupSize;
@@ -124,6 +128,7 @@ public class SoundAttractConfig {
     // --- Mob Interaction ---
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> mobBlacklist;
 
     // --- Sound Properties ---
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
@@ -215,7 +220,9 @@ public class SoundAttractConfig {
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczGunShootDecibels;
     public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczAttachmentReductions;
     public final ForgeConfigSpec.DoubleValue taczAttachmentReductionDefault;
-
+    public final ForgeConfigSpec.DoubleValue gunshotBaseDetectionRange;
+    public final ForgeConfigSpec.IntValue gunshotDetectionDurationTicks;
+    public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;    
     // --- Simple VC Integration ---
     public final ForgeConfigSpec.BooleanValue enableVoiceChatIntegration;
     public final ForgeConfigSpec.IntValue voiceChatWhisperRange;
@@ -239,6 +246,11 @@ public class SoundAttractConfig {
                                 .defineInRange("soundLifetimeTicks", 600, 20, 1000000);
             scanCooldownTicks = builder.comment("Minimum time in ticks between mob scans for new sounds. Higher values can improve performance but reduce responsiveness.")
                                 .defineInRange("scanCooldownTicks", 25, 1, 1000000);
+            cooldownTicksPerMob = builder.comment("How many ticks to add to the base scan cooldown for each active mob.",
+                 "This directly controls how much the cooldown increases with more mobs.",
+                 "A higher value means more cooldown per mob, slowing down scans more aggressively.",
+                 "Example: 0.25 means 100 mobs will add (100 * 0.15) = 15 ticks to the base cooldown.")
+                                .defineInRange("cooldownTicksPerMob", 0.15, 0.0, 10.0);
             minTpsForScanCooldown = builder.comment("TPS below which scanCooldownTicks is dynamically increased to save performance. Set to 0 to disable.")
                                 .defineInRange("minTpsForScanCooldown", 15.0, 0.0, 20.0);
             maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
@@ -248,7 +260,7 @@ public class SoundAttractConfig {
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
                                 .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
-                                .defineInRange("maxSoundsTracked", 10, 1, 1000000);
+                                .defineInRange("maxSoundsTracked", 20, 1, 1000000);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
                                 .defineInRange("maxGroupSize", 64, 1, 128);
             leaderGroupRadius = builder.comment("Radius (in blocks) used to group mobs under a leader for group AI behavior. Default: 64.0")
@@ -257,6 +269,13 @@ public class SoundAttractConfig {
                                 .defineInRange("groupDistance", 128.0, 1.0, 128.0);
             soundSwitchRatio = builder.comment("Minimum ratio for a new sound's weight to overcome an existing target sound's weight for a mob to switch targets (e.g., 1.2 means new sound must be 20% 'heavier').")
                                 .defineInRange("soundSwitchRatio", 0.7, 1.0, 5.0);
+            soundNoveltyBonusWeight = builder.comment("A small weight bonus given to very new sounds to make mobs more likely to switch to them.",
+                 "This helps break ties and makes mobs seem more 'alert' to new threats.",
+                 "Set to 0.0 to disable.")
+                                .defineInRange("soundNoveltyBonusWeight", 0.5, 0.0, 10.0);
+            soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
+                 "20 ticks = 1 second.")
+                                .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
             leaderSpacingMultiplier = builder.comment("Multiplier for spacing between mob leaders in a group. Default: 1.0")
                                 .defineInRange("leaderSpacingMultiplier", 1.0, 0.1, 10.0);
             numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 8")
@@ -292,11 +311,17 @@ public class SoundAttractConfig {
                     "spore:spitter", "spore:stalker", "spore:thorn", "spore:umarmed", "spore:usurper",
                     "spore:verva", "spore:vigil", "spore:volatile", "spore:wendigo"
                 ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
+
+                mobBlacklist = builder.comment("A list of entity resource IDs to PREVENT from receiving the attraction AI goals.",
+                         "This acts as a blacklist. Mobs on this list will never be attracted to sounds, regardless of other settings.",
+                         "Format: ['minecraft:pig', 'modid:some_other_mob']")
+                                      .defineList("mobBlacklist", Collections.singletonList("minecraft:pig"), obj -> obj instanceof String);
             builder.pop();
 
             builder.push("Sounds White List");
             soundIdWhitelist = builder.comment("If not empty, only sound event IDs in this list will be considered by mobs.")
                                     .defineList("soundIdWhitelist", Arrays.asList(
+                                        "gcaa:item.g19.fire",
                                         "minecraft:item.crossbow.shoot",
                                         "minecraft:item.crossbow.loading_start",
                                         "minecraft:item.crossbow.loading_middle",
@@ -487,6 +512,7 @@ public class SoundAttractConfig {
                     "Example: 'minecraft:item.crossbow.shoot;16.0;4.0'")
                                          .defineList("soundDefaults",
                                          Arrays.asList(
+                                            "gcaa:item.g19.fire;160;10",
                                          "minecraft:item.crossbow.shoot;16;4",
                                          "minecraft:item.crossbow.loading_start;6;2",
                                          "minecraft:item.crossbow.loading_middle;6;2",
@@ -951,7 +977,7 @@ public class SoundAttractConfig {
                     try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
                 });
             taczAttachmentReductions = builder.comment("Tacz attachment sound reduction. Format: 'modid:item;reduction'. Example: 'tacz:suppressor;15.0'")
-                .defineList("taczAttachmentReductions", Arrays.asList(
+                    .defineList("taczAttachmentReductions", Arrays.asList(
                     "tacz:muzzle_brake_cthulhu;-3.0",
                     "tacz:muzzle_brake_pioneer;-3.0",
                     "tacz:muzzle_brake_cyclone_d2;-3.0",
@@ -971,7 +997,31 @@ public class SoundAttractConfig {
                     try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
                 });
             taczAttachmentReductionDefault = builder.comment("Default reduction value for Tacz attachments if the attachment id is not in the list.")
-                .defineInRange("taczAttachmentReductionDefault", 20.0, -300.0, 300.0);
+                    .defineInRange("taczAttachmentReductionDefault", 20.0, -300.0, 300.0);
+            gunshotBaseDetectionRange = builder.comment("The base visual detection range (in blocks) when a gunshot occurs, before muzzle attachments are factored in.")
+                    .defineInRange("gunshotBaseDetectionRange", 128.0, 16.0, 512.0);
+            gunshotDetectionDurationTicks = builder.comment("How long (in ticks) the increased detection from a gunshot lasts. 20 ticks = 1 second.")
+                    .defineInRange("gunshotDetectionDurationTicks", 60, 1, 200);
+            taczMuzzleFlashReductions = builder.comment("Tacz attachment VISUAL FLASH reduction. A positive value reduces flash range, a negative value INCREASES it (e.g., for muzzle brakes)., Format: 'modid:item;reduction_amount'")
+                    .defineList("taczMuzzleFlashReductions", Arrays.asList(
+                    "tacz:muzzle_silencer_mirage;100.0",
+                    "tacz:muzzle_silencer_vulture;110.0",
+                    "tacz:muzzle_silencer_knight_qd;105.0",
+                    "tacz:muzzle_silencer_ursus;90.0",
+                    "tacz:muzzle_silencer_ptilopsis;90.0",
+                    "tacz:muzzle_silencer_phantom_s1;90.0",
+                    "tacz:muzzle_brake_cthulhu;-10.0",
+                    "tacz:muzzle_brake_pioneer;-10.0",
+                    "tacz:muzzle_brake_cyclone_d2;-10.0",
+                    "tacz:muzzle_brake_trex;-15.0",
+                    "tacz:muzzle_compensator_trident;-5.0"                
+                ), obj -> {
+                    if (!(obj instanceof String str)) return false;
+                    String[] parts = str.split(";", 2);
+                    if (parts.length != 2) return false;
+                    try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                });
+
             builder.pop();
 
             builder.push("Simple VC");
@@ -1117,6 +1167,20 @@ public class SoundAttractConfig {
             }
         }
 
+        TACZ_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+        List<? extends String> rawFlashAtt = COMMON.taczMuzzleFlashReductions.get();
+        for (String raw : rawFlashAtt) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double reductionValue = Double.parseDouble(parts[1]);
+                if (rl != null) {
+                    TACZ_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reductionValue);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Failed to parse muzzle flash reduction entry: {}", raw, e);
+            }
+        }
         parseAndCacheCustomArmorColors();
 
         SPECIAL_MOB_PROFILES_CACHE = new ArrayList<>();

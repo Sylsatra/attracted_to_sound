@@ -98,7 +98,8 @@ dependencies {
     compileOnly "de.maxhenkel.voicechat:voicechat-api:2.5.27"
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-1.20.1-2.5.27")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
-    compileOnly fg.deobf("curse.maven:smartbrainlib-661293:5654964")
+    compileOnly "curse.maven:timeless-and-classics-zero-1028108:6654541"
+
 }
 
 tasks.named('processResources', ProcessResources).configure {

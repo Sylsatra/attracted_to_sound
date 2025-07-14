@@ -44,7 +44,8 @@ public class SoundAttractionEvents {
     private static int cachedAttractedMobCount_ServerTick = 0;
     private static Set<EntityType<?>> CACHED_ATTRACTED_ENTITY_TYPES = null;
     private static List<String> lastKnownAttractedEntitiesConfig_Copy = null;
-
+    private static Set<EntityType<?>> CACHED_BLACKLISTED_ENTITY_TYPES = null;
+    private static List<String> lastKnownBlacklistConfig_Copy = null;
 
     public static Set<EntityType<?>> getCachedAttractedEntityTypes() {
         List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.attractedEntities.get();
@@ -65,14 +66,41 @@ public class SoundAttractionEvents {
                     })
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
-            lastKnownAttractedEntitiesConfig_Copy = currentConfigListMutableCopy; // Store the new mutable copy
+            lastKnownAttractedEntitiesConfig_Copy = currentConfigListMutableCopy;
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Built attracted EntityType cache with {} types.", CACHED_ATTRACTED_ENTITY_TYPES.size());
+                String resultingTypes = CACHED_ATTRACTED_ENTITY_TYPES.stream().map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
+                        .collect(Collectors.joining(", "));
+                SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final attracted EntityType cache contains: [{}]", resultingTypes);
             }
         }
         return CACHED_ATTRACTED_ENTITY_TYPES;
     }
 
+    public static Set<EntityType<?>> getCachedBlacklistedEntityTypes() {
+        List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.mobBlacklist.get();
+        List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
+        if (CACHED_BLACKLISTED_ENTITY_TYPES == null || lastKnownBlacklistConfig_Copy == null || !lastKnownBlacklistConfig_Copy.equals(currentConfigListMutableCopy)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get() && CACHED_BLACKLISTED_ENTITY_TYPES != null) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Mob blacklist config changed, rebuilding EntityType cache.");
+            }
+            CACHED_BLACKLISTED_ENTITY_TYPES = currentConfigListFromGetter.stream()
+                    .map(idStr -> {
+                        try {
+                            return ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                        } catch (Exception e) {
+                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for blacklisted entity type in config: {}", idStr, e);
+                            return null;
+                        }
+                    }).filter(Objects::nonNull).collect(Collectors.toSet());
+            lastKnownBlacklistConfig_Copy = currentConfigListMutableCopy;
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                String resultingTypes = CACHED_BLACKLISTED_ENTITY_TYPES.stream().map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
+                        .collect(Collectors.joining(", "));
+                SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final blacklisted EntityType cache contains: [{}]", resultingTypes);
+            }
+        }
+        return CACHED_BLACKLISTED_ENTITY_TYPES;
+    }
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -148,7 +176,6 @@ public class SoundAttractionEvents {
     public static void onLevelTick(TickEvent.LevelTickEvent event) {
         if (event.phase == TickEvent.Phase.END && !event.level.isClientSide()) {
             if (event.level instanceof ServerLevel serverLevel) {
-                SoundTracker.pruneIrrelevantSounds(serverLevel);
                 com.example.soundattract.ai.MobGroupManager.updateGroups(serverLevel);
             }
         }
@@ -159,8 +186,18 @@ public class SoundAttractionEvents {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (event.getLevel().isClientSide()) return;
 
+        Set<EntityType<?>> blacklistedEntityTypes = getCachedBlacklistedEntityTypes();
+        if (blacklistedEntityTypes.contains(mob.getType())) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Mob {} is on the blacklist, ignoring.", EntityType.getKey(mob.getType()));
+            }
+            return;
+        }
+        
         Set<EntityType<?>> attractedEntityTypes = getCachedAttractedEntityTypes();
-        if (!attractedEntityTypes.contains(mob.getType())) {
+        boolean isAttractedByType = attractedEntityTypes.contains(mob.getType());
+        boolean hasMatchingprofile = SoundAttractConfig.getMatchingProfile(mob) != null;
+        if (!isAttractedByType && !hasMatchingprofile) {
             return;
         }
 

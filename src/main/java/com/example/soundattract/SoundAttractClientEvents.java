@@ -47,10 +47,9 @@ public class SoundAttractClientEvents {
             if (soundRL == null || soundRL.equals(SoundMessage.VOICE_CHAT_SOUND_ID)) {
                 return;
             }
-            // Skip sounds that are not on the whitelist (if a whitelist is defined).
             if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                     && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundRL)) {
-                return; // Not approved – do not send any packet.
+                return; 
             }
 
             SoundEvent se = BuiltInRegistries.SOUND_EVENT.get(soundRL);

@@ -13,6 +13,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
+import com.example.soundattract.loot.ModLootModifiers;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -23,6 +24,7 @@ public class SoundAttractMod {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         
         ModEnchantments.register(modEventBus);
+        ModLootModifiers.register(modEventBus);
         modEventBus.addListener(this::onCommonSetup);
         modEventBus.addListener(SoundAttractMod::onClientSetup);
 
@@ -37,6 +39,20 @@ public class SoundAttractMod {
             SoundAttractConfig.bakeConfig();
             SoundAttractNetwork.register();
         });
+        event.enqueueWork(this::handleTaczIntegration);
+    }
+
+    private void handleTaczIntegration() {
+        if (ModList.get().isLoaded("tacz") && SoundAttractConfig.TACZ_ENABLED_CACHE) {
+            LOGGER.info("Tacz mod found and integration is enabled. Registering event listeners.");
+            try {
+                com.example.soundattract.integration.TaczIntegrationHandler.register();
+            } catch (NoClassDefFoundError e) {
+                LOGGER.error("Failed to register Tacz integration events. The Tacz API might be missing or has changed.", e);
+            }
+        } else {
+            LOGGER.info("Tacz integration is disabled or mod not found.");
+        }
     }
 
     private static void onClientSetup(final FMLClientSetupEvent event) {

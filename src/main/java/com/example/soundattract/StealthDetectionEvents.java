@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -43,6 +45,7 @@ public class StealthDetectionEvents {
     private static final Map<Mob, Integer> mobOutOfRangeTicks = new HashMap<>();
     private static final Map<Player, net.minecraft.world.phys.Vec3> lastPlayerPositions = new HashMap<>();
     private static long lastStealthCheckTick = -1;
+    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
 
     private static int getStealthCheckInterval() {
         return SoundAttractConfig.COMMON.stealthCheckInterval.get();
@@ -59,6 +62,44 @@ public class StealthDetectionEvents {
             return false;
         }
         return EnchantmentHelper.getItemEnchantmentLevel(concealEnchant, stack) > 0;
+    }
+    public static class GunshotInfo {
+        public final long timestamp;
+        public final double detectionRange;
+        public GunshotInfo(long timestamp, double detectionRange) {
+            this.timestamp = timestamp;
+            this.detectionRange = detectionRange;
+        }
+    }
+    public static void recordPlayerGunshot(Player player, double detectionRange) {
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        long currentTime = player.level().getGameTime();
+        playerGunshotInfo.put(player.getUUID(), new GunshotInfo(currentTime, detectionRange));
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[Gunshot] Recorded gunshot for {} with range {}. Effective until tick {}.",
+                player.getName().getString(),
+                String.format("%.2f", detectionRange),
+                currentTime + SoundAttractConfig.COMMON.gunshotDetectionDurationTicks.get()
+            );
+        }
+    }
+    private static Optional<Double> getActiveGunshotRange(Player player) {
+        GunshotInfo info = playerGunshotInfo.get(player.getUUID());
+        if (info == null) {
+            return Optional.empty();
+        }
+
+        long currentTime = player.level().getGameTime();
+        long duration = SoundAttractConfig.COMMON.gunshotDetectionDurationTicks.get();
+
+        if ((currentTime - info.timestamp) < duration) {
+            return Optional.of(info.detectionRange);
+        } else {
+            playerGunshotInfo.remove(player.getUUID());
+            return Optional.empty();
+        }
     }
 
     @SubscribeEvent
@@ -312,67 +353,74 @@ public class StealthDetectionEvents {
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
         }
-
-        com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(mob);
-        PlayerStance currentStance = determinePlayerStance(player);
-
-        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            StringBuilder armorInfo = new StringBuilder("Armor: [");
-            int i = 0;
-            for (ItemStack stack : player.getArmorSlots()) {
-                if (!stack.isEmpty()) {
-                    if (i > 0) {
-                        armorInfo.append(", ");
-                    }
-                    armorInfo.append(ForgeRegistries.ITEMS.getKey(stack.getItem()));
-                }
-                i++;
-            }
-            armorInfo.append("]");
-            SoundAttractMod.LOGGER.info(
-                    "[GRSDR_Start] Calculating for Mob: {}, Player: {}, Stance: {}, InitialDist: {}, {}",
-                    mob.getName().getString(), player.getName().getString(), currentStance,
-                    String.format("%.2f", Math.sqrt(mob.distanceToSqr(player))), armorInfo.toString()
-            );
-        }
         double baseRange;
-        Optional<Double> override = Optional.empty();
-        if (mobProfile != null) {
-            override = mobProfile.getDetectionOverride(currentStance);
-        }
-
-        if (override.isPresent()) {
-            baseRange = override.get();
+        Optional<Double> gunshotRangeOpt = getActiveGunshotRange(player);
+        PlayerStance currentStance = determinePlayerStance(player);
+        if (gunshotRangeOpt.isPresent()) {
+            baseRange = gunshotRangeOpt.get();
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] Mob {} using profile '{}' detection range for stance {}: {}",
-                        mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                "[GRSDR_Update] Player {} has active gunshot flash. Initial range set to {}.",
+                player.getName().getString(), String.format("%.2f", baseRange)
+                );
+            }
+            double standingRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
+            double currentPoseBaseRange;
+            switch (currentStance) {
+                case CRAWLING:
+                    currentPoseBaseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
+                    break;
+                case SNEAKING:
+                    currentPoseBaseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
+                    break;
+                default:
+                    currentPoseBaseRange = standingRange;
+                    break;
+            }
+            double poseReduction = Math.max(0, standingRange - currentPoseBaseRange); 
+            baseRange -= poseReduction;
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info(
+                "[GRSDR_Update] Gunshot range adjusted by pose {}. Reduction of {}. New range: {}.",
+                currentStance, String.format("%.2f", poseReduction), String.format("%.2f", baseRange)
                 );
             }
         } else {
-            switch (currentStance) {
-                case CRAWLING:
-                    baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
-                    break;
-                case SNEAKING:
-                    baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
-                    break;
-                case STANDING:
-                default:
-                    baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
-                    break;
-            }
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                if (mobProfile != null) {
+            com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(mob);
+            Optional<Double> override = (mobProfile != null) ? mobProfile.getDetectionOverride(currentStance) : Optional.empty();
+            if (override.isPresent()) {
+                baseRange = override.get();
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
+                    "[GRSDR_Update] Mob {} using profile '{}' detection range for stance {}: {}",
+                    mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                    );
+                }
+            } else {
+                switch (currentStance) {
+                    case CRAWLING:
+                        baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
+                        break;
+                    case SNEAKING:
+                        baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
+                        break;
+                    case STANDING:
+                    default:
+                        baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
+                        break;
+                }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    if (mobProfile != null) {
+                        SoundAttractMod.LOGGER.info(
                         "[GRSDR_Update] Mob {} profile '{}' has no override for stance {}, using default: {}",
                         mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
-                    );
-                } else {
-                     SoundAttractMod.LOGGER.info(
+                        );
+                    } else {
+                        SoundAttractMod.LOGGER.info(
                         "[GRSDR_Update] No profile for Mob {}, using default for stance {}: {}",
                         mob.getName().getString(), currentStance, baseRange
-                    );
+                        );
+                    }
                 }
             }
         }

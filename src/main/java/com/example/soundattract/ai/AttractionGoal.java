@@ -237,44 +237,40 @@ public class AttractionGoal extends Goal {
         return true;
     }
 
-    @Override
-    public boolean canContinueToUse() {
-        if (!isMobEligible()) {
-            return false;
-        }
-        if (mob.isVehicle() || mob.isSleeping() || shouldSuppressTargeting()) return false;
-        if (targetSoundPos == null || mob.getNavigation().isDone()) return false;
-
-        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
-        Mob leader = MobGroupManager.getLeader(mob);
-        if (leader != mob && smartEdge
-            && mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos))
-               < getArrivalDistance() * getArrivalDistance()
-        ) {
-            return false;
-        }
-
-        SoundTracker.SoundRecord live = SoundTracker.findNearestSound(
-            mob,
-            mob.level(),
-            mob.blockPosition(),
-            mob.getEyePosition()
-        );
-
-        if (live == null || !live.pos.equals(targetSoundPos)) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "[AttractionGoal] canContinueToUse: live sound vanished for {} (target {})",
-                    mob.getName().getString(),
-                    targetSoundPos
-                );
-            }
-            return false;
-        }
-
-        cachedSound = live;
-        return true;
-    }
+ @Override
+ public boolean canContinueToUse() {
+  if (!isMobEligible()) {
+   return false;
+  }
+  if (mob.isVehicle() || mob.isSleeping() || shouldSuppressTargeting()) {
+   return false;
+  }
+  if (targetSoundPos == null || mob.getNavigation().isDone()) {
+   return false;
+  }
+  boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
+  Mob leader = MobGroupManager.getLeader(mob);
+  if (leader != mob && smartEdge && mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < getArrivalDistance() * getArrivalDistance()) {
+   return false;
+  }
+  SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
+  if (bestSoundNow == null) {
+   return false;
+  }
+  if (bestSoundNow.pos.equals(this.targetSoundPos)) {
+   this.cachedSound = bestSoundNow;
+   this.lastSoundTicksRemaining = bestSoundNow.ticksRemaining;
+   return true;
+  }
+  double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
+  if (bestSoundNow.weight > this.currentTargetWeight * switchRatio) {
+   if (SoundAttractConfig.COMMON.debugLogging.get()) {
+    SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} is switching from target {} (weight {}) to {} (weight {})", mob.getName().getString(), this.targetSoundPos, this.currentTargetWeight, bestSoundNow.pos, bestSoundNow.weight);
+   }
+   return false;
+  }
+  return true;
+ }
 
     @Override
     public void stop() {
