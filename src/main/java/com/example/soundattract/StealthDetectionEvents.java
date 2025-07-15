@@ -1,12 +1,14 @@
 package com.example.soundattract;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
@@ -46,6 +48,7 @@ public class StealthDetectionEvents {
     private static final Map<Mob, Integer> mobOutOfRangeTicks = new HashMap<>();
     private static final Map<Player, net.minecraft.world.phys.Vec3> lastPlayerPositions = new HashMap<>();
     private static long lastStealthCheckTick = -1;
+    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
 
     private static int getStealthCheckInterval() {
         return SoundAttractConfig.COMMON.stealthCheckInterval.get();
@@ -156,6 +159,44 @@ public class StealthDetectionEvents {
             );
         }
         return true;
+    }
+    public static class GunshotInfo {
+        public final long timestamp;
+        public final double detectionRange;
+        public GunshotInfo(long timestamp, double detectionRange) {
+            this.timestamp = timestamp;
+            this.detectionRange = detectionRange;
+        }
+    }
+    public static void recordPlayerGunshot(Player player, double detectionRange) {
+        if (player == null || player.level().isClientSide()) {
+            return;
+        }
+        long currentTime = player.level().getGameTime();
+        playerGunshotInfo.put(player.getUUID(), new GunshotInfo(currentTime, detectionRange));
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[Gunshot] Recorded gunshot for {} with range {}. Effective until tick {}.",
+                player.getName().getString(),
+                String.format("%.2f", detectionRange),
+                currentTime + SoundAttractConfig.COMMON.gunshotDetectionDurationTicks.get()
+            );
+        }
+    }
+    private static Optional<Double> getActiveGunshotRange(Player player) {
+        GunshotInfo info = playerGunshotInfo.get(player.getUUID());
+        if (info == null) {
+            return Optional.empty();
+        }
+
+        long currentTime = player.level().getGameTime();
+        long duration = SoundAttractConfig.COMMON.gunshotDetectionDurationTicks.get();
+
+        if ((currentTime - info.timestamp) < duration) {
+            return Optional.of(info.detectionRange);
+        } else {
+            playerGunshotInfo.remove(player.getUUID());
+            return Optional.empty();
+        }
     }
 
     public static boolean shouldSuppressTargeting(Mob mob) {
@@ -307,407 +348,183 @@ public class StealthDetectionEvents {
         return PlayerStance.STANDING;
     }
 
+    private static int colorDifference(int color1, int color2) {
+        int r1 = (color1 >> 16) & 0xFF;
+        int g1 = (color1 >> 8) & 0xFF;
+        int b1 = color1 & 0xFF;
+
+        int r2 = (color2 >> 16) & 0xFF;
+        int g2 = (color2 >> 8) & 0xFF;
+        int b2 = color2 & 0xFF;
+    
+        return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+    }
+
     public static double getRealisticStealthDetectionRange(Player player, Mob mob, Level level) {
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
         }
 
-        com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(mob);
-        PlayerStance currentStance = determinePlayerStance(player);
-
-        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            StringBuilder armorInfo = new StringBuilder("Armor: [");
-            int i = 0;
-            for (ItemStack stack : player.getArmorSlots()) {
-                if (!stack.isEmpty()) {
-                    if (i > 0) {
-                        armorInfo.append(", ");
-                    }
-                    armorInfo.append(BuiltInRegistries.ITEM.getKey(stack.getItem()));
-                }
-                i++;
-            }
-            armorInfo.append("]");
-            SoundAttractMod.LOGGER.info(
-                    "[GRSDR_Start] Calculating for Mob: {}, Player: {}, Stance: {}, InitialDist: {}, {}",
-                    mob.getName().getString(), player.getName().getString(), currentStance,
-                    String.format("%.2f", Math.sqrt(mob.distanceToSqr(player))), armorInfo.toString()
-            );
-        }
         double baseRange;
-        Optional<Double> override = Optional.empty();
-        if (mobProfile != null) {
-            override = mobProfile.getDetectionOverride(currentStance);
-        }
-
-        if (override.isPresent()) {
-            baseRange = override.get();
+        Optional<Double> gunshotRangeOpt = getActiveGunshotRange(player);
+        PlayerStance currentStance = determinePlayerStance(player);
+    
+        if (gunshotRangeOpt.isPresent()) {
+            baseRange = gunshotRangeOpt.get();
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] Mob {} using profile '{}' detection range for stance {}: {}",
-                        mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
-                );
+                SoundAttractMod.LOGGER.info("[GRSDR] Player has active gunshot flash. Initial range: {}", String.format("%.2f", baseRange));
+            }
+            double standingRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
+            double currentPoseBaseRange;
+            switch (currentStance) {
+                case CRAWLING: currentPoseBaseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get(); break;
+                case SNEAKING: currentPoseBaseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get(); break;
+                default: currentPoseBaseRange = standingRange; break;
+            }
+            double poseReduction = Math.max(0, standingRange - currentPoseBaseRange);
+            baseRange -= poseReduction;
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[GRSDR] Gunshot range adjusted by pose {}. Reduction: {}. New range: {}.", currentStance, String.format("%.2f", poseReduction), String.format("%.2f", baseRange));
             }
         } else {
-            switch (currentStance) {
-                case CRAWLING:
-                    baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
-                    break;
-                case SNEAKING:
-                    baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
-                    break;
-                case STANDING:
-                default:
-                    baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
-                    break;
-            }
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                if (mobProfile != null) {
-                    SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] Mob {} profile '{}' has no override for stance {}, using default: {}",
-                        mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
-                    );
-                } else {
-                     SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] No profile for Mob {}, using default for stance {}: {}",
-                        mob.getName().getString(), currentStance, baseRange
-                    );
+            com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(mob);
+            Optional<Double> override = (mobProfile != null) ? mobProfile.getDetectionOverride(currentStance) : Optional.empty();
+            if (override.isPresent()) {
+                baseRange = override.get();
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[GRSDR] Mob profile '{}' provides override for stance {}: {}", mobProfile.getProfileName(), currentStance, baseRange);
+                }
+            } else {
+                switch (currentStance) {
+                    case CRAWLING: baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get(); break;
+                    case SNEAKING: baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get(); break;
+                    default: baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get(); break;
+                }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[GRSDR] No profile override for stance {}, using default: {}", currentStance, baseRange);
                 }
             }
         }
-        if (player.hasEffect(net.minecraft.world.effect.MobEffects.INVISIBILITY)) {
-            double invisFactor = SoundAttractConfig.COMMON.invisibilityStealthFactor.get();
-            baseRange *= invisFactor;
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] Player {} is invisible, reducing baseRange to {}",
-                        player.getName().getString(), String.format("%.2f", baseRange)
-                );
-            }
-        }
 
-        BlockPos basePos = player.blockPosition();
-        long dayTime = level.getDayTime() % 24000L;
-        boolean isDay = dayTime >= 0 && dayTime < 12000L;
+        if (player.hasEffect(net.minecraft.world.effect.MobEffects.INVISIBILITY)) {
+            baseRange *= SoundAttractConfig.COMMON.invisibilityStealthFactor.get();
+            if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Invisibility applied. Range -> {}", String.format("%.2f", baseRange));
+        }
 
         int effectiveLight = 0;
-        BlockPos playerFeetPos = player.blockPosition();
+        BlockPos playerFeetPos = player.blockPosition(); 
         BlockPos playerEyesPos = playerFeetPos.above();
-
+        int skyDarkness = level.getSkyDarken();
         if (level.isLoaded(playerFeetPos)) {
-            effectiveLight = Math.max(effectiveLight, level.getBrightness(LightLayer.BLOCK, playerFeetPos));
-            if (isDay && level.canSeeSky(playerFeetPos)) {
-                effectiveLight = Math.max(effectiveLight, level.getBrightness(LightLayer.SKY, playerFeetPos));
-            }
+            effectiveLight = level.getRawBrightness(playerFeetPos, skyDarkness);
         }
         if (level.isLoaded(playerEyesPos)) {
-             effectiveLight = Math.max(effectiveLight, level.getBrightness(LightLayer.BLOCK, playerEyesPos));
-            if (isDay && level.canSeeSky(playerEyesPos)) {
-                effectiveLight = Math.max(effectiveLight, level.getBrightness(LightLayer.SKY, playerEyesPos));
-            }
+            effectiveLight = Math.max(effectiveLight, level.getRawBrightness(playerEyesPos, skyDarkness));
         }
-
         for (ItemStack s : List.of(player.getMainHandItem(), player.getOffhandItem())) {
-            if (s.getItem() instanceof BlockItem bi) {
-                BlockState def = bi.getBlock().defaultBlockState();
-                if (level.isLoaded(basePos)) {
-                    int emit = def.getLightEmission(level, basePos);
-                    effectiveLight = Math.max(effectiveLight, emit);
-                }
-            }
+            if (s.getItem() instanceof BlockItem bi) effectiveLight = Math.max(effectiveLight, bi.getBlock().defaultBlockState().getLightEmission());
         }
-
-        double neutral = SoundAttractConfig.COMMON.neutralLightLevel.get();
-        double sensitivity = SoundAttractConfig.COMMON.lightLevelSensitivity.get();
-        double lightEffect = (effectiveLight - neutral) * (sensitivity / 15.0);
-        double lightFactor = 1.0 + lightEffect;
-        lightFactor = Math.max(SoundAttractConfig.COMMON.minLightFactor.get(), lightFactor);
-        lightFactor = Math.min(SoundAttractConfig.COMMON.maxLightFactor.get(), lightFactor);
+        double lightFactor = 1.0 + (effectiveLight - SoundAttractConfig.COMMON.neutralLightLevel.get()) * (SoundAttractConfig.COMMON.lightLevelSensitivity.get() / 15.0);
+        lightFactor = Math.clamp(lightFactor, SoundAttractConfig.COMMON.minLightFactor.get(), SoundAttractConfig.COMMON.maxLightFactor.get());
         baseRange *= lightFactor;
-        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("[GRSDR_Update] Light - EffectiveLight: {}, LightFactor (clamped): {}, baseRange: {}",
-                    effectiveLight, String.format("%.2f", lightFactor), String.format("%.2f", baseRange));
-        }
-        if (SoundAttractConfig.COMMON.enableHeldItemPenalty.get()) {
-            int heldItemCount = 0;
-            if (!player.getMainHandItem().isEmpty()) heldItemCount++;
-            if (!player.getOffhandItem().isEmpty()) heldItemCount++;
-            if (heldItemCount > 0) {
-                double penaltyPerItem = SoundAttractConfig.COMMON.heldItemPenaltyFactor.get();
-                for (int i = 0; i < heldItemCount; i++) {
-                    baseRange *= penaltyPerItem;
-                }
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Penalty: {} items, factor {:.2f} (applied {} times) -> {:.2f}",
-                            heldItemCount, penaltyPerItem, heldItemCount, baseRange);
-                }
-            }
-        }
+        if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Light Level: {}, Factor: {}, Range -> {}", effectiveLight, String.format("%.2f", lightFactor), String.format("%.2f", baseRange));
+    
         if (SoundAttractConfig.COMMON.enableEnchantmentPenalty.get()) {
-            int visiblyEnchantedArmorPieces = 0;
-            for (ItemStack armorStack : player.getArmorSlots()) {
-                if (!armorStack.isEmpty() && armorStack.isEnchanted() && !hasConcealmentEnchant(armorStack)) {
-                    visiblyEnchantedArmorPieces++;
-                }
+            int enchantedArmorCount = 0;
+            for (ItemStack armorStack : player.getArmorSlots()) if (!armorStack.isEmpty() && armorStack.isEnchanted() && !hasConcealmentEnchant(armorStack)) enchantedArmorCount++;
+            if(enchantedArmorCount > 0) {
+                baseRange *= Math.pow(SoundAttractConfig.COMMON.armorEnchantmentPenaltyFactor.get(), enchantedArmorCount);
+                if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Enchanted Armor Penalty ({} pcs). Range -> {}", enchantedArmorCount, String.format("%.2f", baseRange));
             }
-            if (visiblyEnchantedArmorPieces > 0) {
-                double armorPenaltyFactor = SoundAttractConfig.COMMON.armorEnchantmentPenaltyFactor.get();
-                for (int i = 0; i < visiblyEnchantedArmorPieces; i++) {
-                    baseRange *= armorPenaltyFactor;
-                }
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Armor Enchant Penalty: {} pieces, factor {:.2f} (applied {} times) -> {:.2f}",
-                            visiblyEnchantedArmorPieces, armorPenaltyFactor, visiblyEnchantedArmorPieces, baseRange);
-                }
-            }
-            int visiblyEnchantedHeldItems = 0;
-            if (!player.getMainHandItem().isEmpty() && player.getMainHandItem().isEnchanted() && !hasConcealmentEnchant(player.getMainHandItem())) {
-                visiblyEnchantedHeldItems++;
-            }
-            if (!player.getOffhandItem().isEmpty() && player.getOffhandItem().isEnchanted() && !hasConcealmentEnchant(player.getOffhandItem())) {
-                visiblyEnchantedHeldItems++;
-            }
-            if (visiblyEnchantedHeldItems > 0) {
-                double heldItemEnchantPenalty = SoundAttractConfig.COMMON.heldItemEnchantmentPenaltyFactor.get();
-                for (int i = 0; i < visiblyEnchantedHeldItems; i++) {
-                    baseRange *= heldItemEnchantPenalty;
-                }
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Enchant Penalty: {} items, factor {:.2f} (applied {} times) -> {:.2f}",
-                            visiblyEnchantedHeldItems, heldItemEnchantPenalty, visiblyEnchantedHeldItems, baseRange);
-                }
+
+            int enchantedHeldCount = 0;
+            if(!player.getMainHandItem().isEmpty() && player.getMainHandItem().isEnchanted() && !hasConcealmentEnchant(player.getMainHandItem())) enchantedHeldCount++;
+            if(!player.getOffhandItem().isEmpty() && player.getOffhandItem().isEnchanted() && !hasConcealmentEnchant(player.getOffhandItem())) enchantedHeldCount++;
+            if(enchantedHeldCount > 0) {
+                baseRange *= Math.pow(SoundAttractConfig.COMMON.heldItemEnchantmentPenaltyFactor.get(), enchantedHeldCount);
+                if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Enchanted Held Item Penalty ({} pcs). Range -> {}", enchantedHeldCount, String.format("%.2f", baseRange));
             }
         }
-        List<String> camouflageItems = new ArrayList<>(SoundAttractConfig.COMMON.camouflageArmorItems.get());
 
         if (SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
             Optional<Integer> armorColorOpt = getEffectiveArmorColor(player);
             Optional<Integer> envColorOpt = getAverageEnvironmentalColor(player, level);
-
             if (armorColorOpt.isPresent() && envColorOpt.isPresent()) {
-                int armorColor = armorColorOpt.get();
-                int envColor = envColorOpt.get();
-
-                int rArmor = (armorColor >> 16) & 0xFF;
-                int gArmor = (armorColor >> 8) & 0xFF;
-                int bArmor = armorColor & 0xFF;
-
-                int rEnv = (envColor >> 16) & 0xFF;
-                int gEnv = (envColor >> 8) & 0xFF;
-                int bEnv = envColor & 0xFF;
-
-                int diff = Math.abs(rArmor - rEnv) + Math.abs(gArmor - gEnv) + Math.abs(bArmor - bEnv);
-                int matchBonusThreshold = SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get();
-
-                if (diff <= matchBonusThreshold) {
-                    double maxBonusEffect = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get();
-                    double effectivenessRatio;
-                    if (matchBonusThreshold > 0) {
-                        effectivenessRatio = 1.0 - ((double) diff / matchBonusThreshold);
-                    } else {
-                        effectivenessRatio = (diff == 0) ? 1.0 : 0.0;
-                    }
-
-                    double actualBonusEffectiveness = maxBonusEffect * effectivenessRatio;
-                    baseRange *= (1.0 - actualBonusEffectiveness);
-
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                                "[EnvCamo] Player {} BONUS: armor=0x{}, env=0x{}, diff={}, matchThold={}, ratio={}, effect={}, newRange={}",
-                                player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor),
-                                diff, matchBonusThreshold, String.format("%.2f", effectivenessRatio),
-                                String.format("%.2f", actualBonusEffectiveness), String.format("%.2f", baseRange)
-                        );
-                    }
-                } else if (SoundAttractConfig.COMMON.enableEnvironmentalMismatchPenalty.get()) {
-                    int mismatchPenaltyThreshold = SoundAttractConfig.COMMON.environmentalMismatchThreshold.get();
-                    if (diff > mismatchPenaltyThreshold) {
-                        double penaltyFactor = SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
-                        baseRange *= penaltyFactor;
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[EnvCamo] Player {} PENALTY: armor=0x{}, env=0x{}, diff={}, mismatchThold={}, penaltyFactor={}, newRange={}",
-                                    player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor),
-                                    diff, mismatchPenaltyThreshold, String.format("%.2f", penaltyFactor), String.format("%.2f", baseRange)
-                            );
-                        }
-                    } else {
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[EnvCamo] Player {} NEUTRAL: armor=0x{}, env=0x{}, diff={}, no bonus or penalty from env camo.",
-                                    player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor), diff
-                            );
-                        }
-                    }
+                int diff = colorDifference(armorColorOpt.get(), envColorOpt.get());
+                if (diff <= SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get()) {
+                    double ratio = 1.0 - ((double) diff / SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get());
+                    double effect = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get() * ratio;
+                    baseRange *= (1.0 - effect);
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] EnvCamo BONUS (diff: {}). Range -> {}", diff, String.format("%.2f", baseRange));
+                } else if (SoundAttractConfig.COMMON.enableEnvironmentalMismatchPenalty.get() && diff > SoundAttractConfig.COMMON.environmentalMismatchThreshold.get()) {
+                    baseRange *= SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] EnvCamo PENALTY (diff: {}). Range -> {}", diff, String.format("%.2f", baseRange));
                 }
-            } else {
-                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[EnvCamo] Player {} - Could not get armor or environment color. Skipping.", player.getName().getString());
-                 }
             }
         }
 
         if (level.isRainingAt(player.blockPosition())) {
             baseRange *= SoundAttractConfig.COMMON.rainStealthFactor.get();
-             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[GRSDR_Update] Raining. Factor applied. baseRange: {}", String.format("%.2f", baseRange));
-            }
+            if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Rain applied. Range -> {}", String.format("%.2f", baseRange));
         }
         if (level.isThundering()) {
             baseRange *= SoundAttractConfig.COMMON.thunderStealthFactor.get();
-             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[GRSDR_Update] Thundering. Factor applied. baseRange: {}", String.format("%.2f", baseRange));
-            }
+            if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Thunder applied. Range -> {}", String.format("%.2f", baseRange));
         }
 
         if (currentStance != PlayerStance.SNEAKING && currentStance != PlayerStance.CRAWLING) {
             if (isPlayerMoving(player, SoundAttractConfig.COMMON.movementThreshold.get())) {
                 baseRange *= SoundAttractConfig.COMMON.movementStealthPenalty.get();
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Player moving (not sneak/crawl). Penalty applied. baseRange: {}", String.format("%.2f", baseRange));
-                }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Movement penalty applied. Range -> {}", String.format("%.2f", baseRange));
             } else {
                 baseRange *= SoundAttractConfig.COMMON.stationaryStealthBonusFactor.get();
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Player stationary (not sneak/crawl). Bonus applied. baseRange: {}", String.format("%.2f", baseRange));
-                }
-            }
-        } else {
-             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[GRSDR_Update] Player sneaking/crawling. Movement penalty/bonus not applied here (handled by stance base range). baseRange: {}", String.format("%.2f", baseRange));
+                if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Stationary bonus applied. Range -> {}", String.format("%.2f", baseRange));
             }
         }
 
         if (SoundAttractConfig.COMMON.enableCamouflage.get()) {
-            if (!camouflageItems.isEmpty()) {
-                double effectToApply = 0.0;
-                int totalActualArmorPieces = 0;
-                long wornListedCamouflagePieces = 0;
-                for (ItemStack armorStack : player.getArmorSlots()) {
-                    if (!armorStack.isEmpty()) {
-                        totalActualArmorPieces++;
+            List<String> camoItems = new ArrayList<>(SoundAttractConfig.COMMON.camouflageArmorItems.get());
+            if (!camoItems.isEmpty()) {
+                double totalEffect = 0.0;
+                int piecesWorn = 0, camoPiecesWorn = 0;
+                List<ItemStack> armorList = new ArrayList<>();
+                player.getArmorSlots().forEach(armorList::add);
+                Collections.reverse(armorList); 
+                for(int i = 0; i < armorList.size(); i++){
+                    ItemStack armorStack = armorList.get(i);
+                    if(!armorStack.isEmpty()){
+                        piecesWorn++;
                         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(armorStack.getItem());
-                        if (itemId != null && camouflageItems.contains(itemId.toString())) {
-                            wornListedCamouflagePieces++;
-                        }
-                    }
-                }
-                boolean isActuallyWearingFullSetOfListedItems = (totalActualArmorPieces == 4 && wornListedCamouflagePieces == totalActualArmorPieces && totalActualArmorPieces > 0);
-
-                if (SoundAttractConfig.COMMON.requireFullSetForCamouflageBonus.get()) {
-                    if (isActuallyWearingFullSetOfListedItems) {
-                        effectToApply = SoundAttractConfig.COMMON.fullArmorStealthBonus.get();
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[GRSDR_Update ItemCamo] Player {} wearing full set of listed items (requireFullSet=true). Applying fullArmorStealthBonus: {}",
-                                    player.getName().getString(), effectToApply
-                            );
-                        }
-                    } else {
-                        double totalEffectiveness = 0.0;
-                        List<ItemStack> armorItemsList = new ArrayList<>();
-                        player.getArmorSlots().forEach(armorItemsList::add);
-                        for (int i = 0; i < armorItemsList.size(); i++) {
-                            ItemStack stack = armorItemsList.get(i);
-                            if (stack.isEmpty()) continue;
-                            Item item = stack.getItem();
-                            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
-                            if (itemId != null && camouflageItems.contains(itemId.toString())) {
-                                switch (i) {
-                                    case 0: totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get(); break;
-                                    case 1: totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get(); break;
-                                    case 2: totalEffectiveness += SoundAttractConfig.COMMON.chestplateCamouflageEffectiveness.get(); break;
-                                    case 3: totalEffectiveness += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get(); break;
-                                }
+                        if(itemId != null && camoItems.contains(itemId.toString())){
+                            camoPiecesWorn++;
+                            switch(i){
+                                case 0: totalEffect += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get(); break;
+                                case 1: totalEffect += SoundAttractConfig.COMMON.chestplateCamouflageEffectiveness.get(); break;
+                                case 2: totalEffect += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get(); break;
+                                case 3: totalEffect += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get(); break;
                             }
                         }
-                        effectToApply = totalEffectiveness;
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                             SoundAttractMod.LOGGER.info(
-                                    "[GRSDR_Update ItemCamo] Player {} wearing partial listed camo (requireFullSet=true). Applying summed per-piece effectiveness: {}",
-                                    player.getName().getString(), effectToApply
-                            );
-                        }
-                    }
-                } else {
-                    if (isActuallyWearingFullSetOfListedItems && SoundAttractConfig.COMMON.fullArmorStealthBonus.get() > 0) {
-                        effectToApply = SoundAttractConfig.COMMON.fullArmorStealthBonus.get();
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[GRSDR_Update ItemCamo] Player {} wearing full set of listed items (requireFullSet=false, using full bonus). Applying fullArmorStealthBonus: {}",
-                                    player.getName().getString(), effectToApply
-                            );
-                        }
-                    } else {
-                        double totalEffectiveness = 0.0;
-                        List<ItemStack> armorItemsList = new ArrayList<>();
-                        player.getArmorSlots().forEach(armorItemsList::add);
-                        for (int i = 0; i < armorItemsList.size(); i++) {
-                            ItemStack stack = armorItemsList.get(i);
-                            if (stack.isEmpty()) continue;
-                            Item item = stack.getItem();
-                            ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
-                            if (itemId != null && camouflageItems.contains(itemId.toString())) {
-                                switch (i) {
-                                    case 0: totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get(); break;
-                                    case 1: totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get(); break;
-                                    case 2: totalEffectiveness += SoundAttractConfig.COMMON.chestplateCamouflageEffectiveness.get(); break;
-                                    case 3: totalEffectiveness += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get(); break;
-                                }
-                            }
-                        }
-                        effectToApply = totalEffectiveness;
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[GRSDR_Update ItemCamo] Player {} (requireFullSet=false). Applying summed per-piece effectiveness: {}",
-                                    player.getName().getString(), effectToApply
-                            );
-                        }
                     }
                 }
-
-                if (effectToApply > 0.0) {
-                    double itemCamoMultiplier = 1.0 - Math.min(effectToApply, 0.99);
-                    baseRange *= itemCamoMultiplier;
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                                "[GRSDR_Update ItemCamo] Player {} range after general item camouflage: {}. Applied multiplier: {} (Effect: {})",
-                                player.getName().getString(), String.format("%.2f", baseRange),
-                                String.format("%.2f", itemCamoMultiplier), String.format("%.2f", effectToApply)
-                        );
-                    }
+                boolean hasFullSet = (piecesWorn == 4 && camoPiecesWorn == 4);
+                if(SoundAttractConfig.COMMON.requireFullSetForCamouflageBonus.get()){
+                    if(hasFullSet) totalEffect = SoundAttractConfig.COMMON.fullArmorStealthBonus.get();
+                    else totalEffect = 0; 
+                } else if(hasFullSet && SoundAttractConfig.COMMON.fullArmorStealthBonus.get() > totalEffect) {
+                    totalEffect = SoundAttractConfig.COMMON.fullArmorStealthBonus.get();
                 }
-
-                double finalCalculatedRange = Math.max(SoundAttractConfig.COMMON.minStealthDetectionRange.get(), Math.min(baseRange, SoundAttractConfig.COMMON.maxStealthDetectionRange.get()));
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                            "[GRSDR_End] Mob: {}, Player: {}, Final Calculated Range (camo items processed): {}",
-                            mob.getName().getString(), player.getName().getString(), String.format("%.2f", finalCalculatedRange)
-                    );
+            
+                if (totalEffect > 0) {
+                    baseRange *= (1.0 - Math.min(totalEffect, 0.99));
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Item Camo effect {} applied. Range -> {}", String.format("%.2f", totalEffect), String.format("%.2f", baseRange));
                 }
-                return finalCalculatedRange;
-            } else {
-                double finalCalculatedRange = Math.max(SoundAttractConfig.COMMON.minStealthDetectionRange.get(), Math.min(baseRange, SoundAttractConfig.COMMON.maxStealthDetectionRange.get()));
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                            "[GRSDR_End] Mob: {}, Player: {}, Item Camo enabled but no items configured. Final Range: {}",
-                            mob.getName().getString(), player.getName().getString(), String.format("%.2f", finalCalculatedRange)
-                    );
-                }
-                return finalCalculatedRange;
             }
-        } else {
-            double finalCalculatedRange = Math.max(SoundAttractConfig.COMMON.minStealthDetectionRange.get(), Math.min(baseRange, SoundAttractConfig.COMMON.maxStealthDetectionRange.get()));
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                        "[GRSDR_End] Mob: {}, Player: {}, Item Camo system disabled. Final Range: {}",
-                        mob.getName().getString(), player.getName().getString(), String.format("%.2f", finalCalculatedRange)
-                );
-            }
-            return finalCalculatedRange;
         }
+    
+        double finalRange = Math.clamp(baseRange, SoundAttractConfig.COMMON.minStealthDetectionRange.get(), SoundAttractConfig.COMMON.maxStealthDetectionRange.get());
+        if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR_End] Final calculated range for {}: {}", player.getName().getString(), String.format("%.2f", finalRange));
+        return finalRange;
     }
-
 
     private static Optional<Integer> getEffectiveArmorColor(Player player) {
         List<Integer> colors = new ArrayList<>();

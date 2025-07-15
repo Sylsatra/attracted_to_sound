@@ -80,7 +80,6 @@ public record SoundMessage(
     );
 
     public static void handle(SoundMessage msg, IPayloadContext context) {
-        com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] Server received a message: {}", msg);
         context.enqueueWork(() -> {
             try {
                 ResourceLocation loc = msg.soundId();
@@ -91,7 +90,6 @@ public record SoundMessage(
                 ResourceKey<Level> levelKey = ResourceKey.create(Registries.DIMENSION, msg.dimension());
                 ServerLevel serverLevel = ServerLifecycleHooks.getCurrentServer().getLevel(levelKey);
                 if (serverLevel == null) {
-                    SoundAttractMod.LOGGER.warn("[SoundMessage] serverLevel is null for {}", msg.dimension());
                     return;
                 }
                 final Vec3 soundLocation = msg.position().equals(Vec3.ZERO) && sender != null ? sender.position() : msg.position();
@@ -124,7 +122,6 @@ public record SoundMessage(
                     se.ifPresent(soundEvent -> SoundTracker.addSound(soundEvent, pos, dimString, finalRange, finalWeight, lifetime, null));
                 }
             } catch  (Exception e) {
-                SoundAttractMod.LOGGER.error("[SoundMessage] Exception for soundId={}", msg.soundId(), e);
             }
         });
     }

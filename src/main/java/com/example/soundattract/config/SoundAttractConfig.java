@@ -39,6 +39,7 @@ public class SoundAttractConfig {
     public static boolean TACZ_ENABLED_CACHE = false;
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();    
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
@@ -111,6 +112,8 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue mobMoveSpeed;
     public final ModConfigSpec.IntValue maxSoundsTracked;
     public final ModConfigSpec.DoubleValue soundSwitchRatio;
+    public final ModConfigSpec.DoubleValue soundNoveltyBonusWeight;
+    public final ModConfigSpec.IntValue soundNoveltyTimeTicks;
 
     // --- Group AI Settings ---
     public final ModConfigSpec.IntValue maxGroupSize;
@@ -215,6 +218,9 @@ public class SoundAttractConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> taczGunShootDecibels;
     public final ModConfigSpec.ConfigValue<List<? extends String>> taczAttachmentReductions;
     public final ModConfigSpec.DoubleValue taczAttachmentReductionDefault;
+    public final ModConfigSpec.DoubleValue gunshotBaseDetectionRange;
+    public final ModConfigSpec.IntValue gunshotDetectionDurationTicks;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;    
 
     // --- Simple VC Integration ---
     public final ModConfigSpec.BooleanValue enableVoiceChatIntegration;
@@ -257,6 +263,13 @@ public class SoundAttractConfig {
                                 .defineInRange("groupDistance", 128.0, 1.0, 128.0);
             soundSwitchRatio = builder.comment("Minimum ratio for a new sound's weight to overcome an existing target sound's weight for a mob to switch targets (e.g., 1.2 means new sound must be 20% 'heavier').")
                                 .defineInRange("soundSwitchRatio", 0.7, 1.0, 5.0);
+            soundNoveltyBonusWeight = builder.comment("A small weight bonus given to very new sounds to make mobs more likely to switch to them.",
+                 "This helps break ties and makes mobs seem more 'alert' to new threats.",
+                 "Set to 0.0 to disable.")
+                                .defineInRange("soundNoveltyBonusWeight", 0.5, 0.0, 10.0);
+            soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
+                 "20 ticks = 1 second.")
+                                .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
             leaderSpacingMultiplier = builder.comment("Multiplier for spacing between mob leaders in a group. Default: 1.0")
                                 .defineInRange("leaderSpacingMultiplier", 1.0, 0.1, 10.0);
             numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 8")
@@ -283,6 +296,8 @@ public class SoundAttractConfig {
             builder.push("Sounds White List");
             soundIdWhitelist = builder.comment("If not empty, only sound event IDs in this list will be considered by mobs.")
                                     .defineList("soundIdWhitelist", Arrays.asList(
+                                        "tacz:gun_shoot",
+                                        "tacz:gun_reload",
                                         "gcaa:item.g19.fire",
                                         "minecraft:item.crossbow.shoot",
                                         "minecraft:item.crossbow.loading_start",
@@ -960,6 +975,30 @@ public class SoundAttractConfig {
                 });
             taczAttachmentReductionDefault = builder.comment("Default reduction value for Tacz attachments if the attachment id is not in the list.")
                 .defineInRange("taczAttachmentReductionDefault", 20.0, -300.0, 300.0);
+            gunshotBaseDetectionRange = builder.comment("The base visual detection range (in blocks) when a gunshot occurs, before muzzle attachments are factored in.")
+                    .defineInRange("gunshotBaseDetectionRange", 128.0, 16.0, 512.0);
+            gunshotDetectionDurationTicks = builder.comment("How long (in ticks) the increased detection from a gunshot lasts. 20 ticks = 1 second.")
+                    .defineInRange("gunshotDetectionDurationTicks", 60, 1, 200);
+            taczMuzzleFlashReductions = builder.comment("Tacz attachment VISUAL FLASH reduction. A positive value reduces flash range, a negative value INCREASES it (e.g., for muzzle brakes)., Format: 'modid:item;reduction_amount'")
+                    .defineList("taczMuzzleFlashReductions", Arrays.asList(
+                    "tacz:muzzle_silencer_mirage;100.0",
+                    "tacz:muzzle_silencer_vulture;110.0",
+                    "tacz:muzzle_silencer_knight_qd;105.0",
+                    "tacz:muzzle_silencer_ursus;90.0",
+                    "tacz:muzzle_silencer_ptilopsis;90.0",
+                    "tacz:muzzle_silencer_phantom_s1;90.0",
+                    "tacz:muzzle_brake_cthulhu;-10.0",
+                    "tacz:muzzle_brake_pioneer;-10.0",
+                    "tacz:muzzle_brake_cyclone_d2;-10.0",
+                    "tacz:muzzle_brake_trex;-15.0",
+                    "tacz:muzzle_compensator_trident;-5.0"                
+                ), obj -> {
+                    if (!(obj instanceof String str)) return false;
+                    String[] parts = str.split(";", 2);
+                    if (parts.length != 2) return false;
+                    try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                });
+
             builder.pop();
 
             builder.push("Simple VC");
@@ -1102,6 +1141,21 @@ public class SoundAttractConfig {
                     TACZ_ATTACHMENT_REDUCTION_DB_CACHE.put(rl, Pair.of(db, 0.0));
                 }
             } catch (Exception e) {
+            }
+        }
+
+        TACZ_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+        List<? extends String> rawFlashAtt = COMMON.taczMuzzleFlashReductions.get();
+        for (String raw : rawFlashAtt) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double reductionValue = Double.parseDouble(parts[1]);
+                if (rl != null) {
+                    TACZ_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reductionValue);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Failed to parse muzzle flash reduction entry: {}", raw, e);
             }
         }
 

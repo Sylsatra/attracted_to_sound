@@ -157,7 +157,6 @@ public class SoundAttractionEvents {
     public void onLevelTick(LevelTickEvent.Post event) {
         if (!event.getLevel().isClientSide()) {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
-                SoundTracker.pruneIrrelevantSounds(serverLevel);
                 MobGroupManager.updateGroups(serverLevel);
             }
         }

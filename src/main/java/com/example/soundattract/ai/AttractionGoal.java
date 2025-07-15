@@ -4,6 +4,7 @@ import com.example.soundattract.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundAttractionEvents;
 import com.example.soundattract.SoundTracker;
+import com.example.soundattract.StealthDetectionEvents;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
 import java.util.ArrayList;
@@ -188,140 +189,115 @@ public class AttractionGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
+        if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
             return false;
         }
-
-        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
-        Mob leader = MobGroupManager.getLeader(mob);
 
         if (scanCooldownCounter > 0) {
+            scanCooldownCounter--;
             return false;
         }
+        scanCooldownCounter = scanCooldownTicks();
 
-        if (leader != mob && smartEdge) {
-            SoundTracker.SoundRecord directSound = SoundTracker.findNearestSound(
-                this.mob,
-                this.mob.level(),
-                this.mob.blockPosition(),
-                this.mob.getEyePosition()
-            );
+        Mob leader = MobGroupManager.getLeader(mob);
+        if (leader != mob && SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            SoundTracker.SoundRecord directSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
             List<MobGroupManager.SoundRelay> relayedSounds = MobGroupManager.consumeRelayedSounds(this.mob);
-            boolean hasDirectSound = directSound != null;
-            boolean hasRelayedSound = relayedSounds != null && !relayedSounds.isEmpty();
-
-            if (!hasDirectSound && !hasRelayedSound) {
-                SoundAttractMod.LOGGER.info(
-                    "AttractionGoal canUse: Non-leader " + mob.getName().getString()
-                    + " has no direct or relayed sound in smart edge mode."
-                );
-                return false;
+            if (directSound == null && (relayedSounds == null || relayedSounds.isEmpty())) {
+                return false; 
             }
         }
 
         SoundTracker.SoundRecord newSound = findInterestingSoundRecord();
         if (newSound == null) return false;
+
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info(
-                "[AttractionGoal] Mob {} found sound: pos={}, range={}, weight={}",
-                mob.getName().getString(),
-                newSound.pos,
-                newSound.range,
-                newSound.weight
-            );
+            SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} canUse sound: id={}, pos={}, range={}, weight={}", mob.getName().getString(), newSound.soundId, newSound.pos, String.format("%.2f", newSound.range), String.format("%.2f", newSound.weight));
         }
+        
         this.targetSoundPos = newSound.pos;
         this.currentTargetWeight = newSound.weight;
-        this.lastSoundTicksRemaining = newSound.ticksRemaining;
+        this.cachedSound = newSound; 
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (!isMobEligible()) {
+        if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
             return false;
         }
-        if (mob.isVehicle() || mob.isSleeping() || shouldSuppressTargeting()) return false;
-        if (targetSoundPos == null || mob.getNavigation().isDone()) return false;
+        if (targetSoundPos == null || this.mob.getNavigation().isDone()) {
+            return false;
+        }
 
-        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         Mob leader = MobGroupManager.getLeader(mob);
-        if (leader != mob && smartEdge
-            && mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos))
-               < getArrivalDistance() * getArrivalDistance()
-        ) {
+        if (leader != mob && SoundAttractConfig.COMMON.edgeMobSmartBehavior.get() && mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < getArrivalDistance() * getArrivalDistance()) {
             return false;
         }
 
-        SoundTracker.SoundRecord live = SoundTracker.findNearestSound(
-            mob,
-            mob.level(),
-            mob.blockPosition(),
-            mob.getEyePosition()
-        );
+        SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
+        if (bestSoundNow == null) {
+            return false;
+        }
+        
+        if (bestSoundNow.pos.equals(this.targetSoundPos)) {
+            this.cachedSound = bestSoundNow;
+            return true;
+        }
 
-        if (live == null || !live.pos.equals(targetSoundPos)) {
+        double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
+        if (bestSoundNow.weight > this.currentTargetWeight * switchRatio) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "[AttractionGoal] canContinueToUse: live sound vanished for {} (target {})",
-                    mob.getName().getString(),
-                    targetSoundPos
-                );
+                SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} switching from target (w:{}) to new sound (w:{})", mob.getName().getString(), String.format("%.2f", this.currentTargetWeight), String.format("%.2f", bestSoundNow.weight));
             }
             return false;
         }
 
-        cachedSound = live;
         return true;
+    }
+    
+    @Override
+    public void start() {
+        if (this.targetSoundPos != null) {
+            this.mob.getNavigation().moveTo(this.targetSoundPos.getX(), this.targetSoundPos.getY(), this.targetSoundPos.getZ(), this.moveSpeed);
+        }
     }
 
     @Override
     public void stop() {
-        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
-        Mob leader = MobGroupManager.getLeader(mob);
-
         this.mob.getNavigation().stop();
         this.targetSoundPos = null;
         this.currentTargetWeight = -1.0;
         this.cachedSound = null;
         this.isPursuingSound = false;
         this.pursuingSoundTicksRemaining = 0;
+        
+        this.edgeMobState = null;
+        this.foundPlayerOrHit = false;
+        this.relayedToLeader = false;
+        this.edgeArrivalTicks = 0;
+
+        this.chosenDest = null;
+        this.hasPicked = false;
+        
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("AttractionGoal stop: " + mob.getName().getString());
+            SoundAttractMod.LOGGER.info("[AttractionGoal] stop: {}", mob.getName().getString());
         }
-
-        if (leader != mob && smartEdge && edgeMobState == EdgeMobState.GOING_TO_SOUND) {
-            edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "Follower " + mob.getName().getString() + " transitioning to RETURNING_TO_LEADER."
-                );
-            }
-            edgeArrivalTicks = 0;
-        } else {
-            edgeMobState = null;
-        }
-        foundPlayerOrHit = false;
-        relayedToLeader = false;
-        edgeArrivalTicks = 0;
     }
-
     @Override
     public void tick() {
         if (scanCooldownCounter > 0) {
             scanCooldownCounter--;
-        }        
+        }
         SoundTracker.SoundRecord freshSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
-        boolean  shouldSwitch = false;
+        boolean shouldSwitch = false;
         if (freshSound != null) {
             if (this.cachedSound == null) {
                 shouldSwitch = true;
             } else {
                 double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
-                double[] muffledFresh = SoundTracker.applyBlockMuffling(this.mob.level(), freshSound.pos, this.mob.blockPosition(), freshSound.range, freshSound.weight, freshSound.soundId);
-                double freshWeight = muffledFresh[1];
-                double[] muffledCurrent = SoundTracker.applyBlockMuffling(this.mob.level(), this.cachedSound.pos, this.mob.blockPosition(), this.cachedSound.range, this.cachedSound.weight, this.cachedSound.soundId);
-                double currentWeight = muffledCurrent[1];
+                double freshWeight = freshSound.weight;
+                double currentWeight = this.cachedSound.weight;
                 if (freshWeight > currentWeight * switchRatio) {
                     shouldSwitch = true;
                 }
@@ -330,7 +306,7 @@ public class AttractionGoal extends Goal {
         if (shouldSwitch) {
             this.cachedSound = freshSound;
             this.targetSoundPos = freshSound.pos;
-            this.currentTargetWeight = freshSound.weight;
+            this.currentTargetWeight = freshSound.weight; 
             this.hasPicked = false;
             this.chosenDest = null;
             this.edgeMobState = null;
@@ -339,15 +315,9 @@ public class AttractionGoal extends Goal {
             this.mob.getNavigation().stop();
         } else if (freshSound == null) {
             this.cachedSound = null;
-            this.targetSoundPos = null;        
+            this.targetSoundPos = null;
         }
         if (targetSoundPos == null) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "AttractionGoal tick: targetSoundPos is null for "
-                    + mob.getName().getString() + ", goal will likely stop."
-                );
-            }
             return;
         }
 
@@ -357,13 +327,6 @@ public class AttractionGoal extends Goal {
         if (lastPos != null && lastPos.equals(mob.blockPosition())) {
             stuckTicks++;
             if (stuckTicks >= RECALC_THRESHOLD && !mob.getNavigation().isStuck()) {
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                        "AttractionGoal tick: " + mob.getName().getString()
-                        + " stuck for " + stuckTicks + " ticks at " + lastPos
-                        + ", recalculating path to " + targetSoundPos
-                    );
-                }
                 mob.getNavigation().moveTo(
                     targetSoundPos.getX(),
                     targetSoundPos.getY(),
@@ -379,24 +342,10 @@ public class AttractionGoal extends Goal {
 
         SoundTracker.SoundRecord currentPursuedSound = this.cachedSound;
         if (currentPursuedSound == null || !currentPursuedSound.pos.equals(this.targetSoundPos)) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "AttractionGoal tick: Cached sound mismatch for {} during expiration check. Target: {}, Cached: {}",
-                    mob.getName().getString(),
-                    targetSoundPos,
-                    (currentPursuedSound != null ? currentPursuedSound.pos : "null")
-                );
-            }
             currentPursuedSound = null;
         }
 
         if (currentPursuedSound == null || currentPursuedSound.ticksRemaining <= 0) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "AttractionGoal tick: Sound at " + targetSoundPos
-                    + " (from cache) expired or removed for " + mob.getName().getString()
-                );
-            }
             targetSoundPos = null;
             return;
         }
@@ -404,10 +353,7 @@ public class AttractionGoal extends Goal {
         if (leader == mob) {
             if (!hasPicked) {
                 double arrivalDist = getArrivalDistance();
-                long seed = mob.getUUID().getMostSignificantBits()
-                          ^ mob.getUUID().getLeastSignificantBits()
-                          ^ targetSoundPos.hashCode();
-                Random rand = new Random(seed);
+                net.minecraft.util.RandomSource rand = this.mob.getRandom();
                 double angle = rand.nextDouble() * (Math.PI * 2.0);
                 double radius = arrivalDist * Math.sqrt(rand.nextDouble());
                 double offsetX = Math.cos(angle) * radius;
@@ -447,10 +393,11 @@ public class AttractionGoal extends Goal {
         List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(mob);
         if (relays != null && !relays.isEmpty()) {
             for (MobGroupManager.SoundRelay relay : relays) {
-                SoundEvent relayEvent = BuiltInRegistries.SOUND_EVENT.get(ResourceLocation.parse(relay.soundId));
+                java.util.Optional<net.minecraft.sounds.SoundEvent> relayEventOpt = BuiltInRegistries.SOUND_EVENT.getOptional(ResourceLocation.parse(relay.soundId));
                 SoundTracker.SoundRecord relayedSoundRecord = new SoundTracker.SoundRecord(
-                    relayEvent,
-                    new BlockPos((int) relay.x, (int) relay.y, (int) relay.z),
+                    relayEventOpt.orElse(null),
+                    relay.soundId,
+                    BlockPos.containing(relay.x, relay.y, relay.z),
                     20,
                     mob.level().dimension().location().toString(),
                     relay.range,
@@ -461,18 +408,9 @@ public class AttractionGoal extends Goal {
                     || (
                         Math.abs(relayedSoundRecord.weight - cachedSound.weight) < 0.001
                         && relayedSoundRecord.pos.distSqr(mob.blockPosition())
-                           < cachedSound.pos.distSqr(mob.blockPosition())
-                       )
+                        < cachedSound.pos.distSqr(mob.blockPosition())
+                    )
                 ) {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "Leader " + mob.getName().getString()
-                            + " switching to relayed sound (ID: " + relay.soundId
-                            + ") from follower at " + relayedSoundRecord.pos
-                            + " (w:" + relayedSoundRecord.weight
-                            + ", r:" + relayedSoundRecord.range + ")"
-                        );
-                    }
                     cachedSound = relayedSoundRecord;
                     targetSoundPos = cachedSound.pos;
                     currentTargetWeight = cachedSound.weight;
@@ -498,14 +436,6 @@ public class AttractionGoal extends Goal {
                     targetSoundPos.getZ(),
                     this.moveSpeed
                 );
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                        "Follower " + mob.getName().getString()
-                        + " (leader: " + leader.getName().getString()
-                        + ") starting to move to sound at " + targetSoundPos
-                        + " (EdgeMobState: GOING_TO_SOUND)"
-                    );
-                }
             }
 
             if (edgeMobState == EdgeMobState.GOING_TO_SOUND) {
@@ -518,13 +448,6 @@ public class AttractionGoal extends Goal {
                 if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos))
                     < getArrivalDistance() * getArrivalDistance()
                 ) {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "Follower " + mob.getName().getString()
-                            + " arrived at sound location " + targetSoundPos
-                            + ". Waiting for " + EDGE_WAIT_TICKS + " ticks."
-                        );
-                    }
                     edgeArrivalTicks++;
                     if (edgeArrivalTicks >= EDGE_WAIT_TICKS || foundPlayerOrHit) {
                         if (!relayedToLeader && foundPlayerOrHit) {
@@ -544,46 +467,23 @@ public class AttractionGoal extends Goal {
                                     soundToRelay.weight,
                                     this.mob.level().getGameTime()
                                 );
-                                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                                    SoundAttractMod.LOGGER.info(
-                                        "Follower " + mob.getName().getString()
-                                        + " relayed 'foundPlayerOrHit' event (Sound ID: "
-                                        + soundToRelay.soundId + ") to leader "
-                                        + leader.getName().getString()
-                                        + " for sound at " + targetSoundPos
-                                    );
-                                }
                                 relayedToLeader = true;
                             }
                         }
                         edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                "Follower " + mob.getName().getString()
-                                + " transitioning to RETURNING_TO_LEADER."
-                            );
-                        }
                         edgeArrivalTicks = 0;
                     }
                 } else {
                     LivingEntity targetPlayer = this.mob.getTarget();
                     if (targetPlayer instanceof net.minecraft.world.entity.player.Player
                         && targetPlayer.distanceToSqr(this.mob)
-                           < getDetectionRangeForPlayer(targetPlayer)
-                             * getDetectionRangeForPlayer(targetPlayer)
+                        < Math.pow(StealthDetectionEvents.getRealisticStealthDetectionRange((net.minecraft.world.entity.player.Player) targetPlayer, this.mob, this.mob.level()), 2)
                     ) {
                         foundPlayerOrHit = true;
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                "Follower " + mob.getName().getString()
-                                + " detected player " + targetPlayer.getName().getString()
-                                + " en route to sound."
-                            );
-                        }
                     }
                 }
             } else if (edgeMobState == EdgeMobState.RETURNING_TO_LEADER) {
-                if (leader != null && !leader.isRemoved() && !leader.isDeadOrDying()) {
+                if (leader != null && !leader.isRemoved() && leader.isAlive()) {
                     mob.getNavigation().moveTo(
                         leader.getX(),
                         leader.getY(),
@@ -593,23 +493,10 @@ public class AttractionGoal extends Goal {
                     if (mob.distanceToSqr(leader)
                         < (getArrivalDistance() + 2.0) * (getArrivalDistance() + 2.0)
                     ) {
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                "Follower " + mob.getName().getString()
-                                + " reached leader " + leader.getName().getString()
-                                + ". Stopping attraction goal (will re-evaluate)."
-                            );
-                        }
                         targetSoundPos = null;
                         edgeMobState = null;
                     }
                 } else {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "Follower " + mob.getName().getString()
-                            + " lost its leader while returning. Stopping attraction goal."
-                        );
-                    }
                     targetSoundPos = null;
                     edgeMobState = null;
                 }
@@ -628,12 +515,6 @@ public class AttractionGoal extends Goal {
                 pursuingSoundTicksRemaining--;
                 if (pursuingSoundTicksRemaining <= 0) {
                     isPursuingSound = false;
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "AttractionGoal tick: " + mob.getName().getString()
-                            + " pursuit timer expired. Will re-evaluate sounds."
-                        );
-                    }
                 }
             }
         } else if (!isPursuingSound) {
@@ -643,13 +524,6 @@ public class AttractionGoal extends Goal {
         if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos))
             < getArrivalDistance() * getArrivalDistance()
         ) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                    "AttractionGoal tick: " + mob.getName().getString()
-                    + " arrived at " + targetSoundPos
-                    + ". Scan cooldown will apply if it re-evaluates canUse."
-                );
-            }
             this.scanCooldownCounter = scanCooldownTicks();
         }
     }
