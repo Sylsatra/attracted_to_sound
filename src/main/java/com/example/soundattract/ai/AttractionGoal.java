@@ -495,10 +495,12 @@ public class AttractionGoal extends Goal {
                     ) {
                         targetSoundPos = null;
                         edgeMobState = null;
+                        return;
                     }
                 } else {
                     targetSoundPos = null;
                     edgeMobState = null;
+                    return;
                 }
             }
         } else {
@@ -536,12 +538,7 @@ public class AttractionGoal extends Goal {
         Vec3 mobEyePos = this.mob.getEyePosition(1.0F);
         Mob leader = MobGroupManager.getLeader(this.mob);
 
-        SoundTracker.SoundRecord bestSoundOverall = SoundTracker.findNearestSound(
-            this.mob,
-            level,
-            mobPos,
-            mobEyePos
-        );
+        SoundTracker.SoundRecord bestSoundOverall = null;
 
         if (leader == this.mob) {
             List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(this.mob);
@@ -551,7 +548,7 @@ public class AttractionGoal extends Goal {
                         null,
                         relay.soundId,
                         new BlockPos((int) relay.x, (int) relay.y, (int) relay.z),
-                        20,
+                        200,
                         level.dimension().location().toString(),
                         relay.range,
                         relay.weight
@@ -565,6 +562,13 @@ public class AttractionGoal extends Goal {
                     }
                 }
             }
+        } else {
+            bestSoundOverall = SoundTracker.findNearestSound(
+                this.mob,
+                level,
+                mobPos,
+                mobEyePos
+            );
         }
 
         SoundTracker.SoundRecord currentTargetSound = this.cachedSound;
