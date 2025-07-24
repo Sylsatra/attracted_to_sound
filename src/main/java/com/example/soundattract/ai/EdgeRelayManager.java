@@ -50,7 +50,7 @@ public class EdgeRelayManager {
     public static void cleanupExpired(long currentTimeMillis) {
         relayStates.entrySet().removeIf(entry -> {
             RelayState state = entry.getValue();
-            return state.completed || state.cancelled || (currentTimeMillis - state.startTime > state.delayMillis + 60_000); // 1 min grace
+            return state.completed || state.cancelled || (currentTimeMillis - state.startTime > state.delayMillis + 60_000);
         });
     }
 }

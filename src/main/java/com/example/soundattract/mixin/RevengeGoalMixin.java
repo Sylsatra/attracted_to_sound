@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(RevengeGoal.class)
 public abstract class RevengeGoalMixin {
 
-    // Accessor to grab "mob" from TrackTargetGoal (superclass of RevengeGoal):
+
     private MobEntity getMob() {
         return ((TrackTargetGoalAccessor)(Object)this).getMob();
     }
@@ -28,7 +28,7 @@ public abstract class RevengeGoalMixin {
         MobEntity mob = getMob();
         LivingEntity attacker = mob.getAttacker();
         if (!(attacker instanceof PlayerEntity player)) {
-            // If the attacker is not a player, let vanilla resume its own canStart()
+
             return;
         }
 
@@ -39,10 +39,10 @@ public abstract class RevengeGoalMixin {
         }
 
         if (dist > allowed) {
-            // Player is outside our stealth range → cancel revenge entirely
+
             StealthUtils.clearTargetAndMemories(mob);
             cir.setReturnValue(false);
         }
-        // Otherwise: player is in stealth range → let vanilla check lastAttackedTime, universal anger, noRevengeTypes, etc.
+
     }
 }

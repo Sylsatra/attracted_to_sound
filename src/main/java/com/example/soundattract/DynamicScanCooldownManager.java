@@ -8,7 +8,7 @@ import net.minecraft.server.world.ServerWorld;
 public class DynamicScanCooldownManager {
     private static volatile double lastTps = 20.0;
 
-    // Start currentScanCooldownTicks at whatever the user configured (or 20 if CONFIG is null).
+
     public static int currentScanCooldownTicks = (SoundAttractMod.CONFIG != null
         ? SoundAttractMod.CONFIG.scanCooldownTicks
         : 20);
@@ -24,7 +24,7 @@ public class DynamicScanCooldownManager {
     private static final int MOBS_400_THRESHOLD = 400;
     private static final int MOBS_800_THRESHOLD = 800;
 
-    // We no longer use MIN_COOLDOWN for clamping downward; instead we clamp at the configured value.
+
     private static double getLowTps() {
         return SoundAttractMod.CONFIG.minTpsForScanCooldown;
     }
@@ -35,7 +35,7 @@ public class DynamicScanCooldownManager {
     private static long lastCheckTime = System.currentTimeMillis();
     private static long lastTickCount = 0;
 
-    // Base scheduler (unchanged)
+
     private static final int[] DEFAULT_TIER_SHIFTS = {0, 1, 2, 3};
     public static AdaptiveScanScheduler scheduler =
         new AdaptiveScanScheduler(currentScanCooldownTicks, DEFAULT_TIER_SHIFTS);
@@ -57,7 +57,7 @@ public class DynamicScanCooldownManager {
         long ticksElapsed = totalTickCount - lastTickCount;
         long timeElapsed = now - lastCheckTime;
 
-        // Decide which “maximum” cooldown to use based on how many mobs are loaded
+
         int maxCooldown;
         if (mobCount > MOBS_800_THRESHOLD) {
             maxCooldown = MOBS_800_MAX_COOLDOWN;
@@ -72,23 +72,23 @@ public class DynamicScanCooldownManager {
         }
 
         if (ticksElapsed > 0 && timeElapsed > 0) {
-            // Recompute averaged TPS
+
             double tps = (ticksElapsed * 1000.0) / timeElapsed * 20.0;
             lastTps = 0.8 * lastTps + 0.2 * tps;
 
             double lowTps = getLowTps();
             double highTps = getHighTps();
 
-            // Pull the user’s original scanCooldownTicks out of the config each tick
+
             int configuredCooldown = (SoundAttractMod.CONFIG != null
                 ? SoundAttractMod.CONFIG.scanCooldownTicks
                 : currentScanCooldownTicks);
 
             if (tps < lowTps || mobCount > MOBS_100_THRESHOLD) {
-                // If TPS is low or mobCount is very high, we slowly ramp UP toward maxCooldown
+
                 currentScanCooldownTicks = Math.min(maxCooldown, currentScanCooldownTicks + 2);
             } else if (tps > highTps && currentScanCooldownTicks > configuredCooldown) {
-                // If TPS is high, we ramp DOWN— but only as far as the original configured value
+
                 currentScanCooldownTicks = Math.max(configuredCooldown, currentScanCooldownTicks - 1);
             }
         }

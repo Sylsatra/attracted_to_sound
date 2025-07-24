@@ -26,16 +26,16 @@ public class ItemMixin {
         ItemStack stack,
         CallbackInfoReturnable<Boolean> cir
     ) {
-        // If this stack has our "Conceal" enchantment, cancel the glint:
+
         Enchantment conceal = ModEnchantments.CONCEAL;
         if (conceal != null) {
             int level = EnchantmentHelper.getLevel(conceal, stack);
             if (level > 0) {
-                // Force return false (no glint), skipping vanilla logic entirely
+
                 cir.setReturnValue(false);
             }
         } else {
-            // If somehow ModEnchantments.CONCEAL isn't registered:
+
             if (SoundAttractMod.LOGGER != null) {
                 SoundAttractMod.LOGGER.error("[ItemMixin] CONCEAL is null! Registration issue?");
             } else {

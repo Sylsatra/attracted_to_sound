@@ -20,12 +20,11 @@
 	"ProjectileAttackGoalMixin",
 	"CreeperIgniteGoalMixin",
 	"MobEntitySeeMixin",
-	"LivingEntityDamageMixin"
+	"LivingEntityDamageMixin",
+	"GunItemMixin"
 	],
 	"client": [
-    	"SoundManagerMixin",
-    	"MinecraftClientMixin",
-    	"SoundSystemMixin"
+    	"SoundManagerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

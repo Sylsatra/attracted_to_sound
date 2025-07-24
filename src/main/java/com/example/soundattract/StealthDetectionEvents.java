@@ -27,7 +27,53 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 public class StealthDetectionEvents {
+    private static class GunshotInfo {
+        public final double detectionRange;
+        public final long timestamp;
+
+        public GunshotInfo(double detectionRange, long timestamp) {
+            this.detectionRange = detectionRange;
+            this.timestamp = timestamp;
+        }
+    }
+
+    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new ConcurrentHashMap<>();
+
+    public static void recordPlayerGunshot(PlayerEntity player, double detectionRange) {
+        if (player == null || SoundAttractMod.CONFIG == null) return;
+        long timestamp = player.getWorld().getTime();
+        playerGunshotInfo.put(player.getUuid(), new GunshotInfo(detectionRange, timestamp));
+
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info(
+                "[StealthDetection] Recorded gunshot flash for {} with range {} at tick {}",
+                player.getName().getString(),
+                String.format("%.2f", detectionRange),
+                timestamp
+            );
+        }
+    }
+
+    private static Optional<Double> getActiveGunshotRange(PlayerEntity player) {
+        GunshotInfo info = playerGunshotInfo.get(player.getUuid());
+        if (info == null || SoundAttractMod.CONFIG == null) {
+            return Optional.empty();
+        }
+
+        long currentTime = player.getWorld().getTime();
+        long duration = SoundAttractMod.CONFIG.gunshotDetectionDurationTicks;
+
+        if ((currentTime - info.timestamp) < duration) {
+            return Optional.of(info.detectionRange);
+        } else {
+
+            playerGunshotInfo.remove(player.getUuid());
+            return Optional.empty();
+        }
+    }
 private static final Map<java.util.UUID, Double> camoCache = new HashMap<>();
 private static final Map<java.util.UUID, Long> camoCacheTick = new HashMap<>();
 
@@ -121,46 +167,76 @@ public static void register() {
     });
 }
 
+
 public static double computeFullDetectionRange(MobEntity mob,
                                                 PlayerEntity player,
                                                 net.minecraft.world.World level) {
-    MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
+
+    double range;
     PlayerStance stance = determinePlayerStance(player);
+    Optional<Double> gunshotRangeOpt = getActiveGunshotRange(player);
 
-    if (profile != null) {
-        Optional<Double> overrideOpt = profile.getDetectionOverride(stance);
-        if (overrideOpt.isPresent()) {
-            return overrideOpt.get();
+    if (gunshotRangeOpt.isPresent()) {
+        range = gunshotRangeOpt.get();
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info(
+                "[StealthDetection] Player {} has active gunshot flash. Initial range: {}",
+                player.getName().getString(), String.format("%.2f", range)
+            );
         }
-    }
 
-    double base, camo;
-    if (stance == PlayerStance.CRAWLING) {
-        base = SoundAttractMod.CONFIG.crawlDetectionRange;
-        camo = SoundAttractMod.CONFIG.crawlDetectionRangeCamouflage;
-    } else if (stance == PlayerStance.SNEAKING) {
-        base = SoundAttractMod.CONFIG.sneakDetectionRange;
-        camo = SoundAttractMod.CONFIG.sneakDetectionRangeCamouflage;
+        double standingRange = SoundAttractMod.CONFIG.standingDetectionRange;
+        double currentPoseBaseRange;
+        switch (stance) {
+            case CRAWLING -> currentPoseBaseRange = SoundAttractMod.CONFIG.crawlDetectionRange;
+            case SNEAKING -> currentPoseBaseRange = SoundAttractMod.CONFIG.sneakDetectionRange;
+            default -> currentPoseBaseRange = standingRange;
+        }
+        double poseReduction = Math.max(0, standingRange - currentPoseBaseRange);
+        range -= poseReduction;
+
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info(
+                "[StealthDetection] Gunshot range adjusted by pose {}. Reduction: {}, New range: {}.",
+                stance, String.format("%.2f", poseReduction), String.format("%.2f", range)
+            );
+        }
     } else {
-        base = SoundAttractMod.CONFIG.standingDetectionRange;
-        camo = SoundAttractMod.CONFIG.standingDetectionRangeCamouflage;
-    }
+        MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
+        Optional<Double> overrideOpt = (profile != null) ? profile.getDetectionOverride(stance) : Optional.empty();
 
-    CamouflageFactorResult camoResult;
-    if (stance == PlayerStance.CRAWLING) {
-        camoResult = getCrawlingCamouflageFactor(player, level);
-    } else if (stance == PlayerStance.SNEAKING) {
-        camoResult = getSneakingCamouflageFactor(player, level);
-    } else {
-        camoResult = getStandingCamouflageFactor(player, level);
-    }
-    double factor = camoResult.factor;
+        if (overrideOpt.isPresent()) {
+            range = overrideOpt.get();
+        } else {
+            double base, camo;
+            if (stance == PlayerStance.CRAWLING) {
+                base = SoundAttractMod.CONFIG.crawlDetectionRange;
+                camo = SoundAttractMod.CONFIG.crawlDetectionRangeCamouflage;
+            } else if (stance == PlayerStance.SNEAKING) {
+                base = SoundAttractMod.CONFIG.sneakDetectionRange;
+                camo = SoundAttractMod.CONFIG.sneakDetectionRangeCamouflage;
+            } else {
+                base = SoundAttractMod.CONFIG.standingDetectionRange;
+                camo = SoundAttractMod.CONFIG.standingDetectionRangeCamouflage;
+            }
 
-    double range = (factor <= 0.0)
+            CamouflageFactorResult camoResult;
+            if (stance == PlayerStance.CRAWLING) {
+                camoResult = getCrawlingCamouflageFactor(player, level);
+            } else if (stance == PlayerStance.SNEAKING) {
+                camoResult = getSneakingCamouflageFactor(player, level);
+            } else {
+                camoResult = getStandingCamouflageFactor(player, level);
+            }
+            double factor = camoResult.factor;
+            
+            range = (factor <= 0.0)
                  ? base
                  : (factor >= 1.0)
                    ? camo
                    : base - (base - camo) * factor;
+        }
+    }
 
     if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.INVISIBILITY)) {
         double invisFactor = SoundAttractMod.CONFIG.invisibilityStealthFactor;
@@ -228,7 +304,7 @@ public static double computeFullDetectionRange(MobEntity mob,
         if (!player.getMainHandStack().isEmpty()) heldCount++;
         if (!player.getOffHandStack().isEmpty()) heldCount++;
 
-        double penalty = SoundAttractMod.CONFIG.heldItemPenaltyFactor; // ≥ 1.0
+        double penalty = SoundAttractMod.CONFIG.heldItemPenaltyFactor;
         for (int i = 0; i < heldCount; i++) {
             range *= penalty;
         }
@@ -249,7 +325,7 @@ public static double computeFullDetectionRange(MobEntity mob,
                 enchantedArmorPieces++;
             }
         }
-        double armorFactor = SoundAttractMod.CONFIG.armorEnchantmentPenaltyFactor; // ≥ 1.0
+        double armorFactor = SoundAttractMod.CONFIG.armorEnchantmentPenaltyFactor;
         for (int i = 0; i < enchantedArmorPieces; i++) {
             range *= armorFactor;
         }
@@ -273,7 +349,7 @@ public static double computeFullDetectionRange(MobEntity mob,
          && !hasConcealmentEnchant(player.getOffHandStack())) {
             enchantedHeldItems++;
         }
-        double heldEnchantFactor = SoundAttractMod.CONFIG.heldItemEnchantmentPenaltyFactor; // ≥ 1.0
+        double heldEnchantFactor = SoundAttractMod.CONFIG.heldItemEnchantmentPenaltyFactor;
         for (int i = 0; i < enchantedHeldItems; i++) {
             range *= heldEnchantFactor;
         }

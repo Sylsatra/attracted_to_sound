@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class LivingEntityDamageMixin {
 
     @Inject(method = "damage", at = @At("HEAD"))
-    private void soundattract_onDamageRememberAttacker(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) { // <-- CORRECTED PARAMETER
+    private void soundattract_onDamageRememberAttacker(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity target = (LivingEntity) (Object) this;
 
         if (target instanceof MobEntity mob) {

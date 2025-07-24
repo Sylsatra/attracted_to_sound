@@ -27,11 +27,11 @@ public abstract class ActiveTargetGoalMixin {
     @Shadow private int reciprocalChance;
     @Shadow @Nullable protected LivingEntity targetEntity;
 
-    // Accessor interface must exist in your code:
-    // @Mixin(TrackTargetGoal.class)
-    // public interface TrackTargetGoalAccessor {
-    //     @Accessor("mob") MobEntity getMob();
-    // }
+
+
+
+
+
     private MobEntity getMob() {
         return ((TrackTargetGoalAccessor)(Object)this).getMob();
     }
@@ -42,7 +42,7 @@ public abstract class ActiveTargetGoalMixin {
         cancellable = true
     )
     private void onCanStart_StealthChecks(CallbackInfoReturnable<Boolean> cir) {
-        // Only intercept if targeting PlayerEntity or ServerPlayerEntity
+
         if (targetClass != PlayerEntity.class && targetClass != ServerPlayerEntity.class) {
             return;
         }
@@ -50,7 +50,7 @@ public abstract class ActiveTargetGoalMixin {
         MobEntity mob = getMob();
         World world = mob.getWorld();
 
-        // Use vanilla getClosestPlayer(TargetPredicate, sourceEntity, x, y, z):
+
         PlayerEntity closest = world.getClosestPlayer(
             targetPredicate,
             mob,
@@ -59,7 +59,7 @@ public abstract class ActiveTargetGoalMixin {
             mob.getZ()
         );
 
-        // If no player was found by vanilla’s predicate → cancel immediately
+
         if (closest == null) {
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
@@ -71,7 +71,7 @@ public abstract class ActiveTargetGoalMixin {
             return;
         }
 
-        // Compute actual distance and stealth‐based allowed range
+
         double actualDistance = mob.distanceTo(closest);
         double allowedRange   = StealthDetectionEvents.computeFullDetectionRange(mob, closest, world);
 
@@ -89,7 +89,7 @@ public abstract class ActiveTargetGoalMixin {
             );
         }
 
-        // If player is outside our stealth range → cancel entire canStart
+
         if (actualDistance > allowedRange) {
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
@@ -101,7 +101,7 @@ public abstract class ActiveTargetGoalMixin {
             return;
         }
 
-        // Otherwise: player is within stealth range → let vanilla continue
-        // (i.e. reciprocalChance check, findClosestTarget(), return targetEntity != null)
+
+
     }
 }

@@ -39,7 +39,7 @@ public abstract class CreeperIgniteGoalMixin {
             double allowedSq = allowed * allowed;
 
             if (distSq > allowedSq) {
-                // Out of range → cancel ignition entirely
+
                 StealthUtils.clearTargetAndMemories(creeper);
                 creeper.setFuseSpeed(-1); 
                 cir.setReturnValue(false);

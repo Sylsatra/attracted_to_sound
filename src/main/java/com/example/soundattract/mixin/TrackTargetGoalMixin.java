@@ -21,8 +21,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class TrackTargetGoalMixin {
 
     @Shadow @Final protected MobEntity mob;
-    // We do NOT shadow "target" here because ActiveTargetGoal never writes into TrackTargetGoal.target.
-    // Instead, ActiveTargetGoal stores the chosen entity in mob.getTarget().
+
+
 
     @Inject(
         method = "shouldContinue()Z",
@@ -30,19 +30,19 @@ public abstract class TrackTargetGoalMixin {
         cancellable = true
     )
     private void onShouldContinue_StealthChecks(CallbackInfoReturnable<Boolean> cir) {
-        // Only run this logic if the current TrackTargetGoal instance is actually an ActiveTargetGoal
+
         if (!(((Object) this) instanceof ActiveTargetGoal)) {
             return;
         }
 
-        // Find the mob’s current target from mob.getTarget():
+
         LivingEntity currentTarget = mob.getTarget();
         if (!(currentTarget instanceof PlayerEntity player)) {
-            // If it's not a player, skip stealth override; let vanilla continue.
+
             return;
         }
 
-        // Compute actual distance and allowed stealth range
+
         double actualDistance = mob.distanceTo(player);
         double allowedRange   = StealthDetectionEvents.computeFullDetectionRange(mob, player, mob.getWorld());
         if (!mob.canSee(player)) {
@@ -60,7 +60,7 @@ public abstract class TrackTargetGoalMixin {
         }
 
         if (actualDistance > allowedRange) {
-            // Player has slipped outside our custom “stealth” range: forcibly end this goal
+
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
                     "[TrackTargetGoalMixin] Cancelling shouldContinue: mob={} player={} (out of range).",
@@ -71,6 +71,6 @@ public abstract class TrackTargetGoalMixin {
             StealthUtils.clearTargetAndMemories(mob);
             cir.setReturnValue(false);
         }
-        // Otherwise—player is within stealth range—let vanilla’s shouldContinue() run as normal.
+
     }
 }
