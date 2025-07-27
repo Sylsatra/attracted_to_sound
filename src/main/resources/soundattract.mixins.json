@@ -1,0 +1,36 @@
+{
+	"required": true,
+	"package": "com.example.soundattract.mixin",
+	"compatibilityLevel": "JAVA_21",
+  	"debug": true,
+  	"export": true,
+    "refmap": "soundattract-refmap.json",
+	"minVersion": "0.8",
+	"mixins": [
+    "MobVisibilityCacheMixin",
+	"MobEntityAccessor",
+	"PathAwareEntityMixin",
+	"ItemMixin",
+	"TrackTargetGoalMixin",
+	"MeleeAttackGoalMixin",
+	"BowAttackGoalMixin",
+	"CrossbowAttackGoalMixin",
+	"RevengeGoalMixin",
+	"ProjectileAttackGoalMixin",
+	"CreeperIgniteGoalMixin",
+	"LivingEntityDamageMixin",
+	"GunItemMixin",
+	"TrackTargetGoalAccessor",
+    "ServerChunkManagerAccessor",
+    "ServerChunkLoadingManagerAccessor"
+	],
+	"client": [
+    	"SoundManagerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

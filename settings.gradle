@@ -1,0 +1,10 @@
+pluginManagement {
+  repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { name = 'MavenForge'; url = 'https://maven.minecraftforge.net/' }
+        maven { name = 'SpongePowered'; url = 'https://repo.spongepowered.org/maven/' }
+  }
+}
+
+rootProject.name = 'soundattract' 
