@@ -934,6 +934,11 @@ public class SoundAttractConfigData {
      */
     public int stealthCheckInterval = 30;
 
+    /**
+     * How long (in ticks) a mob will remember a target before losing interest.
+     * Default: 60 Recommended: 20–120. Minimum: 1. Maximum: 600.
+     */
+    public int targetLossGracePeriodTicks = 60;
 
     /**
      * Detection range for standing players. Default: 32.0

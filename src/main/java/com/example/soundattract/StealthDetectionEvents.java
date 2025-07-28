@@ -120,46 +120,54 @@ public static void register() {
 
             for (MobEntity mob : mobs) {
                 try {
-                    if (mob == null) {
-                        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                            SoundAttractMod.LOGGER.warn("[StealthDetectionEvents] mob was null in tick loop");
-                        }
-                        continue;
-                    }
-                    LivingEntity target = mob.getTarget();
-                    if (target == null) {
-                        continue;
-                    }
-                    if (target instanceof PlayerEntity player && target.isAlive()) {
-                        if (!FovEvents.isTargetInFov(mob, player, true)) {
-                            mob.setTarget(null);
-                            if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                                SoundAttractMod.LOGGER.info(
-                                    "[StealthDetectionEvents] {} is not in FOV of {} → clearing target",
-                                    player.getName().getString(),
-                                    mob.getName().getString()
-                                );
-                            }
-                        } else {
-                        double dist = mob.distanceTo(player);
 
-                        double detectionRange = computeFullDetectionRange(mob, player, world);
-                        if (dist > detectionRange) {
+                    if (!(mob.getTarget() instanceof PlayerEntity player) || !player.isAlive()) {
+                        continue;
+                    }
+                    
+
+                    if (!(mob instanceof com.example.soundattract.accessor.StealthTargetingAccessor accessor)) {
+                        continue;
+                    }
+
+
+                    
+
+                    boolean isCurrentlyDetectable = FovEvents.isTargetInFov(mob, player, true) &&
+                                                  (mob.distanceTo(player) <= computeFullDetectionRange(mob, player, world));
+                    
+                    if (isCurrentlyDetectable) {
+
+                        accessor.soundattract_setLosingTargetTicks(0);
+                    } else {
+
+
+
+                        int currentTicks = accessor.soundattract_getLosingTargetTicks();
+                        currentTicks += checkInterval;
+                        accessor.soundattract_setLosingTargetTicks(currentTicks);
+
+
+                        int gracePeriodTicks = SoundAttractMod.CONFIG.targetLossGracePeriodTicks;
+
+                        if (currentTicks >= gracePeriodTicks) {
+
                             mob.setTarget(null);
-                            if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+                            accessor.soundattract_setLosingTargetTicks(0);
+
+                            if (SoundAttractMod.CONFIG.debugLogging) {
                                 SoundAttractMod.LOGGER.info(
-                                    "[StealthDetectionEvents] {} is out of detection range ({}) for {} → clearing target",
+                                    "[StealthDetectionEvents] {} lost sight of {} for ~{} ticks. Clearing target.",
+                                    mob.getName().getString(),
                                     player.getName().getString(),
-                                    String.format("%.2f", detectionRange),
-                                    mob.getName().getString()
+                                    gracePeriodTicks
                                 );
                             }
                         }
                     }
-                }
-            } catch (Exception ex) {
-                if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                    SoundAttractMod.LOGGER.error("[StealthDetectionEvents] Exception in mob tick: ", ex);
+                } catch (Exception ex) {
+                    if (SoundAttractMod.CONFIG.debugLogging) {
+                        SoundAttractMod.LOGGER.error("[StealthDetectionEvents] Exception in mob tick for mob " + (mob != null ? mob.getName().getString() : "null"), ex);
                     }
                 }
             }
@@ -168,6 +176,38 @@ public static void register() {
 }
 
 
+public static boolean canMobDetectPlayer(MobEntity mob, PlayerEntity player) {
+    if (mob == null || player == null) {
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Called with null mob or player. Defaulting to detectable.");
+        }
+        return true;
+    }
+    
+
+    if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[CanDetectPlayer] Player {} is creative/spectator/dead. Bypassing stealth. Mob {}.", player.getDisplayName().getString(), mob.getDisplayName().getString());
+        }
+        return true;
+    }
+
+
+
+
+
+
+    
+
+    boolean canSee = mob.canSee(player);
+    
+    if (SoundAttractMod.CONFIG.debugLogging && !canSee) {
+
+        SoundAttractMod.LOGGER.info("[CanDetectPlayer] mob.canSee() returned false for {}.", player.getName().getString());
+    }
+
+    return canSee;
+}
 public static double computeFullDetectionRange(MobEntity mob,
                                                 PlayerEntity player,
                                                 net.minecraft.world.World level) {

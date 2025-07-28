@@ -1,92 +1,74 @@
 package com.example.soundattract.mixin;
 
+import com.example.soundattract.FovEvents;
 import com.example.soundattract.StealthDetectionEvents;
-import com.example.soundattract.StealthUtils;
 import com.example.soundattract.SoundAttractMod;
-
+import com.example.soundattract.StealthUtils;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
-
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.lang.reflect.Field;
 
-/**
- * Stops any MeleeAttackGoal (including ZombieAttackGoal, which inherits MeleeAttackGoal)
- * when the player is out of stealth range.
- */
+
 @Mixin(MeleeAttackGoal.class)
 public abstract class MeleeAttackGoalMixin {
+
+
+    @Accessor("mob")
+    abstract PathAwareEntity getMob();
+
+    private boolean isTargetValid(MobEntity mob, LivingEntity target) {
+        if (!(target instanceof PlayerEntity player)) {
+            return true;
+        }
+
+        return mob.canSee(player);
+    }
+
     /**
-     * Cancel canStart() if the player is outside stealth range.
+     * Prevent the goal from starting if the player is not a valid stealth target.
      */
     @Inject(method = "canStart()Z", at = @At("HEAD"), cancellable = true)
     private void soundattract$cancelMeleeCanStart(CallbackInfoReturnable<Boolean> cir) {
-        MeleeAttackGoal goal = (MeleeAttackGoal) (Object) this;
-        MobEntity mob = extractMob(goal);
-        if (mob == null) return;
 
+        MobEntity mob = this.getMob();
         LivingEntity target = mob.getTarget();
-        if (target instanceof PlayerEntity player) {
-            double dist = mob.distanceTo(player);
-            double allowed = StealthDetectionEvents.computeFullDetectionRange(mob, player, mob.getWorld());
-            if (!mob.canSee(player)) allowed *= 0.5;
-            if (dist > allowed) {
-                StealthUtils.clearTargetAndMemories(mob);
-                cir.setReturnValue(false);
-            }
+
+        if (target == null || !target.isAlive()) {
+            return;
+        }
+
+        if (!isTargetValid(mob, target)) {
+
+            StealthUtils.clearTargetAndMemories(mob);
+            cir.setReturnValue(false);
         }
     }
 
     /**
-     * Cancel shouldContinue() if the player moves out of stealth range.
+     * Prevent the goal from continuing if the player is no longer a valid stealth target.
      */
     @Inject(method = "shouldContinue()Z", at = @At("HEAD"), cancellable = true)
     private void soundattract$cancelMeleeShouldContinue(CallbackInfoReturnable<Boolean> cir) {
-        MeleeAttackGoal goal = (MeleeAttackGoal) (Object) this;
-        MobEntity mob = extractMob(goal);
-        if (mob == null) return;
 
+        MobEntity mob = this.getMob();
         LivingEntity target = mob.getTarget();
-        if (target instanceof PlayerEntity player) {
-            double dist = mob.distanceTo(player);
-            double allowed = StealthDetectionEvents.computeFullDetectionRange(mob, player, mob.getWorld());
-            if (!mob.canSee(player)) allowed *= 0.5;
-            if (dist > allowed) {
-                StealthUtils.clearTargetAndMemories(mob);
-                cir.setReturnValue(false);
-            }
-        }
-    }
 
-    /**
-     * Reflectively find the private field of type MobEntity (PathAwareEntity) inside MeleeAttackGoal.
-     */
-    private MobEntity extractMob(MeleeAttackGoal goal) {
-        for (Field f : goal.getClass().getDeclaredFields()) {
-            if (MobEntity.class.isAssignableFrom(f.getType())) {
-                try {
-                    f.setAccessible(true);
-                    return (MobEntity) f.get(goal);
-                } catch (Exception e) {
-                    if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                        SoundAttractMod.LOGGER.warn("[MeleeAttackGoalMixin] Failed to read field " 
-                            + f.getName() + ": " + e);
-                    }
-                    return null;
-                }
-            }
+        if (target == null || !target.isAlive()) {
+            cir.setReturnValue(false);
+            return;
         }
-        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-            StringBuilder sb = new StringBuilder("[MeleeAttackGoalMixin] No MobEntity field found in MeleeAttackGoal. Available fields: ");
-            for (Field f : goal.getClass().getDeclaredFields()) sb.append(f.getName()).append(" ");
-            SoundAttractMod.LOGGER.warn(sb.toString());
+        
+        if (!isTargetValid(mob, target)) {
+
+            cir.setReturnValue(false);
         }
-        return null;
     }
 }

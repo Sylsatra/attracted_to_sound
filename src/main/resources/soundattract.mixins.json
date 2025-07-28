@@ -8,20 +8,21 @@
 	"minVersion": "0.8",
 	"mixins": [
     "MobVisibilityCacheMixin",
-    "MobEntityAccessor",
+	"MobEntityAccessor",
+	"PathAwareEntityMixin",
 	"ItemMixin",
-	"ActiveTargetGoalMixin",
 	"TrackTargetGoalMixin",
-	"TrackTargetGoalAccessor",
 	"MeleeAttackGoalMixin",
 	"BowAttackGoalMixin",
 	"CrossbowAttackGoalMixin",
 	"RevengeGoalMixin",
 	"ProjectileAttackGoalMixin",
 	"CreeperIgniteGoalMixin",
-	"MobEntitySeeMixin",
 	"LivingEntityDamageMixin",
-	"GunItemMixin"
+	"GunItemMixin",
+	"TrackTargetGoalAccessor",
+    "ServerChunkManagerAccessor",
+    "ThreadedAnvilChunkStorageAccessor"
 	],
 	"client": [
     	"SoundManagerMixin"
