@@ -22,11 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * NOTE: This class is already correctly designed for the new system.
- * It provides the low-level FOV checks that StealthDetectionEvents uses.
- * No changes are required.
- */
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
 public class FovEvents {
     public static final Logger LOGGER = LogManager.getLogger();
@@ -34,7 +29,9 @@ public class FovEvents {
     private static final double BACKSTAB_DAMAGE_MULTIPLIER = 1.2;
 
     private record FovData(double horizontal, double vertical) {}
-    private static final FovData DEFAULT_FOV = new FovData(200.0, 135.0);
+
+    // <<< MODIFIED: Changed from a hardcoded final constant to a cacheable variable >>>
+    private static FovData CONFIG_DEFAULT_FOV = null;
 
     private static final Set<EntityType<?>> DEVELOPER_EXCLUSIONS = Set.of(
             EntityType.WARDEN,
@@ -46,11 +43,16 @@ public class FovEvents {
     private static Set<ResourceLocation> USER_EXCLUSION_CACHE = null;
 
     private static void buildCaches() {
+        // <<< ADDED: Load the default FOV values from the config >>>
+        double defaultH = SoundAttractConfig.COMMON.defaultHorizontalFov.get();
+        double defaultV = SoundAttractConfig.COMMON.defaultVerticalFov.get();
+        CONFIG_DEFAULT_FOV = new FovData(defaultH, defaultV);
+        LOGGER.info("[FOV Config] Loaded default FOV: {} horizontal, {} vertical.", defaultH, defaultV);
+
         USER_EXCLUSION_CACHE = new HashSet<>();
         List<? extends String> exclusionList = SoundAttractConfig.COMMON.fovExclusionList.get();
         for (String entry : exclusionList) {
             try {
-                // Use tryParse which returns null on failure instead of throwing
                 ResourceLocation loc = ResourceLocation.tryParse(entry.trim());
                 if (loc != null) {
                     USER_EXCLUSION_CACHE.add(loc);
@@ -118,7 +120,8 @@ public class FovEvents {
     }
 
     public static boolean isTargetInFov(Mob looker, Entity target, boolean checkObstructions) {
-        if (USER_EXCLUSION_CACHE == null) {
+        // <<< MODIFIED: The condition now checks any of the caches. If one is null, all need to be built. >>>
+        if (CONFIG_FOV_CACHE == null) {
             buildCaches();
         }
 
@@ -127,7 +130,8 @@ public class FovEvents {
         if (DEVELOPER_EXCLUSIONS.contains(looker.getType())) return true;
         if (USER_EXCLUSION_CACHE.contains(lookerId)) return true;
 
-        FovData fov = CONFIG_FOV_CACHE.getOrDefault(lookerId, DEFAULT_FOV);
+        // <<< MODIFIED: Use the newly loaded default FOV from the config cache >>>
+        FovData fov = CONFIG_FOV_CACHE.getOrDefault(lookerId, CONFIG_DEFAULT_FOV);
         if (fov.horizontal() >= 360) return true;
 
         if (checkObstructions && !looker.getSensing().hasLineOfSight(target)) {
@@ -143,7 +147,7 @@ public class FovEvents {
                                     .add(0, target.getEyeHeight() / 2.0, 0)
                                     .subtract(looker.getEyePosition())
                                     .normalize();
-        
+
         Vec3 lookHorizontal = new Vec3(lookVector.x, 0, lookVector.z).normalize();
         Vec3 targetHorizontal = new Vec3(toTargetVector.x, 0, toTargetVector.z).normalize();
         double dotHorizontal = lookHorizontal.dot(targetHorizontal);

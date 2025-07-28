@@ -1,11 +1,20 @@
 package com.example.soundattract;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+
 import com.example.soundattract.ai.AttractionGoal;
+import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.FollowLeaderGoal;
-import com.example.soundattract.config.SoundAttractConfig; 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap; 
-import java.util.stream.Collectors; 
+import com.example.soundattract.config.SoundAttractConfig;
+ 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -146,7 +155,7 @@ public class SoundAttractionEvents {
 
             com.example.soundattract.DynamicScanCooldownManager.update(currentTime, mobCountForCooldownManager);
             SoundTracker.tick();
-
+            BlockBreakerManager.processPendingActions();
             if (!PENDING_GOAL_ADDITIONS.isEmpty()) {
                 Iterator<Map.Entry<Mob, List<GoalDefinition>>> iterator = PENDING_GOAL_ADDITIONS.entrySet().iterator();
                 while (iterator.hasNext()) {

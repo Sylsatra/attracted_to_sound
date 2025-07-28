@@ -91,6 +91,9 @@ repositories {
     maven { name = "Modrinth"; url = "https://api.modrinth.com/maven"; content { includeGroup "maven.modrinth" } }
     mavenLocal()
     maven { name = "Curse Maven"; url = "https://www.cursemaven.com"; content { includeGroup "curse.maven" } }
+    flatDir {
+        dirs 'libs'
+    }
 }
 
 dependencies {
@@ -99,6 +102,8 @@ dependencies {
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-1.20.1-2.5.27")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
     compileOnly "curse.maven:timeless-and-classics-zero-1028108:6654541"
+    compileOnly files('libs/enhancedai-2.7.0.jar')
+    compileOnly files('libs/insanelib-1.21.14.jar')
 
 }
 

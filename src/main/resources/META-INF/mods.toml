@@ -33,3 +33,10 @@ Also camouflage is a thing.
     versionRange="[1.20.1-2.5.27,)"
     ordering="NONE"
     side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="enhanceai"
+    mandatory=false
+    versionRange="[2.7.0,)"
+    ordering="NONE"
+    side="BOTH"
