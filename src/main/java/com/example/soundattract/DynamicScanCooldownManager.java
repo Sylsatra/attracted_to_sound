@@ -19,7 +19,7 @@ public class DynamicScanCooldownManager {
 
     public static void update(long totalTickCount, int mobCount) {
 
-        double ticksPerMob = SoundAttractConfig.COMMON.cooldownTicksPerMob.get(); // You'll need to add this to your config
+        double ticksPerMob = SoundAttractConfig.COMMON.cooldownTicksPerMob.get();
         
         double baseCooldown = MIN_COOLDOWN + (mobCount * ticksPerMob);
 

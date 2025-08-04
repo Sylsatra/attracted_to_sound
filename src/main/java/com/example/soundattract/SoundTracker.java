@@ -482,7 +482,7 @@ public class SoundTracker {
                 || path.contains("rail");
     }
 
-    private static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) { // Added level, pos for signature consistency
+    private static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) {
         String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
         if (SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(blockId)) {
             return true;

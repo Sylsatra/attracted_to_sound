@@ -117,7 +117,7 @@ public class SoundAttractConfig {
     }
 
     public static class Common {
-        // --- General Settings ---
+
 
         public final ForgeConfigSpec.BooleanValue debugLogging;
         public final ForgeConfigSpec.BooleanValue enableRaycastCache;
@@ -134,7 +134,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue soundNoveltyBonusWeight;
         public final ForgeConfigSpec.IntValue soundNoveltyTimeTicks;
 
-        // --- Group AI Settings ---
+
         public final ForgeConfigSpec.IntValue maxGroupSize;
         public final ForgeConfigSpec.DoubleValue leaderGroupRadius;
         public final ForgeConfigSpec.DoubleValue groupDistance;
@@ -143,18 +143,18 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue groupUpdateInterval;
         public final ForgeConfigSpec.IntValue maxLeaders;
 
-        // --- Mob Interaction ---
+
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> mobBlacklist;
 
-        // --- Sound Properties ---
+
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> rawSoundDefaults;
         public final ForgeConfigSpec.DoubleValue minSoundLevelForPlayer;
         public final ForgeConfigSpec.DoubleValue minSoundLevelForMob;
 
-        // --- Block Muffling ---
+
         public final ForgeConfigSpec.BooleanValue enableBlockMuffling;
         public final ForgeConfigSpec.IntValue maxMufflingBlocksToCheck;
         public final ForgeConfigSpec.DoubleValue mufflingFactorWool;
@@ -170,19 +170,19 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> customLiquidBlocks;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> customAirBlocks;
 
-        // --- Stealth Mechanics - General ---
+
         public final ForgeConfigSpec.BooleanValue enableStealthMechanics;
         public final ForgeConfigSpec.IntValue stealthCheckInterval;
         public final ForgeConfigSpec.IntValue stealthGracePeriodTicks;
         public final ForgeConfigSpec.DoubleValue minStealthDetectionRange;
         public final ForgeConfigSpec.DoubleValue maxStealthDetectionRange;
 
-        // --- Stealth Mechanics - Player Stance Ranges ---
+
         public final ForgeConfigSpec.DoubleValue standingDetectionRangePlayer;
         public final ForgeConfigSpec.DoubleValue sneakingDetectionRangePlayer;
         public final ForgeConfigSpec.DoubleValue crawlingDetectionRangePlayer;
 
-        // --- Stealth Mechanics - Environmental Factors (Light, Weather) ---
+
         public final ForgeConfigSpec.IntValue neutralLightLevel;
         public final ForgeConfigSpec.DoubleValue lightLevelSensitivity;
         public final ForgeConfigSpec.DoubleValue minLightFactor;
@@ -192,20 +192,20 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue rainStealthFactor;
         public final ForgeConfigSpec.DoubleValue thunderStealthFactor;
 
-        // --- Stealth Mechanics - Player Actions (Movement, Invisibility) ---
+
         public final ForgeConfigSpec.DoubleValue movementStealthPenalty;
         public final ForgeConfigSpec.DoubleValue stationaryStealthBonusFactor;
         public final ForgeConfigSpec.DoubleValue movementThreshold;
         public final ForgeConfigSpec.DoubleValue invisibilityStealthFactor;
 
-        // --- Stealth Mechanics - Camouflage System ---
+
         public final ForgeConfigSpec.BooleanValue enableCamouflage;
         public final ForgeConfigSpec.BooleanValue enableHeldItemPenalty;
         public final ForgeConfigSpec.DoubleValue heldItemPenaltyFactor;
         public final ForgeConfigSpec.BooleanValue enableEnchantmentPenalty;
         public final ForgeConfigSpec.DoubleValue armorEnchantmentPenaltyFactor;
         public final ForgeConfigSpec.DoubleValue heldItemEnchantmentPenaltyFactor;
-        // Item Camouflage
+
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> camouflageArmorItems;
         public final ForgeConfigSpec.BooleanValue requireFullSetForCamouflageBonus;
         public final ForgeConfigSpec.DoubleValue fullArmorStealthBonus;
@@ -215,7 +215,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue bootsCamouflageEffectiveness;
         public final ForgeConfigSpec.DoubleValue maxCamouflageEffectivenessCap;
         public final ForgeConfigSpec.BooleanValue allowPartialBonusIfFullSetRequired;
-        // Environmental Camouflage
+
         public final ForgeConfigSpec.BooleanValue enableEnvironmentalCamouflage;
         public final ForgeConfigSpec.DoubleValue environmentalCamouflageMaxEffectiveness;
         public final ForgeConfigSpec.IntValue environmentalCamouflageColorMatchThreshold;
@@ -228,7 +228,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue environmentalMismatchPenaltyFactor;
         public final ForgeConfigSpec.IntValue environmentalMismatchThreshold;
 
-        // --- TACZ Integration ---
+
         public final ForgeConfigSpec.BooleanValue enableTaczIntegration;
         public final ForgeConfigSpec.DoubleValue taczReloadRange;
         public final ForgeConfigSpec.DoubleValue taczReloadWeight;
@@ -240,19 +240,19 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue gunshotBaseDetectionRange;
         public final ForgeConfigSpec.IntValue gunshotDetectionDurationTicks;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;
-        // --- Simple VC Integration ---
+
         public final ForgeConfigSpec.BooleanValue enableVoiceChatIntegration;
         public final ForgeConfigSpec.IntValue voiceChatWhisperRange;
         public final ForgeConfigSpec.IntValue voiceChatNormalRange;
         public final ForgeConfigSpec.DoubleValue voiceChatWeight;
 
-        // --- FOV ---
+
         public final ForgeConfigSpec.DoubleValue defaultHorizontalFov;
         public final ForgeConfigSpec.DoubleValue defaultVerticalFov;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovExclusionList;
 
-        // --- Enhanced AI Integration ---
+
         public final ForgeConfigSpec.BooleanValue enableBlockBreaking;
         public final ForgeConfigSpec.DoubleValue blockBreakingTimeMultiplier;
         public final ForgeConfigSpec.BooleanValue blockBreakingToolOnly;
@@ -1596,10 +1596,10 @@ public class SoundAttractConfig {
             )
                     .defineList("customFovOverrides",
                             List.of(
-                                    // --- 360° OMNI-DIRECTIONAL VISION ---
+
                                     "minecraft:spider, 360.0, 360.0",
                                     "minecraft:cave_spider, 360.0, 360.0",
-                                    // --- AERIAL VISION (Enhanced Vertical) ---
+
                                     "minecraft:phantom, 200.0, 280.0",
                                     "minecraft:vex, 200.0, 280.0",
                                     "minecraft:allay, 200.0, 280.0",
@@ -1607,7 +1607,7 @@ public class SoundAttractConfig {
                                     "minecraft:parrot, 200.0, 280.0",
                                     "minecraft:ghast, 200.0, 280.0",
                                     "minecraft:blaze, 200.0, 280.0",
-                                    // --- PREY VISION (Wide Horizontal) ---
+
                                     "minecraft:axolotl, 270.0, 90.0",
                                     "minecraft:camel, 270.0, 90.0",
                                     "minecraft:chicken, 270.0, 90.0",
@@ -1628,7 +1628,7 @@ public class SoundAttractConfig {
                                     "minecraft:wandering_trader, 270.0, 90.0",
                                     "minecraft:slime, 270.0, 120.0",
                                     "minecraft:magma_cube, 270.0, 120.0",
-                                    // --- AQUATIC PREY VISION (Wide Horizontal) ---
+
                                     "minecraft:cod, 300.0, 100.0",
                                     "minecraft:pufferfish, 300.0, 100.0",
                                     "minecraft:salmon, 300.0, 100.0",
@@ -1636,14 +1636,14 @@ public class SoundAttractConfig {
                                     "minecraft:glow_squid, 300.0, 100.0",
                                     "minecraft:tadpole, 300.0, 100.0",
                                     "minecraft:tropical_fish, 300.0, 100.0",
-                                    // --- PREDATOR VISION (Focused Forward) ---
+
                                     "minecraft:cat, 140.0, 140.0",
                                     "minecraft:ocelot, 140.0, 140.0",
                                     "minecraft:wolf, 140.0, 140.0",
                                     "minecraft:polar_bear, 140.0, 140.0",
                                     "minecraft:fox, 140.0, 140.0",
                                     "minecraft:frog, 140.0, 140.0",
-                                    // --- HUMANOID/STANDARD VISION ---
+
                                     "minecraft:zombie, 200.0, 135.0",
                                     "minecraft:husk, 200.0, 135.0",
                                     "minecraft:drowned, 200.0, 135.0",
@@ -1656,7 +1656,7 @@ public class SoundAttractConfig {
                                     "minecraft:piglin, 200.0, 135.0",
                                     "minecraft:piglin_brute, 200.0, 135.0",
                                     "minecraft:iron_golem, 200.0, 135.0",
-                                    // --- SPECIAL CASES & MONSTROSITIES ---
+
                                     "minecraft:creeper, 90.0, 90.0",
                                     "minecraft:enderman, 180.0, 240.0",
                                     "minecraft:guardian, 320.0, 180.0",

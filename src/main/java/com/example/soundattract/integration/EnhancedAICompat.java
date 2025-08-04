@@ -13,14 +13,14 @@ import net.minecraft.resources.ResourceLocation;
  */
 public class EnhancedAICompat {
 
-    // A flag to check only once if the mod is loaded.
+
     private static final boolean IS_ENHANCED_AI_LOADED = ModList.get().isLoaded("enhancedai");
 
-    // Default values to use if EnhancedAI is not present.
+
     private static final int DEFAULT_MAX_Y = 256;
     private static final boolean DEFAULT_BLACKLIST_TILES = true;
     private static final boolean DEFAULT_BLACKLIST_AS_WHITELIST = false;
-    // An empty tag so the 'is' check always returns false if the mod is not loaded.
+
     private static final TagKey<Block> EMPTY_BLACKLIST = TagKey.create(Registries.BLOCK, new ResourceLocation("soundattract", "empty_block_tag"));
 
     /**

@@ -44,7 +44,7 @@ import net.minecraftforge.event.ForgeEventFactory;
 public class BlockBreakerPosGoal extends Goal {
 
     private final Mob miner;
-    private final BlockPos destinationPos; // MODIFIED: The target is now a position.
+    private final BlockPos destinationPos;
     private final double reachDistance;
     private final double timeToBreakMultiplier;
     private final List<BlockPos> targetBlocks = new ArrayList<>();
@@ -58,8 +58,8 @@ public class BlockBreakerPosGoal extends Goal {
 
     public BlockBreakerPosGoal(Mob miner, BlockPos destination, double timeToBreakMultiplier, boolean toolOnly, boolean properToolOnly, boolean properToolRequired) {
         this.miner = miner;
-        this.destinationPos = destination; // MODIFIED: Set the destination position
-        this.reachDistance = 4.9; // Slightly more than player's reach
+        this.destinationPos = destination;
+        this.reachDistance = 4.9;
         this.timeToBreakMultiplier = timeToBreakMultiplier;
         this.toolOnly = toolOnly;
         this.properToolOnly = properToolOnly;
@@ -116,17 +116,17 @@ public class BlockBreakerPosGoal extends Goal {
         if (this.targetBlocks.isEmpty() || this.destinationPos == null) {
             return false;
         }
-        // If we can no longer mine the block (e.g. tool broke), stop.
+
         if (this.properToolOnly && this.blockState != null && !this.canBreakBlock()) {
             return false;
         }
 
-        // If we are close enough to the destination, stop.
+
         if (this.miner.blockPosition().distSqr(this.destinationPos) < 4.0d) {
             return false;
         }
 
-        // If the block we were targeting is now air, stop trying to break it (and re-evaluate).
+
         return !this.miner.level().getBlockState(this.targetBlocks.get(0)).isAir();
     }
 
@@ -291,7 +291,7 @@ public class BlockBreakerPosGoal extends Goal {
         return true;
     }
 
-    //region Unchanged Vanilla/EnhancedAI Utility Methods
+
     private int computeTickToBreak() {
         int canHarvestBlock = this.canHarvestBlock() ? 30 : 100;
         if (this.blockState.getDestroySpeed(this.miner.level(), this.targetBlocks.get(0)) == 0f) {
@@ -353,5 +353,5 @@ public class BlockBreakerPosGoal extends Goal {
         ItemStack stack = this.miner.getOffhandItem();
         return !stack.isEmpty() && stack.isCorrectToolForDrops(this.blockState);
     }
-    //endregion
+
 }

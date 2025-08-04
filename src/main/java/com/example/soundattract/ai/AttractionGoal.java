@@ -259,10 +259,10 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        // --- START OF THE FIX ---
-        // This is the new, robust check.
-        // We only stop if the navigation is done AND we are close to our destination (i.e., we have arrived).
-        // This prevents the goal from stopping due to temporary pathfinding flickers when far away.
+
+
+
+
         if (this.mob.getNavigation().isDone()) {
             BlockPos destination = null;
             Mob leader = MobGroupManager.getLeader(this.mob);
@@ -272,16 +272,16 @@ public class AttractionGoal extends Goal {
                 destination = this.targetSoundPos;
             }
 
-            // If our destination is valid and we are very close to it, we can stop.
-            if (destination != null && this.mob.blockPosition().distSqr(destination) < 4.0D) { // 2*2 blocks
-                return false; // We have arrived.
-            }
-            // Otherwise, navigation is "done" but we are far away. This means we are STUCK.
-            // In this case, we must *continue* the goal so our 'stuckTicks' logic in tick() can trigger.
-        }
-        // --- END OF THE FIX ---
 
-        // The rest of the logic can now run, knowing we haven't quit prematurely.
+            if (destination != null && this.mob.blockPosition().distSqr(destination) < 4.0D) {
+                return false;
+            }
+
+
+        }
+
+
+
         Mob leader = MobGroupManager.getLeader(mob);
         if (leader != mob && SoundAttractConfig.COMMON.edgeMobSmartBehavior.get() && mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < getArrivalDistance() * getArrivalDistance()) {
             return false;
@@ -289,7 +289,7 @@ public class AttractionGoal extends Goal {
 
         SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
         if (bestSoundNow == null) {
-            // If we previously had a sound but now there are none, we should stop pursuing.
+
             return false;
         }
 
@@ -304,10 +304,10 @@ public class AttractionGoal extends Goal {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} is switching from target {} (weight {}) to {} (weight {})", mob.getName().getString(), this.targetSoundPos, this.currentTargetWeight, bestSoundNow.pos, bestSoundNow.weight);
             }
-            return false; // A better sound appeared, so stop this goal to restart on the new one.
+            return false;
         }
 
-        // If we've reached here, we should continue pursuing the current sound.
+
         return true;
     }
 
@@ -344,38 +344,38 @@ public class AttractionGoal extends Goal {
 
     @Override
     public void tick() {
-// REPLACE THE OLD GUARD CLAUSE WITH THIS NEW, CORRECTED VERSION
+
 
         if (this.blockBreakerGoal != null && this.mob.goalSelector.getRunningGoals().anyMatch(g -> g.getGoal() == this.blockBreakerGoal)) {
-            // --- START OF THE CORRECT FIX ---
-            // Use the raw SoundTracker.findNearestSound() to get an unfiltered view of the best current sound.
+
+
             SoundTracker.SoundRecord bestPossibleSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
 
-            // Check if there is a better sound available than the one we are currently tunneling towards.
+
             if (bestPossibleSound != null && this.cachedSound != null && !areSoundsEffectivelySame(bestPossibleSound, this.cachedSound)) {
                 double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
-                // The comparison uses the unfiltered weight of the new sound against our current target's weight.
+
                 if (bestPossibleSound.weight > this.cachedSound.weight * switchRatio) {
-                    // A much better sound appeared! Stop mining and let the goal restart.
+
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info("[AttractionGoal] Mining mob {} found a better sound ({} > {}). Stopping block breaking.", this.mob.getName().getString(), bestPossibleSound.weight, this.cachedSound.weight);
                     }
                     BlockBreakerManager.scheduleRemove(this.mob, this.blockBreakerGoal);
                     this.blockBreakerGoal = null;
-                    this.stop(); // Calling stop() will force the whole goal to end and re-evaluate on the new sound.
+                    this.stop();
                     return;
                 }
             }
-            // --- END OF THE CORRECT FIX ---
 
-            // Check if we've broken through the wall.
+
+
             if (lastPos != null && mob.position().distanceToSqr(Vec3.atCenterOf(lastPos)) >= 1.0) {
                 BlockBreakerManager.scheduleRemove(this.mob, this.blockBreakerGoal);
                 this.blockBreakerGoal = null;
                 this.stuckTicks = 0;
                 this.lastPos = this.mob.blockPosition();
             }
-            return; // Continue to yield control to the breaker goal.
+            return;
         }
         SoundTracker.SoundRecord fresh = findInterestingSoundRecord();
         double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
@@ -416,39 +416,39 @@ public class AttractionGoal extends Goal {
         boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         Mob leader = MobGroupManager.getLeader(mob);
 
-// REPLACE THE PREVIOUS BLOCK BREAKER LOGIC WITH THIS STABLE VERSION
-// --- Start of Stable Block Breaker Logic ---
+
+
         if (lastPos != null && mob.position().distanceToSqr(Vec3.atCenterOf(lastPos)) < 1.0) {
             stuckTicks++;
         } else {
-            // Mob is moving, so it's not stuck.
+
             stuckTicks = 0;
-            // Dismiss the specialist block breaker goal if it exists.
+
             if (this.blockBreakerGoal != null) {
                 BlockBreakerManager.scheduleRemove(this.mob, this.blockBreakerGoal);
-                this.blockBreakerGoal = null; // Clear our reference to it
+                this.blockBreakerGoal = null;
             }
         }
 
-// This prevents the 'stuck spot' from changing while the mob is jittering inside the radius.
+
         if (stuckTicks == 0) {
             lastPos = mob.blockPosition();
         }
 
-// FIX: The threshold is increased to 40 ticks (2 seconds) to prevent false positives during normal pathfinding.
+
         if (stuckTicks >= 40 && SoundAttractConfig.COMMON.enableBlockBreaking.get()) {
 
-            // Diagnostic Log: Let's see what the vanilla navigation system thinks when we trigger.
-            if (SoundAttractConfig.COMMON.debugLogging.get() && stuckTicks == 40) { // Log only once when the threshold is first met
+
+            if (SoundAttractConfig.COMMON.debugLogging.get() && stuckTicks == 40) {
                 SoundAttractMod.LOGGER.info("[AttractionGoal DEBUG] Mob {} truly stuck. stuckTicks: {}, navigation.isStuck(): {}", mob.getName().getString(), stuckTicks, this.mob.getNavigation().isStuck());
             }
 
-            // Use our internal 'blockBreakerGoal' field as a flag.
+
             if (this.blockBreakerGoal == null) {
 
-// REPLACE THE PREVIOUS BLOCK BREAKER LOGIC WITH THIS DEFINITIVE, SMARTER VERSION
-// --- Start of Definitive Block Breaker Logic ---
-// Determine the mob's true destination for distance checks
+
+
+
                 BlockPos destination = null;
                 if (leader == this.mob && this.chosenDest != null) {
                     destination = BlockPos.containing(this.chosenDest);
@@ -456,18 +456,18 @@ public class AttractionGoal extends Goal {
                     destination = this.targetSoundPos;
                 }
 
-// PRIMARY CHECK: The mob's own navigation must have stopped or failed.
+
                 if (this.mob.getNavigation().isDone()) {
-                    // SECONDARY CHECK: We must still be far from our destination.
-                    // This confirms we are stuck at an obstacle, not because we arrived.
-                    if (destination != null && this.mob.blockPosition().distSqr(destination) > 4.0) { // Using 2*2 blocks as an "arrival" buffer
 
-                        stuckTicks++; // The mob has no path and is not at its goal, so it's genuinely stuck.
 
-                        // If it's been in this "no-path" state for 1 second (20 ticks), deploy the breaker.
+                    if (destination != null && this.mob.blockPosition().distSqr(destination) > 4.0) {
+
+                        stuckTicks++;
+
+
                         if (stuckTicks >= 20 && SoundAttractConfig.COMMON.enableBlockBreaking.get()) {
 
-                            // Use our internal 'blockBreakerGoal' field as a flag to prevent spamming the manager.
+
                             if (this.blockBreakerGoal == null) {
                                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                                     SoundAttractMod.LOGGER.info("[AttractionGoal] Mob {} navigation is DONE and it's far from its goal. Deploying BlockBreakerPosGoal.", mob.getName().getString());
@@ -484,22 +484,22 @@ public class AttractionGoal extends Goal {
                             }
                         }
                     } else {
-                        // Navigation is done, but we are close to the destination. We have arrived. Reset everything.
+
                         stuckTicks = 0;
                     }
                 } else {
-                    // The mob is actively pathfinding. It is not stuck. Reset the counter.
+
                     stuckTicks = 0;
-                    // And ensure any old breaker goal is removed.
+
                     if (this.blockBreakerGoal != null) {
                         BlockBreakerManager.scheduleRemove(this.mob, this.blockBreakerGoal);
                         this.blockBreakerGoal = null;
                     }
                 }
-// --- End of Definitive Block Breaker Logic ---
+
             }
         }
-// --- End of Stable Block Breaker Logic ---
+
         SoundTracker.SoundRecord currentPursuedSound = this.cachedSound;
         if (currentPursuedSound == null || !currentPursuedSound.pos.equals(this.targetSoundPos)) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
