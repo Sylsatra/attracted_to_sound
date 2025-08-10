@@ -58,7 +58,9 @@ public abstract class LivingEntityDamageMixin {
             double distance = mob.distanceTo(player);
             if (distance >= 5.0) {
                 if (SoundAttractMod.CONFIG.debugLogging) SoundAttractMod.LOGGER.info("... Target is HOSTILE and far away. Setting flee location.", mob.getName().getString());
-                ((FleeOnDamageAccessor) mob).soundattract_setFleeFromLocation(attacker.getPos());
+                if (mob instanceof FleeOnDamageAccessor accessor) {
+                    accessor.soundattract_setFleeFromLocation(attacker.getPos());
+                }
             } else {
                 if (mob instanceof CreeperEntity creeper) {
                     if (SoundAttractMod.CONFIG.debugLogging) SoundAttractMod.LOGGER.info("... Target is a Creeper at close range. IGNITING.", mob.getName().getString());
@@ -69,7 +71,9 @@ public abstract class LivingEntityDamageMixin {
             }
         } else {
             if (SoundAttractMod.CONFIG.debugLogging) SoundAttractMod.LOGGER.info("... Target is PASSIVE. Setting flee location.", mob.getName().getString());
-            ((FleeOnDamageAccessor) mob).soundattract_setFleeFromLocation(attacker.getPos());
+            if (mob instanceof FleeOnDamageAccessor accessor) {
+                accessor.soundattract_setFleeFromLocation(attacker.getPos());
+            }
         }
     }
     

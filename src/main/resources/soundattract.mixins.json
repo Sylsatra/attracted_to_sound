@@ -22,7 +22,8 @@
 	"GunItemMixin",
 	"TrackTargetGoalAccessor",
     "ServerChunkManagerAccessor",
-    "ThreadedAnvilChunkStorageAccessor"
+    "ThreadedAnvilChunkStorageAccessor",
+    "PhantomEntityMixin"
 	],
 	"client": [
     	"SoundManagerMixin"
