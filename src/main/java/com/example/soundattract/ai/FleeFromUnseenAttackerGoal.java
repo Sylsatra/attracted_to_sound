@@ -4,7 +4,9 @@ import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.accessor.FleeOnDamageAccessor;
 import net.minecraft.entity.ai.FuzzyTargeting;
 import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
+
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
@@ -12,13 +14,14 @@ import java.util.EnumSet;
 
 public class FleeFromUnseenAttackerGoal extends Goal {
 
-    protected final PathAwareEntity mob;
+    protected final MobEntity mob;
+
     private final double speedModifier;
 
     @Nullable private Vec3d fleeFromPos;
     @Nullable private Vec3d fleeToPos;
 
-    public FleeFromUnseenAttackerGoal(PathAwareEntity mob, double speedModifier) {
+    public FleeFromUnseenAttackerGoal(MobEntity mob, double speedModifier) {
         this.mob = mob;
         this.speedModifier = speedModifier;
         this.setControls(EnumSet.of(Goal.Control.MOVE));
@@ -26,8 +29,6 @@ public class FleeFromUnseenAttackerGoal extends Goal {
 
     @Override
     public boolean canStart() {
-
-
 
         this.fleeFromPos = ((FleeOnDamageAccessor) this.mob).soundattract_getFleeFromLocation();
         if (this.fleeFromPos == null) {
@@ -39,7 +40,16 @@ public class FleeFromUnseenAttackerGoal extends Goal {
             SoundAttractMod.LOGGER.info("[FleeGoal] canStart: Received flee order for {}. Finding escape path.", this.mob.getName().getString());
         }
 
-        this.fleeToPos = FuzzyTargeting.findFrom(this.mob, 16, 7, this.fleeFromPos);
+        if (this.mob instanceof PathAwareEntity pathAware) {
+            this.fleeToPos = FuzzyTargeting.findFrom(pathAware, 16, 7, this.fleeFromPos);
+        } else {
+            Vec3d dir = this.mob.getPos().subtract(this.fleeFromPos).normalize();
+            if (Double.isFinite(dir.length()) && dir.lengthSquared() > 0.0001) {
+                this.fleeToPos = this.mob.getPos().add(dir.multiply(16.0));
+            } else {
+                this.fleeToPos = null;
+            }
+        }
 
         if (this.fleeToPos == null) {
             if (SoundAttractMod.CONFIG.debugLogging) {

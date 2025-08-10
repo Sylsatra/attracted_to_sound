@@ -16,10 +16,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Mixin for ALL pathfinding mobs. This is better than MobEntity because it targets
- * the constructor, ensuring the goal is injected even if a subclass overrides initGoals().
- */
 @Mixin(PathAwareEntity.class)
 public abstract class PathAwareEntityMixin extends MobEntity implements SoundAttractMobAccessor, FleeOnDamageAccessor {
 
@@ -47,15 +43,11 @@ public abstract class PathAwareEntityMixin extends MobEntity implements SoundAtt
         super(entityType, world);
     }
 
-    /**
-     * Injects our FleeGoal into every PathAwareEntity at the end of its constructor.
-     * This is the most reliable way to add a goal, as it runs after the mob's
-     * own initGoals() method (even overridden ones) has completed.
-     */
+
     @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
     private void soundattract_addGoalsOnConstruct(EntityType<?> type, World world, CallbackInfo ci) {
 
-        PathAwareEntity thisMob = (PathAwareEntity) (Object) this;
+        MobEntity thisMob = (MobEntity) (Object) this;
 
 
 

@@ -1,7 +1,7 @@
 {
 	"required": true,
 	"package": "com.example.soundattract.mixin",
-	"compatibilityLevel": "JAVA_21",
+	"compatibilityLevel": "JAVA_17",
   	"debug": true,
   	"export": true,
     "refmap": "soundattract-refmap.json",
@@ -19,6 +19,7 @@
 	"ProjectileAttackGoalMixin",
 	"CreeperIgniteGoalMixin",
 	"LivingEntityDamageMixin",
+	"PhantomEntityMixin",
 	"GunItemMixin",
 	"TrackTargetGoalAccessor",
     "ServerChunkManagerAccessor",
