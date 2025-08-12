@@ -36,6 +36,7 @@
 	},
 	"suggests": {
 		"voicechat": ">=1.21.1-2.5.35",
-		"pointblank": ">=1.9.6"
+		"pointblank": ">=1.9.6",
+        "plasmovoice": ">=2.1.5"
 	}
 }

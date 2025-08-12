@@ -4,12 +4,15 @@ import com.example.soundattract.ai.MobCellAssignmentHooks;
 import com.example.soundattract.config.ConfigLoader;
 import com.example.soundattract.config.SoundAttractConfigData;
 import com.example.soundattract.enchantment.ModEnchantments;
+import com.example.soundattract.integration.PlasmoIntegration;
 import com.example.soundattract.integration.PointBlankIntegrationHandler;
 import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.example.soundattract.logic.SoundMessageHandler;
 import com.example.soundattract.loot.ModLootTables;
 import com.example.soundattract.network.SimpleNbtSyncPayload;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -20,8 +23,14 @@ import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import su.plo.voice.api.server.PlasmoVoiceServer;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 
 public class SoundAttractMod implements ModInitializer {
@@ -29,9 +38,10 @@ public class SoundAttractMod implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static SoundAttractConfigData CONFIG;
 
+    private final double tpsSmoothingFactor = 0.05;
     private long lastTickTimeNanos = 0L;
     private double averageTickTimeNanos = 50_000_000.0;
-    private final double tpsSmoothingFactor = 0.05;
+    private PlasmoIntegration plasmo;
 
     @Override
     public void onInitialize() {
@@ -58,12 +68,17 @@ public class SoundAttractMod implements ModInitializer {
         StealthDetectionEvents.register();
 
         registerNetworkHandlers();
-        
+
         PointBlankIntegrationHandler();
 
+        if (FabricLoader.getInstance().isModLoaded("plasmo_voice")) {
+            LOGGER.info("[SoundAttract] Plasmo Voice mod found. Initializing integration.");
+            this.plasmo = new PlasmoIntegration();
+            PlasmoVoiceServer.getAddonsLoader().load(plasmo);
+        }
 
         registerServerLifecycleEvents();
-        
+
         registerTickEvents();
         registerEntityEvents();
 
@@ -74,13 +89,13 @@ public class SoundAttractMod implements ModInitializer {
             LOGGER.info("[DEBUG]   SimpleNbtSyncPayload ID: {}", SimpleNbtSyncPayload.ID.id());
         }
     }
-    
+
     private void registerNetworkHandlers() {
         PayloadTypeRegistry.playC2S().register(SoundMessagePayload.ID, SoundMessagePayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SoundMessagePayload.ID, (payload, context) -> {
             context.server().execute(() -> SoundMessageHandler.handle(payload, context.player()));
         });
-        
+
         PayloadTypeRegistry.playC2S().register(SimpleNbtSyncPayload.ID, SimpleNbtSyncPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SimpleNbtSyncPayload.ID, (payload, context) -> {
             NbtCompound nbt = payload.nbt();
@@ -95,7 +110,7 @@ public class SoundAttractMod implements ModInitializer {
 
     private void PointBlankIntegrationHandler() {
         if (FabricLoader.getInstance().isModLoaded("pointblank")) {
-            if (CONFIG.enablePointBlankIntegration ) {
+            if (CONFIG.enablePointBlankIntegration) {
                 LOGGER.info("[SoundAttract] Point Blank mod found and integration is enabled. Registering server-side event listeners.");
                 try {
                     PointBlankIntegrationHandler.register();
@@ -111,7 +126,6 @@ public class SoundAttractMod implements ModInitializer {
     }
 
     private void registerServerLifecycleEvents() {
-
 
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {

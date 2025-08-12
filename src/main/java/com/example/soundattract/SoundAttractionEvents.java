@@ -36,8 +36,6 @@ public class SoundAttractionEvents {
         }
 
 
-
-
         SoundTracker.pruneIrrelevantSounds(serverWorld);
         SoundTracker.tick(serverWorld);
 
@@ -76,7 +74,7 @@ public class SoundAttractionEvents {
 
                 String mobTypeId = Registries.ENTITY_TYPE.getId(mob.getType()).toString();
                 if (attractedTypes.contains(mobTypeId)) {
-                    long cellKey = (mob.getBlockPos().getX() >> 4) << 32 | (mob.getBlockPos().getZ() >> 4 & 0xFFFFFFFFL);
+                    long cellKey = (long) (mob.getBlockPos().getX() >> 4) << 32 | (mob.getBlockPos().getZ() >> 4 & 0xFFFFFFFFL);
                     stackedMobs.computeIfAbsent(mobTypeId, k -> new java.util.HashMap<>())
                         .computeIfAbsent(cellKey, k -> new java.util.ArrayList<>())
                         .add(mob);
@@ -143,7 +141,6 @@ public class SoundAttractionEvents {
     public static void onEntityJoinWorld(MobEntity mob) {
         if (mob.getWorld().isClient()) return;
         Identifier entityId = Registries.ENTITY_TYPE.getId(mob.getType());
-        if (entityId == null) return;
         String entityIdStr = entityId.toString();
         if (!SoundAttractMod.CONFIG.attractedEntities.contains(entityIdStr)) {
             return;
