@@ -1,10 +1,8 @@
 package com.example.soundattract.integration;
 
-import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundAttractNetwork;
 import com.example.soundattract.SoundMessagePayload;
-import de.maxhenkel.voicechat.api.Position;
-import de.maxhenkel.voicechat.api.ServerPlayer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import su.plo.voice.api.addon.AddonInitializer;
 import su.plo.voice.api.addon.InjectPlasmoVoice;
@@ -16,7 +14,7 @@ import su.plo.voice.api.server.event.audio.source.PlayerSpeakEvent;
 import java.util.Optional;
 
 @Addon(id = "soundattract", name = "Attract to Sound", version = "4.0.3b", authors = {"Paldiu", "Sylsatra"})
-public class PlasmoClientIntegration implements AddonInitializer {
+public class PlasmoIntegration implements AddonInitializer {
 
     @InjectPlasmoVoice
     private PlasmoVoiceServer server;
@@ -36,17 +34,16 @@ public class PlasmoClientIntegration implements AddonInitializer {
         public void voiceActive(PlayerSpeakEvent event) {
             // Get Minecraft player instance (raw)
             Object mcPlayerObj = event.getPlayer().getInstance();
-            if (!(mcPlayerObj instanceof ServerPlayer mcPlayer)) {
+            if (!(mcPlayerObj instanceof ServerPlayerEntity mcPlayer)) {
                 // Not a server player, skip
                 return;
             }
-            Position pos = mcPlayer.getPosition();
 
             // Get position and dimension info
-            double x = pos.getX();
-            double y = pos.getY();
-            double z = pos.getZ();
-            Identifier dim = SoundAttractMod.getDimensionId(mcPlayer.getUuid());
+            double x = mcPlayer.getX();
+            double y = mcPlayer.getY();
+            double z = mcPlayer.getZ();
+            Identifier dim = mcPlayer.getWorld().getRegistryKey().getValue();
 
             //TODO: Possibly rewrite this entire thing to use custom Activation class.
 

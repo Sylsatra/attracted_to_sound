@@ -4,7 +4,7 @@ import com.example.soundattract.ai.MobCellAssignmentHooks;
 import com.example.soundattract.config.ConfigLoader;
 import com.example.soundattract.config.SoundAttractConfigData;
 import com.example.soundattract.enchantment.ModEnchantments;
-import com.example.soundattract.integration.PlasmoClientIntegration;
+import com.example.soundattract.integration.PlasmoIntegration;
 import com.example.soundattract.integration.PointBlankIntegrationHandler;
 import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.example.soundattract.logic.SoundMessageHandler;
@@ -16,7 +16,6 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
@@ -27,7 +26,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import su.plo.slib.api.event.player.McPlayerJoinEvent;
 import su.plo.voice.api.server.PlasmoVoiceServer;
 
 import java.util.HashMap;
@@ -40,12 +38,10 @@ public class SoundAttractMod implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static SoundAttractConfigData CONFIG;
 
-    private static final Map<UUID, Identifier> playerDimensionMap = new HashMap<>();
-
+    private final double tpsSmoothingFactor = 0.05;
     private long lastTickTimeNanos = 0L;
     private double averageTickTimeNanos = 50_000_000.0;
-    private PlasmoClientIntegration plasmo;
-    private final double tpsSmoothingFactor = 0.05;
+    private PlasmoIntegration plasmo;
 
     @Override
     public void onInitialize() {
@@ -72,18 +68,17 @@ public class SoundAttractMod implements ModInitializer {
         StealthDetectionEvents.register();
 
         registerNetworkHandlers();
-        
+
         PointBlankIntegrationHandler();
 
         if (FabricLoader.getInstance().isModLoaded("plasmo_voice")) {
             LOGGER.info("[SoundAttract] Plasmo Voice mod found. Initializing integration.");
-            trackPlayers();
-            this.plasmo = new PlasmoClientIntegration();
+            this.plasmo = new PlasmoIntegration();
             PlasmoVoiceServer.getAddonsLoader().load(plasmo);
         }
 
         registerServerLifecycleEvents();
-        
+
         registerTickEvents();
         registerEntityEvents();
 
@@ -94,13 +89,13 @@ public class SoundAttractMod implements ModInitializer {
             LOGGER.info("[DEBUG]   SimpleNbtSyncPayload ID: {}", SimpleNbtSyncPayload.ID.id());
         }
     }
-    
+
     private void registerNetworkHandlers() {
         PayloadTypeRegistry.playC2S().register(SoundMessagePayload.ID, SoundMessagePayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SoundMessagePayload.ID, (payload, context) -> {
             context.server().execute(() -> SoundMessageHandler.handle(payload, context.player()));
         });
-        
+
         PayloadTypeRegistry.playC2S().register(SimpleNbtSyncPayload.ID, SimpleNbtSyncPayload.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(SimpleNbtSyncPayload.ID, (payload, context) -> {
             NbtCompound nbt = payload.nbt();
@@ -113,28 +108,9 @@ public class SoundAttractMod implements ModInitializer {
         });
     }
 
-    private void trackPlayers() {
-        ServerPlayerEvents.JOIN.register(player -> {
-            Identifier dim = player.getEntityWorld().getRegistryKey().getValue();
-            UUID uuid = player.getUuid();
-            playerDimensionMap.put(uuid, dim);
-        });
-
-        ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, origin, destination) -> {
-            Identifier newDim = destination.getRegistryKey().getValue();
-            playerDimensionMap.put(player.getUuid(), newDim);
-        });
-
-        ServerPlayerEvents.LEAVE.register(player -> playerDimensionMap.remove(player.getUuid()));
-    }
-
-    public static Identifier getDimensionId(UUID playerUuid) {
-        return playerDimensionMap.getOrDefault(playerUuid, Identifier.of("minecraft", "overworld"));
-    }
-
     private void PointBlankIntegrationHandler() {
         if (FabricLoader.getInstance().isModLoaded("pointblank")) {
-            if (CONFIG.enablePointBlankIntegration ) {
+            if (CONFIG.enablePointBlankIntegration) {
                 LOGGER.info("[SoundAttract] Point Blank mod found and integration is enabled. Registering server-side event listeners.");
                 try {
                     PointBlankIntegrationHandler.register();
@@ -150,7 +126,6 @@ public class SoundAttractMod implements ModInitializer {
     }
 
     private void registerServerLifecycleEvents() {
-
 
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
