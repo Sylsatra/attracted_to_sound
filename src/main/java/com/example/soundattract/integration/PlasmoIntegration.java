@@ -1,5 +1,6 @@
 package com.example.soundattract.integration;
 
+import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundAttractNetwork;
 import com.example.soundattract.SoundMessagePayload;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -47,7 +48,7 @@ public class PlasmoIntegration implements AddonInitializer {
 
             //TODO: Possibly rewrite this entire thing to use custom Activation class.
 
-            short range = event.getPacket().getDistance();
+            int range = (event.getPacket() != null) ? event.getPacket().getDistance() : SoundAttractMod.CONFIG.voiceChatNormalRange;
 
             // Send AtS sound message to server
             SoundAttractNetwork.sendSoundMessageToServer(
