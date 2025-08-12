@@ -4,7 +4,6 @@ import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundAttractNetwork;
 import com.example.soundattract.SoundMessagePayload;
 import de.maxhenkel.voicechat.api.Position;
-import de.maxhenkel.voicechat.api.ServerLevel;
 import de.maxhenkel.voicechat.api.ServerPlayer;
 import net.minecraft.util.Identifier;
 import su.plo.voice.api.addon.AddonInitializer;
@@ -49,7 +48,7 @@ public class PlasmoClientIntegration implements AddonInitializer {
             double z = pos.getZ();
             Identifier dim = SoundAttractMod.getDimensionId(mcPlayer.getUuid());
 
-            //TODO: Handle VC Weight (Plasmo weight is complicated.)
+            //TODO: Possibly rewrite this entire thing to use custom Activation class.
 
             short range = event.getPacket().getDistance();
 
@@ -60,7 +59,7 @@ public class PlasmoClientIntegration implements AddonInitializer {
                     dim,
                     Optional.of(mcPlayer.getUuid()),
                     range,
-                    0.0, // TODO: Handle VC Weight
+                    100.0, // Player voice should always take priority over non-player sounds.
                     null,
                     null
             );
