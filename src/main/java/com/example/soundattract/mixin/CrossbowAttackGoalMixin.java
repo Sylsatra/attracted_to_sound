@@ -41,7 +41,7 @@ public abstract class CrossbowAttackGoalMixin {
             return true;
         }
 
-        return mob.canSee(player);
+        return FovEvents.hasSmartLineOfSight(mob, player);
     }
 
     @Inject(method = "canStart()Z", at = @At("HEAD"), cancellable = true)

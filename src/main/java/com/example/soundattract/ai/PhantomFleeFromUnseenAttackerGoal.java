@@ -34,7 +34,7 @@ public class PhantomFleeFromUnseenAttackerGoal extends Goal {
             return false;
         }
 
-        // Compute a point ~16 blocks away in the opposite direction of the attacker.
+
         Vec3d here = this.phantom.getPos();
         Vec3d dir = here.subtract(this.fleeFromPos);
         if (dir.lengthSquared() < 1.0E-6) {
@@ -43,11 +43,11 @@ public class PhantomFleeFromUnseenAttackerGoal extends Goal {
         dir = dir.normalize();
 
         double horizontalDistance = 16.0;
-        double verticalOffset = 4.0 + this.phantom.getRandom().nextDouble() * 6.0; // fly upwards a bit
+        double verticalOffset = 4.0 + this.phantom.getRandom().nextDouble() * 6.0;
 
         Vec3d target = here.add(dir.multiply(horizontalDistance)).add(0.0, verticalOffset, 0.0);
 
-        // Clamp Y within world bounds
+
         int minY = this.phantom.getWorld().getBottomY();
         int maxY = this.phantom.getWorld().getTopY() - 1;
         double clampedY = MathHelper.clamp(target.y, minY + 1, maxY - 1);
@@ -69,7 +69,7 @@ public class PhantomFleeFromUnseenAttackerGoal extends Goal {
     public void start() {
         if (this.fleeToPos == null) return;
 
-        // Clear target and start flying away
+
         this.phantom.setTarget(null);
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info("[PhantomFleeGoal] start: Starting navigation for {} to {}", this.phantom.getName().getString(), this.fleeToPos);

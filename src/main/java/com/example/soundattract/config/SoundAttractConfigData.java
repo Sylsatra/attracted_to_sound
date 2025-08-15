@@ -59,8 +59,9 @@ public class SoundAttractConfigData {
         this.pointBlankGunShootRangesMap = parseConfigList(this.pointblankGunShootRanges);
         this.pointBlankAttachmentSoundReductionsMap = parseConfigList(this.pointblankAttachmentSoundReductions);
         this.pointBlankMuzzleFlashReductionsMap = parseConfigList(this.pointblankMuzzleFlashReductions);
-
-        SoundAttractMod.LOGGER.info("[Config] Caches have been built.");
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[Config] Caches have been built.");
+        }
     }
 
     /**
@@ -73,7 +74,9 @@ public class SoundAttractConfigData {
         this.pointBlankGunShootRangesMap = null;
         this.pointBlankAttachmentSoundReductionsMap = null;
         this.pointBlankMuzzleFlashReductionsMap = null;
-        SoundAttractMod.LOGGER.info("[Config] All caches have been invalidated.");
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[Config] All caches have been invalidated.");
+        }
     }
 
     public Map<String, Double> getPointBlankGunShootRanges() {
@@ -1302,4 +1305,32 @@ public class SoundAttractConfigData {
             "GreedyGoblin;minecraft:piglin;;minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0",
             "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
     ));
+
+        // === Fabric-native Block Breaking (no EnhancedAI required) ===
+    /** If true, mobs can break blocks when stuck pursuing a sound. */
+    public boolean enableBlockBreaking = false;
+    /** Multiplier applied to time needed to break a block. Higher = slower. Default 1.0 */
+    public double blockBreakTimeMultiplier = 1.0;
+    /** If true, only allow breaking when mob holds any item. */
+    public boolean blockBreakToolOnly = false;
+    /** If true, only allow when the held tool is the proper tool for the block. */
+    public boolean blockBreakProperToolOnly = false;
+    /** If true, disallow breaking blocks that require tool when tool is unsuitable. */
+    public boolean blockBreakProperToolRequired = false;
+    /** Max Y level above which blocks will not be broken. */
+    public int blockBreakMaxY = 255;
+    /** If true, blocks with block entities are disallowed. */
+    public boolean blockBreakBlacklistTileEntities = true;
+    /** If true, treat blockBreakBlockList as a whitelist; otherwise as a blacklist. */
+    public boolean blockBreakListAsWhitelist = false;
+    /** List of block IDs used as blacklist or whitelist depending on mode. */
+    public java.util.List<String> blockBreakBlockList = new java.util.ArrayList<>();
+
+    // === Smart LOS configuration ===
+    /**
+     * Blocks in this list are treated as NOT blocking vision by smart LOS.
+     * Entries must be full block IDs like "modid:block_name".
+     * Example: "create:framed_glass", "myglassmod:clear_glass".
+     */
+    public java.util.List<String> nonBlockingVisionAllowList = new java.util.ArrayList<>();
 }

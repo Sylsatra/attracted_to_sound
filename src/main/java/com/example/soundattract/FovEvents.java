@@ -9,6 +9,20 @@ import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.TrapdoorBlock;
+import net.minecraft.block.DoorBlock;
+import net.minecraft.block.IceBlock;
+import net.minecraft.block.PaneBlock;
+import net.minecraft.block.FenceBlock;
+import net.minecraft.block.WallBlock;
+import net.minecraft.block.ShapeContext;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,6 +45,7 @@ public class FovEvents {
 
     private static Map<Identifier, FovData> CONFIG_FOV_CACHE = null;
     private static Set<Identifier> USER_EXCLUSION_CACHE = null;
+    private static Set<Identifier> NON_BLOCKING_VISION_ALLOW = null;
 
     public static void buildCaches() {
         if (SoundAttractMod.CONFIG == null) {
@@ -39,7 +54,9 @@ public class FovEvents {
         }
 
         USER_EXCLUSION_CACHE = new HashSet<>();
-        List<? extends String> exclusionList = SoundAttractMod.CONFIG.fovExclusionList;
+        List<? extends String> exclusionList = SoundAttractMod.CONFIG.fovExclusionList != null
+                ? SoundAttractMod.CONFIG.fovExclusionList
+                : java.util.Collections.emptyList();
         for (String entry : exclusionList) {
             try {
                 Identifier id = Identifier.tryParse(entry.trim());
@@ -52,10 +69,14 @@ public class FovEvents {
                 SoundAttractMod.LOGGER.error("[FOV Config] Error processing exclusion entry: " + entry, e);
             }
         }
-        SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} user-defined exclusions.", USER_EXCLUSION_CACHE.size());
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} user-defined exclusions.", USER_EXCLUSION_CACHE.size());
+        }
 
         CONFIG_FOV_CACHE = new HashMap<>();
-        List<? extends String> overrideList = SoundAttractMod.CONFIG.fovOverrides;
+        List<? extends String> overrideList = SoundAttractMod.CONFIG.fovOverrides != null
+                ? SoundAttractMod.CONFIG.fovOverrides
+                : java.util.Collections.emptyList();
         for (String entry : overrideList) {
             try {
                 String[] parts = entry.split(",");
@@ -76,7 +97,28 @@ public class FovEvents {
                 SoundAttractMod.LOGGER.error("[FOV Config] Failed to parse FOV override entry: " + entry, e);
             }
         }
-        SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} custom FOV overrides.", CONFIG_FOV_CACHE.size());
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} custom FOV overrides.", CONFIG_FOV_CACHE.size());
+        }
+        NON_BLOCKING_VISION_ALLOW = new HashSet<>();
+        List<? extends String> allowList = SoundAttractMod.CONFIG.nonBlockingVisionAllowList != null
+                ? SoundAttractMod.CONFIG.nonBlockingVisionAllowList
+                : java.util.Collections.emptyList();
+        for (String s : allowList) {
+            try {
+                Identifier id = Identifier.tryParse(s.trim());
+                if (id != null) {
+                    NON_BLOCKING_VISION_ALLOW.add(id);
+                } else {
+                    SoundAttractMod.LOGGER.warn("[FOV Config] Malformed nonBlockingVisionAllowList entry: {}", s);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.error("[FOV Config] Error processing nonBlockingVisionAllowList entry: {}", s, e);
+            }
+        }
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} non-blocking vision allowlist entries.", NON_BLOCKING_VISION_ALLOW.size());
+        }
     }
     public static float getModifiedDamage(LivingEntity target, DamageSource source, float amount) {
         if (!(target instanceof MobEntity mob)) return amount;
@@ -109,7 +151,7 @@ public class FovEvents {
         FovData fov = CONFIG_FOV_CACHE.getOrDefault(lookerId, DEFAULT_FOV);
         if (fov.horizontal() >= 360) return true;
 
-        if (checkObstructions && !looker.getVisibilityCache().canSee(target)) {
+        if (checkObstructions && !hasSmartLineOfSight(looker, target)) {
             return false;
         }
 
@@ -138,5 +180,123 @@ public class FovEvents {
         double angleVertical = Math.abs(pitchTarget - pitchLook);
         
         return angleVertical <= verticalFovDegrees / 2.0;
+    }
+    public static boolean hasSmartLineOfSight(MobEntity looker, net.minecraft.entity.Entity target) {
+        World world = looker.getWorld();
+
+
+        Vec3d eyeToEye = target.getEyePos();
+        Vec3d center = target.getPos().add(0, target.getHeight() * 0.5, 0);
+        Vec3d feet = target.getPos().add(0, Math.max(0.1, target.getHeight() * 0.15), 0);
+
+        Vec3d start = looker.getEyePos();
+        return raycastIgnoringNonBlocking(world, start, eyeToEye, looker)
+                || raycastIgnoringNonBlocking(world, start, center, looker)
+                || raycastIgnoringNonBlocking(world, start, feet, looker);
+    }
+
+    private static boolean raycastIgnoringNonBlocking(World world, Vec3d start, Vec3d end, MobEntity looker) {
+
+        final int maxPassThroughs = 24;
+        Vec3d currStart = start;
+        Vec3d dir = end.subtract(start);
+        double totalDist = dir.length();
+        if (totalDist < 1.0e-4) return true;
+        dir = dir.normalize();
+
+        for (int i = 0; i < maxPassThroughs; i++) {
+            RaycastContext ctx = new RaycastContext(
+                    currStart,
+                    end,
+                    RaycastContext.ShapeType.COLLIDER,
+                    RaycastContext.FluidHandling.NONE,
+                    looker
+            );
+            HitResult hit = world.raycast(ctx);
+            if (hit.getType() == HitResult.Type.MISS) {
+                return true;
+            }
+
+            if (hit instanceof BlockHitResult bhr) {
+                BlockPos pos = bhr.getBlockPos();
+                BlockState state = world.getBlockState(pos);
+                if (isNonBlockingVision(state, world, pos)) {
+
+                    Vec3d step = dir.multiply(0.6);
+                    currStart = bhr.getPos().add(step);
+                    continue;
+                }
+                return false;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static boolean isNonBlockingVision(BlockState state, World world, BlockPos pos) {
+        if (state == null || world == null || pos == null) {
+            return false;
+        }
+
+        if (state.isAir()) return true;
+
+
+        if (state.getBlock() instanceof DoorBlock) {
+            Boolean open = state.get(DoorBlock.OPEN);
+            if (open != null && open) return true;
+        }
+        if (state.getBlock() instanceof TrapdoorBlock) {
+            Boolean open = state.get(TrapdoorBlock.OPEN);
+            if (open != null && open) return true;
+        }
+
+
+        if (NON_BLOCKING_VISION_ALLOW == null) {
+            buildCaches();
+        }
+        try {
+            Identifier bid = Registries.BLOCK.getId(state.getBlock());
+            if (bid != null && NON_BLOCKING_VISION_ALLOW != null && NON_BLOCKING_VISION_ALLOW.contains(bid)) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
+
+
+        try {
+            var id = net.minecraft.registry.Registries.BLOCK.getId(state.getBlock());
+            String path = id != null ? id.getPath() : "";
+            if (path.contains("glass") && !path.contains("tinted")) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
+        if (state.getBlock() instanceof IceBlock
+                || state.isOf(Blocks.PACKED_ICE)
+                || state.isOf(Blocks.BLUE_ICE)) {
+            return true;
+        }
+
+
+        if (state.getBlock() instanceof FenceBlock
+                || state.getBlock() instanceof WallBlock
+                || state.getBlock() instanceof PaneBlock) {
+            return true;
+        }
+
+
+        var shape = state.getCollisionShape(world, pos, ShapeContext.absent());
+        if (shape.isEmpty()) return true;
+
+
+        try {
+            if (!state.shouldBlockVision(world, pos)) return true;
+        } catch (Throwable ignored) {
+
+        }
+
+        return false;
     }
 }

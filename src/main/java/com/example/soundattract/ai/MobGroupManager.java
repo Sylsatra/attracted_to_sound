@@ -60,6 +60,18 @@ public class MobGroupManager {
         String id = Registries.ENTITY_TYPE.getId(mob.getType()).toString();
         return SoundAttractMod.CONFIG.attractedEntities.contains(id);
     }
+
+    private static boolean isEligibleLeader(MobEntity mob) {
+        if (mob == null) return false;
+        if (SoundAttractMod.CONFIG == null) return false;
+
+        if (isAttractedType(mob)) return true;
+        try {
+            return SoundAttractMod.CONFIG.getMatchingProfile(mob) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
     public static boolean isEdgeMobEntity(MobEntity mob) {
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging)
             com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMobEntity] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
@@ -418,10 +430,20 @@ public class MobGroupManager {
         double minZ = cellZ * cellSize;
         double maxX = minX + cellSize;
         double maxZ = minZ + cellSize;
+
+        for (MobEntity candidate : mobsInCell) {
+            if (isEligibleLeader(candidate)) {
+                leader = candidate;
+                break;
+            }
+        }
+        if (leader == null) {
+            return;
+        }
+
         for (int i = 0; i < mobsInCell.size(); i++) {
             MobEntity mob = mobsInCell.get(i);
-            if (i == 0) {
-                leader = mob;
+            if (mob == leader) {
                 uuidToLeader.put(mob.getUuid(), mob);
                 leaders.add(new WeakReference<>(mob));
             } else {
@@ -454,6 +476,7 @@ public class MobGroupManager {
                     }
                     for (MobEntity nm : neighborMobs) {
                         MobEntity nLeader = uuidToLeader.getOrDefault(nm.getUuid(), nm);
+                        if (!isEligibleLeader(nLeader)) continue;
                         double d = edgeMob.squaredDistanceTo(nLeader);
                         if (d < bestDist) {
                             bestLeader = nLeader;

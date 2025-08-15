@@ -15,7 +15,7 @@ import java.util.Optional;
 
 public class PointBlankIntegration {
 
-    private static final Identifier PB_GUN_SOUND_ID = new Identifier("pointblank", "gun_action");
+    public static final Identifier PB_GUN_SOUND_ID = new Identifier("pointblank", "gun_action");
 
     public static void onGunShoot(ServerPlayerEntity player, ItemStack gunStack) {
         Identifier gunId = Registries.ITEM.getId(gunStack.getItem());

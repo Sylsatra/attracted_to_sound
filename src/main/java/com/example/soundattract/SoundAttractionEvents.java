@@ -2,6 +2,7 @@ package com.example.soundattract;
 
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
+import com.example.soundattract.ai.BlockBreakerManager;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.registry.Registries;
 import net.minecraft.entity.mob.MobEntity;
@@ -188,6 +189,8 @@ public class SoundAttractionEvents {
             for (com.example.soundattract.SoundTracker.SoundRecord sound : com.example.soundattract.SoundTracker.RECENT_SOUNDS) {
                 com.example.soundattract.ai.MobGroupManager.scheduleCellsForSound(sound.pos, sound.range, serverWorld, serverWorld.getTime());
             }
+
+            BlockBreakerManager.processPendingActions();
         } catch (Exception e) {
             com.example.soundattract.SoundAttractMod.LOGGER.error("[SoundAttractionEvents] Exception in onServerTick", e);
         }
@@ -200,6 +203,8 @@ public class SoundAttractionEvents {
             return;
         }
         com.example.soundattract.ai.MobGroupManager.updateGroups(serverWorld);
+
+        BlockBreakerManager.processPendingActions();
     }
 
     public static void onEntityJoinWorld(MobEntity mob) {

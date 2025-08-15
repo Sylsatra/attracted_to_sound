@@ -66,8 +66,9 @@ public abstract class MobVisibilityCacheMixin {
             cir.setReturnValue(false);
             return;
         }
-        
 
 
+        boolean visible = FovEvents.hasSmartLineOfSight(mob, player);
+        cir.setReturnValue(visible);
     }
 }

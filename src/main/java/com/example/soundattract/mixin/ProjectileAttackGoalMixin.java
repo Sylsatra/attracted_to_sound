@@ -2,6 +2,7 @@ package com.example.soundattract.mixin;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.StealthUtils;
+import com.example.soundattract.FovEvents;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.ProjectileAttackGoal;
 import net.minecraft.entity.mob.MobEntity;
@@ -36,9 +37,9 @@ public abstract class ProjectileAttackGoalMixin {
 
 
 
-            if (!mob.canSee(player)) {
+            if (!FovEvents.hasSmartLineOfSight(mob, player)) {
                 if (SoundAttractMod.CONFIG.debugLogging) {
-                    SoundAttractMod.LOGGER.info("[ProjectileAttackGoal] Cancelling canStart for {}: target {} not visible.", mob.getName().getString(), player.getName().getString());
+                    SoundAttractMod.LOGGER.info("[ProjectileAttackGoal] Cancelling canStart for {}: target {} not visible (smart LOS).", mob.getName().getString(), player.getName().getString());
                 }
 
                 StealthUtils.clearTargetAndMemories(mob);
@@ -58,7 +59,7 @@ public abstract class ProjectileAttackGoalMixin {
 
         if (target instanceof PlayerEntity player) {
 
-            if (!mob.canSee(player)) {
+            if (!FovEvents.hasSmartLineOfSight(mob, player)) {
                 if (SoundAttractMod.CONFIG.debugLogging) {
                     SoundAttractMod.LOGGER.info("[ProjectileAttackGoal] Cancelling shouldContinue for {}: target {} no longer visible.", mob.getName().getString(), player.getName().getString());
                 }

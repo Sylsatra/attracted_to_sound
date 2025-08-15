@@ -29,7 +29,7 @@ public abstract class MeleeAttackGoalMixin {
             return true;
         }
 
-        return mob.canSee(player);
+        return FovEvents.hasSmartLineOfSight(mob, player);
     }
 
     /**
@@ -69,6 +69,16 @@ public abstract class MeleeAttackGoalMixin {
         if (!isTargetValid(mob, target)) {
 
             cir.setReturnValue(false);
+        }
+
+
+
+
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.enableBlockBreaking) {
+            double reach = 2.75;
+            if (mob.distanceTo(target) > reach && mob.getNavigation().isIdle()) {
+                cir.setReturnValue(false);
+            }
         }
     }
 }

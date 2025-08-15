@@ -10,14 +10,25 @@ import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.Identifier;
 import java.util.EnumSet;
 import net.minecraft.world.World;
+import java.util.Random;
 
 public class FollowLeaderGoal extends Goal {
     private final MobEntity mob;
     private final double moveSpeed;
     private MobEntity leader;
     private AttractionGoal leaderAttractionGoal = null;
+    private BlockPos leaderObjectivePos;
+    private BlockPos myStableDestination;
+
+    private int updateTimer;
+    
+
+    private int timeToLive;
+    private static final int MAX_TIME_TO_LIVE = 10;
     private static final double MAX_DISTANCE = 12.0; 
+    private BlockBreakerPosGoal followerBreaker = null;
     private Vec3d lastPos = null;
+    private Vec3d lastPosVec = null;
     private int stuckTicks = 0;
     private int stuckThreshold = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
     private int dynamicTickCounter = 0;
@@ -62,71 +73,121 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public void tick() {
-        if (mob.getWorld().isClient()) return;
-        if (leader == null) return;
-        if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return;
-        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-    SoundAttractMod.LOGGER.warn("[FollowLeaderGoal] MobEntity {} following leader {} (leader is pursuing sound)", mob.getName().getString(), leader.getName().getString());
-}
-
-
-        BlockPos soundPos = null;
-        if (leaderAttractionGoal != null && leaderAttractionGoal.isPursuingSound()) {
-            try {
-                java.lang.reflect.Field f = leaderAttractionGoal.getClass().getDeclaredField("targetSoundPos");
-                f.setAccessible(true);
-                soundPos = (BlockPos) f.get(leaderAttractionGoal);
-            } catch (Exception e) {
-            }
-        }
-        if (soundPos == null) return;
-        double arrivalDistance = SoundAttractMod.CONFIG.arrivalDistance;
-        double distToSound = mob.getPos().distanceTo(Vec3d.ofCenter(soundPos));
-        if (distToSound <= arrivalDistance) {
-            mob.getNavigation().stop();
-            return;
-        }
-        long seed = mob.getUuid().getMostSignificantBits() ^ mob.getUuid().getLeastSignificantBits() ^ soundPos.hashCode();
-        java.util.Random rand = new java.util.Random(seed);
-        double angle = rand.nextDouble() * 2 * Math.PI;
-        double radius = arrivalDistance * (0.5 + rand.nextDouble() * 0.5);
-        double offsetX = Math.cos(angle) * radius;
-        double offsetZ = Math.sin(angle) * radius;
-        double offsetY = (rand.nextDouble() - 0.5) * 2.0;
-        Vec3d offsetTarget = Vec3d.ofCenter(soundPos).add(offsetX, offsetY, offsetZ);
-        BlockPos dest = new BlockPos((int)offsetTarget.x, (int)offsetTarget.y, (int)offsetTarget.z);
-        BlockPos currentTarget = mob.getNavigation().getTargetPos();
-        if (currentTarget == null || currentTarget.getSquaredDistance(dest) > 2.25) {
-            mob.getNavigation().startMovingTo(offsetTarget.x, offsetTarget.y, offsetTarget.z, moveSpeed);
-        }
-        Vec3d curPos = mob.getPos();
-        if (lastPos != null && curPos.squaredDistanceTo(lastPos) < 0.04) {
-            stuckTicks++;
-            if (stuckTicks > stuckThreshold) {
-                double newAngle = angle + Math.PI / 4;
-                double nX = Math.cos(newAngle) * 1.5;
-                double nZ = Math.sin(newAngle) * 1.5;
-                Vec3d newOffset = new Vec3d(nX, 0, nZ);
-                Vec3d newTarget = Vec3d.ofCenter(soundPos).add(newOffset);
-                mob.getNavigation().startMovingTo(newTarget.x, newTarget.y, newTarget.z, moveSpeed);
-                stuckTicks = 0;
-            }
+        if (this.leaderAttractionGoal != null && this.leaderAttractionGoal.isPursuingSound()) {
+            this.timeToLive = MAX_TIME_TO_LIVE;
         } else {
-            stuckTicks = 0;
+            this.timeToLive--;
         }
-        lastPos = curPos;
+
+        if (this.leaderObjectivePos != null) {
+            this.mob.getLookControl().lookAt(Vec3d.ofCenter(this.leaderObjectivePos));
+        }
+
+        if (this.leaderAttractionGoal.isPursuingSound() && ++this.updateTimer % 20 == 0) {
+            BlockPos currentLeaderObjective = this.leaderAttractionGoal.getTargetSoundPos();
+
+            if (currentLeaderObjective != null && !currentLeaderObjective.equals(this.leaderObjectivePos)) {
+                if (this.leaderObjectivePos == null || this.leaderObjectivePos.getSquaredDistance(currentLeaderObjective) > 100.0) {
+                    if (SoundAttractMod.CONFIG.debugLogging) {
+                        SoundAttractMod.LOGGER.info("[FollowLeaderGoal] {} updating target to {}. Recalculating destination.", this.mob.getName().getString(), currentLeaderObjective);
+                    }
+                    this.leaderObjectivePos = currentLeaderObjective;
+                    this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+                    startMovingToDestination();
+                }
+            }
+        }
+
+
+        if (myStableDestination != null && !this.mob.getNavigation().isFollowingPath() && this.mob.getBlockPos().getSquaredDistance(myStableDestination) > 4.0) {
+            startMovingToDestination();
+        }
+
+
+        if (SoundAttractMod.CONFIG.enableBlockBreaking && this.leaderObjectivePos != null) {
+            double distSqToLeaderTarget = this.mob.getPos().squaredDistanceTo(Vec3d.ofCenter(this.leaderObjectivePos));
+
+
+            Vec3d curPos = this.mob.getPos();
+            if (lastPosVec != null && curPos.squaredDistanceTo(lastPosVec) < 0.01) {
+                stuckTicks++;
+                if (SoundAttractMod.CONFIG.debugLogging && (stuckTicks % 10 == 0)) {
+                    SoundAttractMod.LOGGER.info("[FollowLeaderGoal] {} appears stuck for {} ticks near {} while following leader toward {}", this.mob.getName().getString(), stuckTicks, this.mob.getBlockPos(), this.leaderObjectivePos);
+                }
+            } else {
+                stuckTicks = 0;
+                lastPosVec = curPos;
+            }
+
+            boolean navIdleAndFar = this.mob.getNavigation().isIdle() && distSqToLeaderTarget > 4.0;
+            boolean trulyStuck = stuckTicks >= 10;
+
+
+            if (this.followerBreaker != null) {
+                boolean running = false;
+                try {
+                    running = ((com.example.soundattract.mixin.MobEntityAccessor) this.mob)
+                            .getGoalSelector()
+                            .getGoals()
+                            .stream()
+                            .anyMatch(w -> w.getGoal() == this.followerBreaker && w.isRunning());
+                } catch (ClassCastException e) {
+                    SoundAttractMod.LOGGER.error("[FollowLeaderGoal] Failed to access running goals for {}", this.mob.getName().getString(), e);
+                }
+                if (!running) {
+                    this.followerBreaker = null;
+                }
+            }
+
+
+            if (this.followerBreaker == null && (navIdleAndFar || trulyStuck)) {
+                BlockBreakerPosGoal breaker = new BlockBreakerPosGoal(
+                        this.mob,
+                        this.leaderObjectivePos,
+                        SoundAttractMod.CONFIG.blockBreakTimeMultiplier,
+                        SoundAttractMod.CONFIG.blockBreakToolOnly,
+                        SoundAttractMod.CONFIG.blockBreakProperToolOnly,
+                        SoundAttractMod.CONFIG.blockBreakProperToolRequired
+                );
+                BlockBreakerManager.scheduleAdd(this.mob, breaker, 2);
+                this.followerBreaker = breaker;
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info("[FollowLeaderGoal] Scheduling BlockBreakerPosGoal for follower {} toward leader target {} (navIdleAndFar={}, stuckTicks={})", this.mob.getName().getString(), this.leaderObjectivePos, navIdleAndFar, stuckTicks);
+                }
+
+                this.stuckTicks = 0;
+            }
+        }
     }
 
     @Override
     public void stop() {
-        mob.getNavigation().stop();
-        leader = null;
+        this.mob.getNavigation().stop();
+        if (this.followerBreaker != null) {
+            BlockBreakerManager.scheduleRemove(this.mob, this.followerBreaker);
+            this.followerBreaker = null;
+        }
+        this.leader = null;
+        this.leaderAttractionGoal = null;
+        this.leaderObjectivePos = null;
+        this.myStableDestination = null;
+        this.lastPosVec = null;
+        this.stuckTicks = 0;
     }
 
     @Override
     public boolean canStart() {
-        return canUse();
+        if (this.mob.getTarget() != null) return false;
+
+        this.leader = MobGroupManager.getLeader(this.mob);
+        if (this.leader == null || this.leader == this.mob || !this.leader.isAlive()) return false;
+
+        this.leaderAttractionGoal = AttractionGoal.getAttractionGoal(this.leader);
+        if (this.leaderAttractionGoal == null || !this.leaderAttractionGoal.isPursuingSound()) return false;
+
+        return this.leaderAttractionGoal.getTargetSoundPos() != null;
     }
+
 
     @Override
     public boolean shouldContinue() {
@@ -135,5 +196,29 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public void start() {
+    }
+    private void startMovingToDestination() {
+        if (this.myStableDestination != null) {
+            this.mob.getNavigation().startMovingTo(
+                this.myStableDestination.getX() + 0.5,
+                this.myStableDestination.getY(),
+                this.myStableDestination.getZ() + 0.5,
+                this.moveSpeed
+            );
+        }
+    }
+    
+    private BlockPos calculateMyStableDestination(BlockPos leaderTarget) {
+        if (leaderTarget == null) return null;
+        double arrivalDistance = SoundAttractMod.CONFIG.arrivalDistance;
+        long seed = this.mob.getUuid().getMostSignificantBits() ^ leaderTarget.asLong();
+        Random rand = new Random(seed);
+        double angle = rand.nextDouble() * 2 * Math.PI;
+        double radius = arrivalDistance * (0.5 + rand.nextDouble() * 0.5);
+        return BlockPos.ofFloored(
+            leaderTarget.getX() + Math.cos(angle) * radius,
+            leaderTarget.getY(),
+            leaderTarget.getZ() + Math.sin(angle) * radius
+        );
     }
 }

@@ -18,7 +18,10 @@ repositories {
         name = "Fuzs Mod Resources"
         url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
     }
-    
+    maven {
+        name = "plasmoverse-releases"
+        url = "https://repo.plasmoverse.com/releases"
+    }
     // This is for your local Tacz jar
     flatDir {
         dirs 'libs'
@@ -47,7 +50,8 @@ dependencies {
     // ── 3) Voice-chat integration (if you’re using it) ─────────────────────────
     modCompileOnly "de.maxhenkel.voicechat:voicechat-api:${voicechat_api_version}"
     modRuntimeOnly "maven.modrinth:simple-voice-chat:fabric-${voicechat_version}"
-
+    modCompileOnly "su.plo.voice.api:server:2.1.5"
+    modCompileOnly "su.plo.voice.api:client:2.1.5"
     modImplementation files('libs/pointblank-fabric-1.20.1-1.9.6.jar')
     modImplementation files('libs/geckolib-fabric-1.20.1-4.7.3.jar')
 }

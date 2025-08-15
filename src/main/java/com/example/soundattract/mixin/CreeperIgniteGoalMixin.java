@@ -30,7 +30,7 @@ public abstract class CreeperIgniteGoalMixin {
             return true;
         }
 
-        return creeper.canSee(player);
+        return FovEvents.hasSmartLineOfSight(creeper, player);
     } 
 
     @Inject(method = "canStart()Z", at = @At("HEAD"), cancellable = true)

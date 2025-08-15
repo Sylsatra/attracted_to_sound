@@ -1,6 +1,9 @@
 package com.example.soundattract.mixin;
 
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.FovEvents;
+import com.example.soundattract.ai.BlockBreakerManager;
+import com.example.soundattract.ai.BlockBreakerPosGoal;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.TrackTargetGoal;
 import net.minecraft.entity.mob.MobEntity;
@@ -31,11 +34,8 @@ public abstract class TrackTargetGoalMixin {
 
 
         if (currentTarget instanceof PlayerEntity player) {
-
-
-
-            if (!this.mob.canSee(player)) {
-                
+            boolean visible = FovEvents.hasSmartLineOfSight(this.mob, player);
+            if (!visible) {
                 if (SoundAttractMod.CONFIG.debugLogging) {
                     SoundAttractMod.LOGGER.info(
                         "[TrackTargetGoalMixin] Cancelling shouldContinue for {}: target {} no longer visible.",
@@ -43,11 +43,31 @@ public abstract class TrackTargetGoalMixin {
                         player.getName().getString()
                     );
                 }
-
-
-
-
                 cir.setReturnValue(false);
+                return;
+            }
+
+
+
+            if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.enableBlockBreaking) {
+                double reach = 2.75;
+                if (this.mob.distanceTo(player) > reach && this.mob.getNavigation().isIdle()) {
+                    BlockBreakerPosGoal breaker = new BlockBreakerPosGoal(
+                        this.mob,
+                        player.getBlockPos(),
+                        SoundAttractMod.CONFIG.blockBreakTimeMultiplier,
+                        SoundAttractMod.CONFIG.blockBreakToolOnly,
+                        SoundAttractMod.CONFIG.blockBreakProperToolOnly,
+                        SoundAttractMod.CONFIG.blockBreakProperToolRequired
+                    );
+                    BlockBreakerManager.scheduleAdd(this.mob, breaker, 2);
+                    if (SoundAttractMod.CONFIG.debugLogging) {
+                        SoundAttractMod.LOGGER.info(
+                            "[TrackTargetGoalMixin] Scheduling BlockBreakerPosGoal for {} toward player {} at {} (nav idle, out of reach)",
+                            this.mob.getName().getString(), player.getName().getString(), player.getBlockPos()
+                        );
+                    }
+                }
             }
         }
     }

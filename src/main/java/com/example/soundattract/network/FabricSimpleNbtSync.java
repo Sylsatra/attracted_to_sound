@@ -13,25 +13,27 @@ public class FabricSimpleNbtSync {
 
     public static void registerServerReceiver(Logger logger) {
         ServerPlayNetworking.registerGlobalReceiver(SIMPLE_NBT_SYNC_ID, (server, player, handler, buf, responseSender) -> {
-            if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) 
             try {
                 NbtCompound nbt = buf.readNbt();
                 server.execute(() -> {
-                    logger.info("[FabricSimpleNbtSync] Server received NBT from {}: {}", player.getName().getString(), nbt);
+                    if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+                        logger.info("[FabricSimpleNbtSync] Server received NBT from {}: {}", player.getName().getString(), nbt);
+                    }
                 });
             } catch (Exception e) {
-                if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) 
-                e.printStackTrace();
+                if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+                    e.printStackTrace();
+                }
             }
         });
     }
 
     public static void sendNbtToServer(NbtCompound nbt, Logger logger) {
         if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
-        PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
-        buf.writeNbt(nbt != null ? nbt : new NbtCompound());
-        logger.info("[FabricSimpleNbtSync] Client sending NBT: {}", nbt);
-        ClientPlayNetworking.send(SIMPLE_NBT_SYNC_ID, buf);
-    }
+            PacketByteBuf buf = new PacketByteBuf(io.netty.buffer.Unpooled.buffer());
+            buf.writeNbt(nbt != null ? nbt : new NbtCompound());
+            logger.info("[FabricSimpleNbtSync] Client sending NBT: {}", nbt);
+            ClientPlayNetworking.send(SIMPLE_NBT_SYNC_ID, buf);
+        }
     }
 }

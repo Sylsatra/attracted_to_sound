@@ -7,10 +7,13 @@ import com.example.soundattract.ai.MobCellAssignmentHooks;
 import com.example.soundattract.config.ConfigLoader;
 import com.example.soundattract.config.SoundAttractConfigData;
 import com.example.soundattract.enchantment.ModEnchantments;
+import com.example.soundattract.integration.PlasmoIntegration;
+
 import com.example.soundattract.integration.PointBlankIntegrationHandler;
 import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.example.soundattract.network.FabricSimpleNbtSync;
 import com.example.soundattract.loot.ModLootTables;
+import com.example.soundattract.FovEvents;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -20,6 +23,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.server.world.ServerWorld;
+import su.plo.voice.api.server.PlasmoVoiceServer;
 
 
 public class SoundAttractMod implements ModInitializer {
@@ -30,6 +34,7 @@ public class SoundAttractMod implements ModInitializer {
     private long lastTickTimeNanos = 0L;
     private double averageTickTimeNanos = 50_000_000.0;
     private final double tpsSmoothingFactor = 0.05;
+    private PlasmoIntegration plasmo;
 
     @Override
     public void onInitialize() {
@@ -57,6 +62,13 @@ public class SoundAttractMod implements ModInitializer {
 
         PointBlankIntegrationHandler();
 
+        if (FabricLoader.getInstance().isModLoaded("plasmovoice")) {
+            if (CONFIG.debugLogging) {
+                LOGGER.info("[SoundAttract] Plasmo Voice mod found. Preparing integration.");
+            }
+            this.plasmo = new PlasmoIntegration();
+        }
+        
         registerServerLifecycleEvents();
         registerTickEvents();
         registerEntityEvents();
@@ -71,17 +83,23 @@ public class SoundAttractMod implements ModInitializer {
     private void PointBlankIntegrationHandler() {
         if (FabricLoader.getInstance().isModLoaded("pointblank")) {
             if (CONFIG.enablePointBlankIntegration ) {
-                LOGGER.info("[SoundAttract] Point Blank mod found and integration is enabled. Registering server-side event listeners.");
+                if (CONFIG.debugLogging) {
+                    LOGGER.info("[SoundAttract] Point Blank mod found and integration is enabled. Registering server-side event listeners.");
+                }
                 try {
                     PointBlankIntegrationHandler.register();
                 } catch (Throwable e) {
                     LOGGER.error("Failed to register Point Blank integration events. This may be a mixin conflict or an API change.", e);
                 }
             } else {
-                LOGGER.info("[SoundAttract] Point Blank integration is disabled in the config.");
+                if (CONFIG.debugLogging) {
+                    LOGGER.info("[SoundAttract] Point Blank integration is disabled in the config.");
+                }
             }
         } else {
-            LOGGER.info("[SoundAttract] Point Blank mod not found, skipping integration.");
+            if (CONFIG.debugLogging) {
+                LOGGER.info("[SoundAttract] Point Blank mod not found, skipping integration.");
+            }
         }
     }
 

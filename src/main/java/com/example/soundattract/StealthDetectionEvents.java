@@ -199,7 +199,7 @@ public static boolean canMobDetectPlayer(MobEntity mob, PlayerEntity player) {
 
     
 
-    boolean canSee = mob.canSee(player);
+    boolean canSee = FovEvents.hasSmartLineOfSight(mob, player);
     
     if (SoundAttractMod.CONFIG.debugLogging && !canSee) {
 
