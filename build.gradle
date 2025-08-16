@@ -91,6 +91,10 @@ repositories {
     maven { name = "Modrinth"; url = "https://api.modrinth.com/maven"; content { includeGroup "maven.modrinth" } }
     mavenLocal()
     maven { name = "Curse Maven"; url = "https://www.cursemaven.com"; content { includeGroup "curse.maven" } }
+    maven {
+        name = "plasmoverse-releases"
+        url = "https://repo.plasmoverse.com/releases"
+    }
     flatDir {
         dirs 'libs'
     }
@@ -104,6 +108,8 @@ dependencies {
     compileOnly "curse.maven:timeless-and-classics-zero-1028108:6654541"
     compileOnly files('libs/enhancedai-2.7.0.jar')
     compileOnly files('libs/insanelib-1.21.14.jar')
+    compileOnly "su.plo.voice.api:server:2.1.5"
+    compileOnly "su.plo.voice.api:client:2.1.5"
 
 }
 

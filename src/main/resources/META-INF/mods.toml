@@ -6,7 +6,7 @@ license="GPLv3"
   config = "soundattract.mixins.json"
 [[mods]]
 modId="soundattract" 
-version="4.0.3" 
+version="4.0.6" 
 logoFile="attract-to-sound-mod-logo.jpg"
 displayName="Sound Attract Mod" 
 authors="Sylsatra" 
@@ -38,5 +38,12 @@ Also camouflage is a thing.
     modId="enhanceai"
     mandatory=false
     versionRange="[2.7.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="plasmovoice"
+    mandatory=false
+    versionRange="[2.0.0,)"
     ordering="NONE"
     side="BOTH"

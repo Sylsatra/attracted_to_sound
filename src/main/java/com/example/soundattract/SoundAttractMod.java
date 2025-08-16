@@ -14,6 +14,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.loot.ModLootModifiers;
+import com.example.soundattract.integration.PlasmoVoiceBootstrap;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -32,6 +33,7 @@ public class SoundAttractMod {
         
         MinecraftForge.EVENT_BUS.register(new FovEvents());
         MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());
+        MinecraftForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
