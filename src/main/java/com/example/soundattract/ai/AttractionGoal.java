@@ -340,6 +340,27 @@ public class AttractionGoal extends Goal {
             lastPos = mob.blockPosition();
         }
 
+
+        if (SoundAttractConfig.COMMON.enableBlockBreaking.get()
+            && targetSoundPos != null
+            && (stuckTicks >= STUCK_THRESHOLD || mob.getNavigation().isStuck())) {
+
+            BlockPos blocking = BlockBreakerPosGoal.findFirstBlockingBlock(mob.level(), mob, targetSoundPos);
+            boolean hasBreaker = mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(w -> w.getGoal() instanceof BlockBreakerPosGoal);
+            if (blocking != null && !hasBreaker) {
+                double mult = SoundAttractConfig.COMMON.blockBreakTimeMultiplier.get();
+                boolean toolOnly = SoundAttractConfig.COMMON.blockBreakToolOnly.get();
+                boolean properOnly = SoundAttractConfig.COMMON.blockBreakProperToolOnly.get();
+                boolean properReq = SoundAttractConfig.COMMON.blockBreakProperToolRequired.get();
+                BlockBreakerPosGoal breaker = new BlockBreakerPosGoal(mob, targetSoundPos, mult, toolOnly, properOnly, properReq);
+                BlockBreakerManager.scheduleAdd(mob, breaker, 2);
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[AttractionGoal] {} stuck: scheduled BlockBreakerPosGoal toward {}.", mob.getName().getString(), targetSoundPos);
+                }
+            }
+        }
+
         SoundTracker.SoundRecord currentPursuedSound = this.cachedSound;
         if (currentPursuedSound == null || !currentPursuedSound.pos.equals(this.targetSoundPos)) {
             currentPursuedSound = null;

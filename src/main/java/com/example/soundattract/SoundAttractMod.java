@@ -6,6 +6,7 @@ import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.loot.ModLootModifiers;
 import com.example.soundattract.event.AIModificationEvents;
 import com.example.soundattract.integration.TaczIntegrationServerEvents;
+import com.example.soundattract.integration.PlasmoVoiceBootstrap;
 import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.mojang.logging.LogUtils;
 
@@ -43,6 +44,9 @@ public class SoundAttractMod {
         NeoForge.EVENT_BUS.register(new SoundAttractionEvents());
         NeoForge.EVENT_BUS.register(VanillaIntegrationEvents.class);
         com.example.soundattract.integration.TaczIntegration.register();
+
+
+        NeoForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
 
         if (FMLEnvironment.dist.isClient()) {
             NeoForge.EVENT_BUS.register(new SoundAttractClientEvents());

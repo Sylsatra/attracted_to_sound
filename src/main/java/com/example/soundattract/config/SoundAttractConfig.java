@@ -32,6 +32,7 @@ public class SoundAttractConfig {
     public static Set<ResourceLocation> CUSTOM_NON_SOLID_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_THIN_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_AIR_BLOCKS_CACHE = new HashSet<>();
+    public static Set<ResourceLocation> VISION_PASSTHROUGH_BLOCKS_CACHE = new HashSet<>();
     public static double TACZ_RELOAD_RANGE_CACHE = 10.0;
     public static double TACZ_RELOAD_WEIGHT_CACHE = 1.0;
     public static double TACZ_SHOOT_RANGE_CACHE = 140.0;
@@ -149,6 +150,7 @@ public class SoundAttractConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> customThinBlocks;
     public final ModConfigSpec.ConfigValue<List<? extends String>> customLiquidBlocks;
     public final ModConfigSpec.ConfigValue<List<? extends String>> customAirBlocks;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> visionPassThroughBlocks;
 
     // --- Stealth Mechanics - General ---
     public final ModConfigSpec.BooleanValue enableStealthMechanics;
@@ -231,6 +233,17 @@ public class SoundAttractConfig {
     // --- FOV ---
     public final ModConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
     public final ModConfigSpec.ConfigValue<List<? extends String>> fovExclusionList; 
+
+    // --- Block Breaking ---
+    public final ModConfigSpec.BooleanValue enableBlockBreaking;
+    public final ModConfigSpec.DoubleValue blockBreakTimeMultiplier;
+    public final ModConfigSpec.BooleanValue blockBreakToolOnly;
+    public final ModConfigSpec.BooleanValue blockBreakProperToolOnly;
+    public final ModConfigSpec.BooleanValue blockBreakProperToolRequired;
+    public final ModConfigSpec.IntValue blockBreakMaxY;
+    public final ModConfigSpec.BooleanValue blockBreakBlacklistTileEntities;
+    public final ModConfigSpec.BooleanValue blockBreakListAsWhitelist;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> blockBreakBlockList;
     
 
     public Common(ModConfigSpec.Builder builder) {
@@ -473,8 +486,7 @@ public class SoundAttractConfig {
                                         "scguns:item.scrapper.fire",
                                         "scguns:item.sculk.fire",
                                         "scguns:item.raygun.fire",
-                                        "scguns:item.rocket_rifle.fire",
-                                        "scguns:item.makeshift_rifle.cock","scguns:item.pistol.cock","scguns:item.flamethrower.reload","scguns:item.gauss.reload","scguns:item.pistol.reload","scguns:item.airgun.fire","scguns:item.beam.fire","scguns:item.blackpowder.fire","scguns:item.boomstick.fire","scguns:item.brass_pistol.fire","scguns:item.brass_revolver.fire","scguns:item.brass_shotgun.fire","scguns:item.bruiser.fire","scguns:item.combat_shotgun.fire","scguns:item.cowboy.fire","scguns:item.flamethrower.fire_2","scguns:item.gauss.fire","scguns:item.greaser_smg.fire","scguns:item.gyrojet.fire","scguns:item.heavy_rifle.fire","scguns:item.heavier_rifle.fire","scguns:item.iron_pistol.fire","scguns:item.iron_rifle.fire","scguns:item.makeshift_rifle.fire","scguns:item.plasma.fire","scguns:item.raygun.fire","scguns:item.rocket.fire","scguns:item.rocket_rifle.fire","scguns:item.rusty_gnat.fire","scguns:item.scrapper.fire","scguns:item.sculk.fire","scguns:item.shock.fire","scguns:item.shulker.fire","scguns:item.scorched_sniper.fire","scguns:item.scorched_rifle.fire","scguns:item.shock.silenced_fire","scguns:item.bruiser.silenced_fire","scguns:item.makeshift_rifle.silenced_fire","scguns:item.combat_shotgun.silenced_fire","scguns:item.rusty_gnat.silenced_fire","scguns:item.shock.fire","scguns:item.scorched_sniper.fire","scguns:item.scorched_rifle.fire","scguns:item.bruiser.fire","scguns:item.flamethrower.fire_2","scguns:item.blackpowder.fire","scguns:item.gyrojet.fire","scguns:item.boomstick.fire","scguns:item.brass_shotgun.fire","scguns:item.brass_revolver.fire","scguns:item.shulker.fire","scguns:item.iron_rifle.fire","scguns:item.combat_shotgun.fire","scguns:item.beam.fire","scguns:item.airgun.fire","scguns:item.heavier_rifle.fire","scguns:item.iron_pistol.fire","scguns:item.gauss.fire","scguns:item.heavy_rifle.fire","scguns:item.greaser_smg.fire","scguns:item.plasma.fire","scguns:item.rusty_gnat.fire","scguns:item.cowboy.fire","scguns:item.scrapper.fire","scguns:item.sculk.fire","scguns:item.raygun.fire","scguns:item.rocket_rifle.fire"
+                                        "scguns:item.rocket_rifle.fire"
                                     ),
                                     obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
             minSoundLevelForPlayer = builder.comment("Minimum sound level (0.0-1.0) for player-emitted sounds to be considered. Higher values mean only louder sounds are tracked.")
@@ -774,7 +786,14 @@ public class SoundAttractConfig {
             crawlingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is crawling (e.g., in a 1-block high gap).")
                 .defineInRange("crawlingDetectionRangePlayer", 4.0, 0.0, 128.0);
             builder.pop();
-
+            
+            // Vision pass-through blocks: blocks that do not obstruct vision checks (e.g., glass)
+            builder.push("vision");
+            visionPassThroughBlocks = builder.comment(
+                    "List of block IDs considered pass-through for vision/LOS checks. Format: 'modid:blockid'.",
+                    "Entries here will be ignored when checking if a player is visible to a mob.")
+                .defineList("visionPassThroughBlocks", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
+            builder.pop();
             builder.comment("How environmental conditions affect stealth.").push("environmental_factors");
             builder.comment("Light level effects on detection.").push("light_level");
             neutralLightLevel = builder.comment("The light level (0-15) considered neutral (no bonus or penalty to detection).")
@@ -1038,6 +1057,28 @@ public class SoundAttractConfig {
             customAirBlocks = builder.comment("List of custom air block IDs for sound muffling. Format: 'modid:blockid'. Default: empty list.")
                                          .defineList("customAirBlocks", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
 
+            // Block breaking configuration
+            builder.push("block_breaking");
+            enableBlockBreaking = builder.comment("Enable mobs to break blocks that obstruct pathing when stuck.")
+                    .define("enableBlockBreaking", false);
+            blockBreakTimeMultiplier = builder.comment("Global multiplier for block breaking time. Higher means slower breaking.")
+                    .defineInRange("blockBreakTimeMultiplier", 1.0, 0.01, 100.0);
+            blockBreakToolOnly = builder.comment("Only allow breaking if the mob is holding any tool in main hand.")
+                    .define("blockBreakToolOnly", false);
+            blockBreakProperToolOnly = builder.comment("Only allow breaking if the mob is holding a proper tool for the block (faster if true).")
+                    .define("blockBreakProperToolOnly", false);
+            blockBreakProperToolRequired = builder.comment("Require a proper tool to break the block at all.")
+                    .define("blockBreakProperToolRequired", false);
+            blockBreakMaxY = builder.comment("Maximum Y level where mobs are allowed to break blocks (safety).")
+                    .defineInRange("blockBreakMaxY", 320, -2032, 4064);
+            blockBreakBlacklistTileEntities = builder.comment("Prevent breaking blocks that have block entities (e.g., chests) to avoid grief.")
+                    .define("blockBreakBlacklistTileEntities", true);
+            blockBreakListAsWhitelist = builder.comment("Treat blockBreakBlockList as a whitelist (true) or blacklist (false).")
+                    .define("blockBreakListAsWhitelist", false);
+            blockBreakBlockList = builder.comment("Whitelist/Blacklist of blocks for block breaking, depending on blockBreakListAsWhitelist. Format: 'modid:blockid'.")
+                    .defineList("blockBreakBlockList", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
+            builder.pop();
+
             specialMobProfilesRaw = builder.comment(
                 "List of special mob profiles. Each profile is a string with 5 parts separated by ';'.",
                 "Format: profileName;mobId;nbtMatcher;soundOverridesString;detectionOverridesString",
@@ -1160,6 +1201,22 @@ public class SoundAttractConfig {
         }
 
         parseAndCacheCustomArmorColors();
+
+        // Vision pass-through blocks
+        VISION_PASSTHROUGH_BLOCKS_CACHE.clear();
+        if (COMMON.visionPassThroughBlocks != null) {
+            for (String idStr : COMMON.visionPassThroughBlocks.get()) {
+                ResourceLocation loc = ResourceLocation.tryParse(idStr);
+                if (loc != null) {
+                    VISION_PASSTHROUGH_BLOCKS_CACHE.add(loc);
+                } else {
+                    SoundAttractMod.LOGGER.warn("Invalid ResourceLocation in visionPassThroughBlocks: {}", idStr);
+                }
+            }
+            if (COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[ConfigBake] Loaded {} vision pass-through blocks.", VISION_PASSTHROUGH_BLOCKS_CACHE.size());
+            }
+        }
 
         SPECIAL_MOB_PROFILES_CACHE = new ArrayList<>();
         if (COMMON.specialMobProfilesRaw != null) {

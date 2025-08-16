@@ -18,7 +18,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public class VoiceChatIntegrationClient {
 
     public static void handleClientSound(ClientSoundEvent event) {
-        com.example.soundattract.SoundAttractMod.LOGGER.info("[SVC Integration] ClientSoundEvent received. Whispering: {}", event.isWhispering());
         if (!SoundAttractConfig.COMMON.enableVoiceChatIntegration.get()) {
             return;
         }
@@ -55,7 +54,6 @@ public class VoiceChatIntegrationClient {
             Optional.of(animatorClass),
             Optional.empty()
         );
-        com.example.soundattract.SoundAttractMod.LOGGER.info("[SVC Integration] Sending SoundMessage to server: {}", msg);
         PacketDistributor.sendToServer(msg);
     }
 }

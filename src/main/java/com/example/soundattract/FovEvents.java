@@ -8,6 +8,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.ICancellableEvent;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -122,11 +126,50 @@ public class FovEvents {
         FovData fov = CONFIG_FOV_CACHE.getOrDefault(lookerId, DEFAULT_FOV);
         if (fov.horizontal() >= 360) return true;
 
-        if (checkObstructions && !looker.getSensing().hasLineOfSight(target)) {
+        if (checkObstructions && !hasLineOfSightAllowlist(looker, target)) {
             return false;
         }
 
         return isWithinFieldOfView(looker, target, fov.horizontal(), fov.vertical());
+    }
+
+    /**
+     * Custom LOS that ignores blocks listed in SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.
+     * Falls back to vanilla LOS if anything unexpected occurs.
+     */
+    private static boolean hasLineOfSightAllowlist(Mob looker, Entity target) {
+        try {
+            Level level = looker.level();
+            Vec3 start = looker.getEyePosition();
+            Vec3 end = target.getEyePosition();
+            Vec3 delta = end.subtract(start);
+            double distance = delta.length();
+            if (distance <= 0.001) return true;
+
+            int steps = Math.max(1, (int) Math.ceil(distance * 3.0));
+            Vec3 step = delta.scale(1.0 / steps);
+            Vec3 curr = start;
+
+            for (int i = 0; i <= steps; i++) {
+                BlockPos pos = BlockPos.containing(curr);
+                BlockState state = level.getBlockState(pos);
+                if (!state.isAir()) {
+                    ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+                    if (blockId == null || !SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.contains(blockId)) {
+
+                        if (!state.getCollisionShape(level, pos).isEmpty()) {
+                            return false;
+                        }
+                    }
+                }
+                curr = curr.add(step);
+            }
+            return true;
+        } catch (Exception e) {
+
+            try { return looker.getSensing().hasLineOfSight(target); } catch (Exception ignored) {}
+            return true;
+        }
     }
 
     private static boolean isWithinFieldOfView(Mob looker, Entity target, double horizontalFovDegrees, double verticalFovDegrees) {

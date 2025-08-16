@@ -11,7 +11,6 @@ tasks.named('wrapper', Wrapper).configure {
 
 version = mod_version
 group = mod_group_id
-
 // Add your repositories here
 repositories {
     maven {
@@ -31,6 +30,10 @@ repositories {
     maven {
         name = 'SpongePowered'
         url = 'https://repo.spongepowered.org/maven/'
+    }
+    maven {
+        name = "plasmoverse-releases"
+        url = "https://repo.plasmoverse.com/releases"
     }
     flatDir {
         dirs 'libs'
@@ -119,14 +122,22 @@ configurations {
     runtimeClasspath.extendsFrom localRuntime
 }
 
+// Align transitive versions to Minecraft/NeoForge constraints to avoid conflicts
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.guava:guava:32.1.2-jre'
+        force 'com.google.guava:failureaccess:1.0.1'
+    }
+}
+
 dependencies {
     // Optional dependency for Simple Voice Chat
     // The API is used for compiling your code against.
     compileOnly "de.maxhenkel.voicechat:voicechat-api:neoforge-1.20.1-2.5.30"
     compileOnly "de.maxhenkel.voicechat:voicechat-api:2.5.31"
     compileOnly files('libs/tacz-neoforge-1.21.1-1.1.6-hotfix-r4.jar')
-    // The full mod is added to localRuntime for testing in the development environment.
-    // This makes it an optional dependency that isn't bundled or required by your mod.
+    compileOnly "su.plo.voice.api:server:2.1.5"
+    compileOnly "su.plo.voice.api:client:2.1.5"
     localRuntime "curse.maven:simple-voice-chat-416089:6439546"
     
     // The mixin annotation processor is no longer needed; it's handled by NeoGradle.

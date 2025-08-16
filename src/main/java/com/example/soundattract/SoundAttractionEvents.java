@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.example.soundattract.ai.AttractionGoal;
+import com.example.soundattract.ai.BlockBreakerManager;
+import com.example.soundattract.ai.CombatBlockBreakAssistGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.MobGroupManager;
 import com.example.soundattract.config.SoundAttractConfig;
@@ -129,6 +131,9 @@ public class SoundAttractionEvents {
         com.example.soundattract.DynamicScanCooldownManager.update(currentTime, mobCountForCooldownManager);
         SoundTracker.tick();
 
+
+        BlockBreakerManager.processPendingActions();
+
         if (!PENDING_GOAL_ADDITIONS.isEmpty()) {
             Iterator<Map.Entry<Mob, List<GoalDefinition>>> iterator = PENDING_GOAL_ADDITIONS.entrySet().iterator();
             while (iterator.hasNext()) {
@@ -175,6 +180,9 @@ public class SoundAttractionEvents {
         }
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
+
+
+        scheduleAddGoal(mob, 2, new CombatBlockBreakAssistGoal(mob));
 
         scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
         scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));

@@ -36,6 +36,13 @@ config="${mod_id}.mixins.json"
     side="BOTH"
 
 [[dependencies.${mod_id}]]
+    modId="plasmovoice"
+    type="optional"
+    versionRange="[2.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
     modId="tacz" 
     type="optional"
     versionRange="[1.1.6-hotfix-r4,)" 
