@@ -88,7 +88,9 @@ public class AttractionGoal extends Goal {
 
     private boolean isMobEligible() {
         java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = SoundAttractionEvents.getCachedAttractedEntityTypes();
-        return attractedTypes.contains(this.mob.getType());
+        boolean byType = attractedTypes.contains(this.mob.getType());
+        boolean hasProfile = com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(this.mob) != null;
+        return byType || hasProfile;
     }
 
     private double getArrivalDistance() {
@@ -199,6 +201,11 @@ public class AttractionGoal extends Goal {
     @Override
     public boolean canUse() {
         if (this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
+            return false;
+        }
+
+
+        if (!isMobEligible()) {
             return false;
         }
 

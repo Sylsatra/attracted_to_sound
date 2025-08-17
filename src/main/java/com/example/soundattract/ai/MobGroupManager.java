@@ -125,7 +125,9 @@ public class MobGroupManager {
             SoundAttractMod.LOGGER.info("[MobGroupManager] All mobs present ({}): {}", mobs.size(), allMobTypesLog.toString());
         List<Mob> attractedMobs = new ArrayList<>();
         for (Mob mob : mobs) {
-            if (attractedEntityTypes.contains(mob.getType())) {
+            boolean byType = attractedEntityTypes.contains(mob.getType());
+            boolean hasProfile = SoundAttractConfig.getMatchingProfile(mob) != null;
+            if (byType || hasProfile) {
                 attractedMobs.add(mob);
             }
         }
@@ -266,9 +268,11 @@ public class MobGroupManager {
         }
         mobLastRelayTime.entrySet().removeIf(e -> e.getKey().isRemoved());
         List<Mob> allAttractedMobs = new ArrayList<>();
+        Set<net.minecraft.world.entity.EntityType<?>> cachedTypes = attractedEntityTypes;
         for (Mob mob : level.getEntitiesOfClass(Mob.class, level.getWorldBorder().getCollisionShape().bounds())) {
-            String mobId = mob.getType().builtInRegistryHolder().key().location().toString();
-            if (SoundAttractConfig.COMMON.attractedEntities.get().contains(mobId)) {
+            boolean byType = cachedTypes.contains(mob.getType());
+            boolean hasProfile = SoundAttractConfig.getMatchingProfile(mob) != null;
+            if (byType || hasProfile) {
                 allAttractedMobs.add(mob);
             }
         }

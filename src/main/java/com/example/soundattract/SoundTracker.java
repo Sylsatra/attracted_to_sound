@@ -529,12 +529,32 @@ public class SoundTracker {
                         effectiveInitialWeight = ov.get().getWeight();
                     }
                 }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[findNearest] initial {}: range={}, weight={}",
+                        rl, effectiveInitialRange, effectiveInitialWeight
+                    );
+                }
                 double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effectiveInitialRange, effectiveInitialWeight, soundIdStr != null ? soundIdStr : "unknown");
                 double muffledRange = muffled[0];
                 double muffledWeight = muffled[1];
                 double distSqr = mobPos.distSqr(r.pos);
                 double rangeSqr = muffledRange * muffledRange;
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[findNearest] after muffling {}: range {}->{} (rangeSqr={}), weight {}->{}, distSqr={}",
+                        rl,
+                        effectiveInitialRange, muffledRange, rangeSqr,
+                        effectiveInitialWeight, muffledWeight, distSqr
+                    );
+                }
                 if (distSqr > rangeSqr) {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info(
+                            "[findNearest] skipping {}: distSqr={} > rangeSqr={}",
+                            rl, distSqr, rangeSqr
+                        );
+                    }
                     continue;
                 }
                 double noveltyBonus = 0.0;
@@ -548,11 +568,23 @@ public class SoundTracker {
                     bestSound = r;
                     bestSoundEffectiveRange = muffledRange;
                     bestSoundEffectiveWeight = muffledWeight;
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info(
+                            "[findNearest] candidate now best {}: effRange={}, effWeight={}, compWeight={}, distSqr={}",
+                            rl, bestSoundEffectiveRange, bestSoundEffectiveWeight, finalComparisonWeight, distSqr
+                        );
+                    }
                 }
             }
             if (bestSound != null) {
                 if (bestSound.pos == null) {
                     return null;
+                }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[findNearest] final pick {} at {} with range={} weight={}",
+                        bestSound.soundId, bestSound.pos, bestSoundEffectiveRange, bestSoundEffectiveWeight
+                    );
                 }
                 return new SoundRecord(bestSound.sound, bestSound.soundId, bestSound.pos, bestSound.ticksRemaining, bestSound.dimensionKey, bestSoundEffectiveRange, bestSoundEffectiveWeight);
             }

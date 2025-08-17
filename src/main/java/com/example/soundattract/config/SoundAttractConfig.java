@@ -245,6 +245,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue voiceChatWhisperRange;
         public final ForgeConfigSpec.IntValue voiceChatNormalRange;
         public final ForgeConfigSpec.DoubleValue voiceChatWeight;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> voiceChatDbThresholdMap;
 
 
         public final ForgeConfigSpec.DoubleValue defaultHorizontalFov;
@@ -1946,10 +1947,39 @@ public class SoundAttractConfig {
             builder.pop();
 
             builder.push("Simple VC");
-            enableVoiceChatIntegration = builder.comment("Enable voice chat integration").define("enableVoiceChatIntegration", true);
-            voiceChatWhisperRange = builder.comment("Voice chat whisper range").defineInRange("voiceChatWhisperRange", 4, 1, 64);
-            voiceChatNormalRange = builder.comment("Voice chat normal range").defineInRange("voiceChatNormalRange", 32, 1, 128);
-            voiceChatWeight = builder.comment("Voice chat weight").defineInRange("voiceChatWeight", 9.0, 0.0, 10.0);
+            enableVoiceChatIntegration = builder.comment(
+                    "Enable Simple Voice Chat (SVC) integration.",
+                    "When enabled, voice chat frames generate a dynamic sound whose range scales with the audio's peak level (dBFS).",
+                    "Optional: Only takes effect if SVC is installed.")
+                    .define("enableVoiceChatIntegration", true);
+            voiceChatWhisperRange = builder.comment(
+                    "Base range used when the player is whispering in SVC (before applying dB multiplier).")
+                    .defineInRange("voiceChatWhisperRange", 16, 1, 64);
+            voiceChatNormalRange = builder.comment(
+                    "Base range used for normal speaking in SVC (before applying dB multiplier).")
+                    .defineInRange("voiceChatNormalRange", 32, 1, 128);
+            voiceChatWeight = builder.comment(
+                    "Weight assigned to the generated SVC sound event.")
+                    .defineInRange("voiceChatWeight", 9.0, 0.0, 10.0);
+            voiceChatDbThresholdMap = builder.comment(
+                    "Mapping from normalized dB thresholds to range multipliers for SVC.",
+                    "Normalized dB is in [0..127], where 0 = silence and 127 = max peak (0 dBFS).",
+                    "Each entry format: 'threshold:multiplier'. Entries are evaluated from highest threshold to lowest.",
+                    "Defaults replicate the built-in behavior: >=50 -> 1.0, >=30 -> 0.7, >=10 -> 0.3.")
+                    .defineList("voiceChatDbThresholdMap",
+                            Arrays.asList("110:2.0", "90:1.8", "75:1.5", "50:1.0", "30:0.7", "10:0.3", "0:0.05"),
+                            obj -> {
+                                if (!(obj instanceof String s)) return false;
+                                String[] parts = s.split(":");
+                                if (parts.length != 2) return false;
+                                try {
+                                    Double.parseDouble(parts[0]);
+                                    Double.parseDouble(parts[1]);
+                                    return true;
+                                } catch (Exception e) {
+                                    return false;
+                                }
+                            });
             builder.pop();
 
             builder.comment("Muffling settings for different block types.").push("muffling");

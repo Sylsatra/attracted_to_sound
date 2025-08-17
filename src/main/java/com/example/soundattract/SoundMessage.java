@@ -122,6 +122,12 @@ public class SoundMessage {
 
                 if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
                     if (msg.range > 0) {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info(
+                                "[SoundMessage] Adding VC sound at {} dim={} range={} weight={}",
+                                pos, dimString, msg.range, msg.weight
+                            );
+                        }
                         SoundTracker.addSound(null, pos, dimString,
                                               msg.range, msg.weight, lifetime,
                                               VOICE_CHAT_SOUND_ID.toString());
