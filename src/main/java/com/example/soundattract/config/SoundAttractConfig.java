@@ -229,6 +229,7 @@ public class SoundAttractConfig {
     public final ModConfigSpec.IntValue voiceChatWhisperRange;
     public final ModConfigSpec.IntValue voiceChatNormalRange;
     public final ModConfigSpec.DoubleValue voiceChatWeight;
+    public final ModConfigSpec.ConfigValue<List<? extends String>> voiceChatDbThresholdMap;
 
     // --- FOV ---
     public final ModConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
@@ -1025,6 +1026,25 @@ public class SoundAttractConfig {
             voiceChatWhisperRange = builder.comment("Voice chat whisper range").defineInRange("voiceChatWhisperRange", 4, 1, 64);
             voiceChatNormalRange = builder.comment("Voice chat normal range").defineInRange("voiceChatNormalRange", 32, 1, 128);
             voiceChatWeight = builder.comment("Voice chat weight").defineInRange("voiceChatWeight", 9.0, 0.0, 10.0);
+            voiceChatDbThresholdMap = builder.comment(
+                    "Mapping from normalized dB thresholds to range multipliers for SVC.",
+                    "Normalized dB is in [0..127], where 0 = silence and 127 = max peak (0 dBFS).",
+                    "Each entry format: 'threshold:multiplier'. Entries are evaluated from highest threshold to lowest.",
+                    "Defaults replicate the built-in behavior: >=50 -> 1.0, >=30 -> 0.7, >=10 -> 0.3.")
+                    .defineList("voiceChatDbThresholdMap",
+                            Arrays.asList("110:2.0", "90:1.8", "75:1.5", "50:1.0", "30:0.7", "10:0.3", "0:0.05"),
+                            obj -> {
+                                if (!(obj instanceof String s)) return false;
+                                String[] parts = s.split(":");
+                                if (parts.length != 2) return false;
+                                try {
+                                    Double.parseDouble(parts[0]);
+                                    Double.parseDouble(parts[1]);
+                                    return true;
+                                } catch (Exception e) {
+                                    return false;
+                                }
+                            });
             builder.pop();
 
             builder.comment("Muffling settings for different block types.").push("muffling");
