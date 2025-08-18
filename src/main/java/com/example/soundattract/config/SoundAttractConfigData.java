@@ -1140,8 +1140,14 @@ public class SoundAttractConfigData {
      */
     public double voiceChatWeight = 50.0;
 
-
-
+    /** 
+     * "Mapping from normalized dB thresholds to range multipliers for SVC.",
+     * "Normalized dB is in [0..127], where 0 = silence and 127 = max peak (0 dBFS).",
+     * "Each entry format: 'threshold:multiplier'. Entries are evaluated from highest threshold to lowest.",
+     * "Defaults replicate the built-in behavior: >=50 -> 1.0, >=30 -> 0.7, >=10 -> 0.3.")
+     */
+    public List<String> voiceChatDbThresholdMap = new ArrayList<>(List.of(
+    "110:2.0", "90:1.8", "75:1.5", "50:1.0", "30:0.7", "10:0.3", "0:0.05"));
 
     /**
      * If true, enables integration with Point Blank mod for custom gun sounds.
