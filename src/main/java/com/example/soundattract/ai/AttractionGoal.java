@@ -47,6 +47,8 @@ public class AttractionGoal extends Goal {
     private SoundTracker.SoundRecord cachedSound = null;
     private boolean isPursuingSound = false;
     private int pursuingSoundTicksRemaining = 0;
+    private int continueEvalCooldown = 0;
+    private BlockPos lastContinueEvalPos = null;
 
     private enum EdgeMobState {
         GOING_TO_SOUND, RETURNING_TO_LEADER
@@ -254,6 +256,7 @@ public class AttractionGoal extends Goal {
         this.targetSoundPos = newSound.pos;
         this.currentTargetWeight = newSound.weight;
         this.lastSoundTicksRemaining = newSound.ticksRemaining;
+        this.continueEvalCooldown = Math.max(1, scanCooldownTicks() / 2);
         return true;
     }
 
@@ -294,7 +297,12 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
+        SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(
+                mob,
+                mob.level(),
+                mob.blockPosition(),
+                mob.getEyePosition(),
+                this.cachedSound != null ? this.cachedSound.soundId : null);
         if (bestSoundNow == null) {
 
             return false;
@@ -302,7 +310,9 @@ public class AttractionGoal extends Goal {
 
         if (bestSoundNow.pos.equals(this.targetSoundPos)) {
             this.cachedSound = bestSoundNow;
+            this.currentTargetWeight = bestSoundNow.weight; // refresh to avoid stale high weight blocking switches
             this.lastSoundTicksRemaining = bestSoundNow.ticksRemaining;
+            this.continueEvalCooldown = Math.max(1, scanCooldownTicks() / 2);
             return true;
         }
 
@@ -356,7 +366,12 @@ public class AttractionGoal extends Goal {
         if (this.blockBreakerGoal != null && this.mob.goalSelector.getRunningGoals().anyMatch(g -> g.getGoal() == this.blockBreakerGoal)) {
 
 
-            SoundTracker.SoundRecord bestPossibleSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
+            SoundTracker.SoundRecord bestPossibleSound = SoundTracker.findNearestSound(
+                    this.mob,
+                    this.mob.level(),
+                    this.mob.blockPosition(),
+                    this.mob.getEyePosition(),
+                    this.cachedSound != null ? this.cachedSound.soundId : null);
 
 
             if (bestPossibleSound != null && this.cachedSound != null && !areSoundsEffectivelySame(bestPossibleSound, this.cachedSound)) {
@@ -387,23 +402,29 @@ public class AttractionGoal extends Goal {
         SoundTracker.SoundRecord fresh = findInterestingSoundRecord();
         double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
         if (fresh != null) {
-            boolean isBetterByWeight = fresh.weight > this.currentTargetWeight * switchRatio;
-            boolean isTieButCloser = false;
-            if (!isBetterByWeight && this.targetSoundPos != null && Math.abs(fresh.weight - this.currentTargetWeight) < 0.001) {
-                double freshDistSq = fresh.pos.distSqr(this.mob.blockPosition());
-                double currentDistSq = this.targetSoundPos.distSqr(this.mob.blockPosition());
-                isTieButCloser = freshDistSq < currentDistSq;
-            }
-            if (isBetterByWeight || isTieButCloser) {
-                this.targetSoundPos = fresh.pos;
+            // Refresh weight when staying on the same target to prevent stale high values from blocking switches
+            if (this.targetSoundPos != null && fresh.pos.equals(this.targetSoundPos)) {
                 this.cachedSound = fresh;
                 this.currentTargetWeight = fresh.weight;
-                this.hasPicked = false;
-                this.chosenDest = null;
-                this.edgeMobState = null;
-                this.foundPlayerOrHit = false;
-                this.relayedToLeader = false;
-                this.mob.getNavigation().stop();
+            } else {
+                boolean isBetterByWeight = fresh.weight > this.currentTargetWeight * switchRatio;
+                boolean isTieButCloser = false;
+                if (!isBetterByWeight && this.targetSoundPos != null && Math.abs(fresh.weight - this.currentTargetWeight) < 0.001) {
+                    double freshDistSq = fresh.pos.distSqr(this.mob.blockPosition());
+                    double currentDistSq = this.targetSoundPos.distSqr(this.mob.blockPosition());
+                    isTieButCloser = freshDistSq < currentDistSq;
+                }
+                if (isBetterByWeight || isTieButCloser) {
+                    this.targetSoundPos = fresh.pos;
+                    this.cachedSound = fresh;
+                    this.currentTargetWeight = fresh.weight;
+                    this.hasPicked = false;
+                    this.chosenDest = null;
+                    this.edgeMobState = null;
+                    this.foundPlayerOrHit = false;
+                    this.relayedToLeader = false;
+                    this.mob.getNavigation().stop();
+                }
             }
         }
         if (targetSoundPos == null) {
@@ -813,7 +834,8 @@ public class AttractionGoal extends Goal {
                     this.mob,
                     level,
                     mobPos,
-                    mobEyePos
+                    mobEyePos,
+                    this.cachedSound != null ? this.cachedSound.soundId : null
             );
         }
 

@@ -14,7 +14,9 @@ import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.config.SoundAttractConfig;
- 
+import com.example.soundattract.worker.WorkerScheduler;
+import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
+
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -156,6 +158,18 @@ public class SoundAttractionEvents {
             com.example.soundattract.DynamicScanCooldownManager.update(currentTime, mobCountForCooldownManager);
             SoundTracker.tick();
             BlockBreakerManager.processPendingActions();
+            try {
+                List<GroupComputeResult> results = WorkerScheduler.drainGroupResults();
+                if (!results.isEmpty()) {
+                    for (GroupComputeResult r : results) {
+                        com.example.soundattract.ai.MobGroupManager.applyGroupResult(serverLevel, r);
+                    }
+                }
+            } catch (Throwable t) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.error("[SoundAttractionEvents] Applying group results failed", t);
+                }
+            }
             if (!PENDING_GOAL_ADDITIONS.isEmpty()) {
                 Iterator<Map.Entry<Mob, List<GoalDefinition>>> iterator = PENDING_GOAL_ADDITIONS.entrySet().iterator();
                 while (iterator.hasNext()) {

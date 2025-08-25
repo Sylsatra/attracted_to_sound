@@ -134,6 +134,12 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue soundNoveltyBonusWeight;
         public final ForgeConfigSpec.IntValue soundNoveltyTimeTicks;
 
+        public final ForgeConfigSpec.IntValue soundScoringSubmitCooldownTicks;
+        public final ForgeConfigSpec.IntValue asyncResultTtlTicks;
+
+        public final ForgeConfigSpec.IntValue raycastCacheTtlTicks;
+        public final ForgeConfigSpec.IntValue raycastCacheMaxEntries;
+
 
         public final ForgeConfigSpec.IntValue maxGroupSize;
         public final ForgeConfigSpec.DoubleValue leaderGroupRadius;
@@ -142,6 +148,9 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue numEdgeSectors;
         public final ForgeConfigSpec.IntValue groupUpdateInterval;
         public final ForgeConfigSpec.IntValue maxLeaders;
+
+        public final ForgeConfigSpec.IntValue workerThreads;
+        public final ForgeConfigSpec.IntValue workerTaskBudgetMs;
 
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
@@ -265,6 +274,12 @@ public class SoundAttractConfig {
                     .define("debugLogging", false);
             enableRaycastCache = builder.comment("Enable caching for raycast results to improve performance. Disable if experiencing issues with sound obstruction detection.")
                     .define("enableRaycastCache", true);
+            raycastCacheTtlTicks = builder.comment(
+                            "Time-to-live (in ticks) for raycast cache entries before they are considered expired.")
+                    .defineInRange("raycastCacheTtlTicks", 200, 1, 1000000);
+            raycastCacheMaxEntries = builder.comment(
+                            "Maximum number of entries stored in the raycast cache. Oldest entries are evicted when exceeded.")
+                    .defineInRange("raycastCacheMaxEntries", 5000, 100, 1000000);
             edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
                     .define("edgeMobSmartBehavior", false);
             soundLifetimeTicks = builder.comment("How long a sound event remains 'interesting' to a mob, in ticks (20 ticks = 1 second).")
@@ -292,12 +307,15 @@ public class SoundAttractConfig {
                     .defineInRange("leaderGroupRadius", 64.0, 1.0, 128.0);
             groupDistance = builder.comment("Maximum distance (in blocks) for mobs to consider themselves part of a group for group behaviors. Used in AI such as FollowLeaderGoal.")
                     .defineInRange("groupDistance", 128.0, 1.0, 128.0);
-            soundSwitchRatio = builder.comment("Minimum ratio for a new sound's weight to overcome an existing target sound's weight for a mob to switch targets (e.g., 1.2 means new sound must be 20% 'heavier').")
-                    .defineInRange("soundSwitchRatio", 0.7, 1.0, 5.0);
+            soundSwitchRatio = builder.comment(
+                            "Switching threshold factor (0.0–1.0]. A mob will switch if newWeight > currentWeight × soundSwitchRatio.",
+                            "Example: 0.5 means a new sound beating 70% of the current weight will trigger a switch (more eager switching).",
+                            "Set closer to 1.0 for conservative switching; closer to 0.0 for very eager switching.")
+                    .defineInRange("soundSwitchRatio", 0.5, 0.0, 1.0);
             soundNoveltyBonusWeight = builder.comment("A small weight bonus given to very new sounds to make mobs more likely to switch to them.",
                     "This helps break ties and makes mobs seem more 'alert' to new threats.",
                     "Set to 0.0 to disable.")
-                    .defineInRange("soundNoveltyBonusWeight", 0.5, 0.0, 10.0);
+                    .defineInRange("soundNoveltyBonusWeight", 9.5, 0.0, 10.0);
             soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
                     "20 ticks = 1 second.")
                     .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
@@ -309,6 +327,23 @@ public class SoundAttractConfig {
                     .defineInRange("groupUpdateInterval", 200, 1, 200);
             maxLeaders = builder.comment("Maximum number of group leaders tracked for AI grouping. Default: 16")
                     .defineInRange("maxLeaders", 16, 1, 64);
+
+            workerThreads = builder.comment(
+                            "Number of background worker threads used for off-thread computations (e.g., group building).",
+                            "Increase for large servers; decrease if you observe contention."
+                    )
+                    .defineInRange("workerThreads", 2, 1, 64);
+            workerTaskBudgetMs = builder.comment(
+                            "Soft per-task time budget in milliseconds for worker computations before yielding.",
+                            "Higher values allow more work per batch but can increase latency to apply results."
+                    )
+                    .defineInRange("workerTaskBudgetMs", 10, 1, 1000);
+            soundScoringSubmitCooldownTicks = builder.comment(
+                            "Cooldown (in ticks) per mob between async sound scoring submissions when candidates/target are unchanged.")
+                    .defineInRange("soundScoringSubmitCooldownTicks", 1, 0, 10000);
+            asyncResultTtlTicks = builder.comment(
+                            "Time-to-live (in ticks) for cached async sound scoring results before considered stale.")
+                    .defineInRange("asyncResultTtlTicks", 10, 1, 10000);
             builder.pop();
 
             builder.push("Enchanced AI Integration");

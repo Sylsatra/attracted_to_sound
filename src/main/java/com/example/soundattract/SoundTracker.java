@@ -14,6 +14,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.config.SoundOverride;
+import com.example.soundattract.worker.WorkerScheduler;
+import com.example.soundattract.worker.WorkerScheduler.SoundCandidate;
+import com.example.soundattract.worker.WorkerScheduler.SoundScoreRequest;
+import com.example.soundattract.worker.WorkerScheduler.SoundScoreResult;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -288,11 +292,13 @@ public class SoundTracker {
         public final BlockPos mobPos;
         public final BlockPos soundPos;
         public final String soundId;
+        public final String dimensionKey;
 
-        public RaycastCacheKey(BlockPos mobPos, BlockPos soundPos, String soundId) {
+        public RaycastCacheKey(BlockPos mobPos, BlockPos soundPos, String soundId, String dimensionKey) {
             this.mobPos = mobPos;
             this.soundPos = soundPos;
             this.soundId = soundId;
+            this.dimensionKey = dimensionKey;
         }
 
         @Override
@@ -300,28 +306,78 @@ public class SoundTracker {
             if (!(o instanceof RaycastCacheKey other)) {
                 return false;
             }
-            return mobPos.equals(other.mobPos) && soundPos.equals(other.soundPos) && soundId.equals(other.soundId);
+            return mobPos.equals(other.mobPos)
+                && soundPos.equals(other.soundPos)
+                && soundId.equals(other.soundId)
+                && dimensionKey.equals(other.dimensionKey);
         }
 
         @Override
         public int hashCode() {
-            return mobPos.hashCode() ^ soundPos.hashCode() ^ soundId.hashCode();
+            return mobPos.hashCode() ^ soundPos.hashCode() ^ soundId.hashCode() ^ dimensionKey.hashCode();
         }
     }
-    private static final Map<RaycastCacheKey, double[]> RAYCAST_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final class RaycastEntry {
+        final double[] result;
+        final long gameTime;
+        RaycastEntry(double[] result, long gameTime) {
+            this.result = result;
+            this.gameTime = gameTime;
+        }
+    }
+    private static final Map<RaycastCacheKey, RaycastEntry> RAYCAST_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     private static final double NO_MUFFLING_RANGE = 1.0;
     private static final double NO_MUFFLING_WEIGHT = 1.0;
+
+    private static final java.util.concurrent.ConcurrentHashMap<UUID, String> ASYNC_BEST_SOUND_BY_MOB = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<UUID, Long> ASYNC_RESULT_GAME_TIME = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<UUID, Long> LAST_SUBMIT_GAME_TIME = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<UUID, Integer> LAST_CANDIDATE_HASH = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static void drainAsyncSoundScores(Level level) {
+        try {
+            List<SoundScoreResult> results = WorkerScheduler.drainSoundScoreResults();
+            if (results == null || results.isEmpty()) return;
+            long nowGameTime = level == null ? 0L : level.getGameTime();
+            for (SoundScoreResult r : results) {
+                if (r == null || r.mobUuid() == null) continue;
+                if (r.soundId() != null) {
+                    ASYNC_BEST_SOUND_BY_MOB.put(r.mobUuid(), r.soundId());
+                    ASYNC_RESULT_GAME_TIME.put(r.mobUuid(), nowGameTime);
+                }
+            }
+        } catch (Throwable t) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.error("[SoundTracker] drainAsyncSoundScores failed", t);
+            }
+        }
+    }
 
     public static double[] applyBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
         if (!SoundAttractConfig.COMMON.enableBlockMuffling.get()) {
             return new double[]{origRange, origWeight};
         }
 
-        RaycastCacheKey cacheKey = new RaycastCacheKey(dst, src, soundId);
-        double[] cachedResult = RAYCAST_CACHE.get(cacheKey);
-        if (cachedResult != null) {
-            return cachedResult;
+        RaycastCacheKey cacheKey = new RaycastCacheKey(
+            dst,
+            src,
+            soundId,
+            level.dimension().location().toString()
+        );
+        boolean useCache = SoundAttractConfig.COMMON.enableRaycastCache.get();
+        long raycastTtl = SoundAttractConfig.COMMON.raycastCacheTtlTicks.get();
+        int raycastMax = SoundAttractConfig.COMMON.raycastCacheMaxEntries.get();
+        if (useCache) {
+            RaycastEntry existing = RAYCAST_CACHE.get(cacheKey);
+            if (existing != null) {
+                long age = level.getGameTime() - existing.gameTime;
+                if (age <= raycastTtl) {
+                    return existing.result;
+                } else {
+                    RAYCAST_CACHE.remove(cacheKey);
+                }
+            }
         }
 
         double currentRange = origRange;
@@ -380,7 +436,21 @@ public class SoundTracker {
         }
 
         double[] finalResult = new double[]{Math.max(0, currentRange), Math.max(0, currentWeight)};
-        RAYCAST_CACHE.put(cacheKey, finalResult);
+        if (useCache) {
+            RAYCAST_CACHE.put(cacheKey, new RaycastEntry(finalResult, level.getGameTime()));
+            if (RAYCAST_CACHE.size() > raycastMax) {
+                long now = level.getGameTime();
+                RAYCAST_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime) > raycastTtl);
+                if (RAYCAST_CACHE.size() > raycastMax) {
+                    int toRemove = RAYCAST_CACHE.size() - raycastMax;
+                    java.util.List<java.util.Map.Entry<RaycastCacheKey, RaycastEntry>> list = new java.util.ArrayList<>(RAYCAST_CACHE.entrySet());
+                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime));
+                    for (int i = 0; i < toRemove && i < list.size(); i++) {
+                        RAYCAST_CACHE.remove(list.get(i).getKey());
+                    }
+                }
+            }
+        }
         return finalResult;
     }
 
@@ -491,8 +561,13 @@ public class SoundTracker {
     }
 
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos) {
+        return findNearestSound(mob, level, mobPos, mobEyePos, null);
+    }
+
+    public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos, String currentTargetSoundId) {
         readLock.lock();
         try {
+            drainAsyncSoundScores(level);
             String dimensionKey = level.dimension().location().toString();
             List<SoundRecord> nearbySounds = getNearbySounds(dimensionKey, mobPos);
             if (nearbySounds.isEmpty()) {
@@ -507,6 +582,9 @@ public class SoundTracker {
             double noveltyBonusValue = SoundAttractConfig.COMMON.soundNoveltyBonusWeight.get();
             int noveltyTicks = SoundAttractConfig.COMMON.soundNoveltyTimeTicks.get();
             int maxLifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
+
+            List<SoundCandidate> asyncCandidates = new ArrayList<>();
+            Map<String, SoundRecord> candidateRecordById = new HashMap<>();
 
             for (SoundRecord r : nearbySounds) {
                 if (r == null || r.pos == null) {
@@ -567,13 +645,115 @@ public class SoundTracker {
                     closestDistSqr = distSqr;
                     bestSound = r;
                     bestSoundEffectiveRange = muffledRange;
-                    bestSoundEffectiveWeight = muffledWeight;
+                    bestSoundEffectiveWeight = finalComparisonWeight;
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info(
                             "[findNearest] candidate now best {}: effRange={}, effWeight={}, compWeight={}, distSqr={}",
                             rl, bestSoundEffectiveRange, bestSoundEffectiveWeight, finalComparisonWeight, distSqr
                         );
                     }
+                }
+
+                if (soundIdStr != null) {
+                    long ageTicks = Math.max(0L, maxLifetime - r.ticksRemaining);
+                    long occurredAt = Math.max(0L, level.getGameTime() - ageTicks);
+                    SoundCandidate cand = new SoundCandidate(
+                        soundIdStr,
+                        r.pos.getX() + 0.5, r.pos.getY() + 0.5, r.pos.getZ() + 0.5,
+                        occurredAt,
+                        muffledRange,
+                        muffledWeight,
+                        1.0
+                    );
+                    asyncCandidates.add(cand);
+                    SoundRecord newRec = new SoundRecord(r.sound, r.soundId, r.pos, r.ticksRemaining, r.dimensionKey, muffledRange, muffledWeight + noveltyBonus);
+                    SoundRecord prev = candidateRecordById.get(soundIdStr);
+                    if (prev == null) {
+                        candidateRecordById.put(soundIdStr, newRec);
+                    } else {
+                        boolean better = newRec.weight > prev.weight;
+                        if (!better && Math.abs(newRec.weight - prev.weight) < 1e-6) {
+                            double newDistSq = newRec.pos.distSqr(mobPos);
+                            double prevDistSq = prev.pos.distSqr(mobPos);
+                            better = newDistSq < prevDistSq;
+                        }
+                        if (better) {
+                            candidateRecordById.put(soundIdStr, newRec);
+                        }
+                    }
+                }
+            }
+            int candidateHash = 1;
+            for (SoundCandidate c : asyncCandidates) {
+                int h = 17;
+                h = 31 * h + (c.soundId == null ? 0 : c.soundId.hashCode());
+                h = 31 * h + (int) Math.round(c.x * 10);
+                h = 31 * h + (int) Math.round(c.z * 10);
+                h = 31 * h + (int) Math.round(c.range * 100);
+                h = 31 * h + (int) Math.round(c.weight * 100);
+                candidateHash = 31 * candidateHash + h;
+            }
+            if (currentTargetSoundId != null) {
+                candidateHash = 31 * candidateHash + currentTargetSoundId.hashCode();
+            }
+
+            try {
+                if (!asyncCandidates.isEmpty()) {
+                    long now = level.getGameTime();
+                    Long lastSubmit = LAST_SUBMIT_GAME_TIME.get(mob.getUUID());
+                    Integer lastHash = LAST_CANDIDATE_HASH.get(mob.getUUID());
+                    Long lastAsyncWhen = ASYNC_RESULT_GAME_TIME.get(mob.getUUID());
+                    long asyncTtl = SoundAttractConfig.COMMON.asyncResultTtlTicks.get();
+                    long submitCooldown = SoundAttractConfig.COMMON.soundScoringSubmitCooldownTicks.get();
+                    boolean hasFreshAsync = lastAsyncWhen != null && (now - lastAsyncWhen) <= asyncTtl;
+                    boolean withinCooldown = lastSubmit != null && (now - lastSubmit) < submitCooldown;
+                    boolean unchanged = lastHash != null && lastHash.intValue() == candidateHash;
+                    if (withinCooldown && hasFreshAsync && unchanged) {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.debug("[findNearest] skip submit for {} due to cooldown; last={} now={} hashUnchanged",
+                                    mob.getUUID(), lastSubmit, now);
+                        }
+                    } else {
+                    double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
+                    List<SoundScoreRequest> batch = java.util.Collections.singletonList(
+                        new SoundScoreRequest(
+                            mob.getUUID(),
+                            mobPos.getX() + 0.5, mobPos.getY() + 0.5, mobPos.getZ() + 0.5,
+                            level.getGameTime(),
+                            currentTargetSoundId,
+                            asyncCandidates,
+                            switchRatio,
+                            noveltyBonusValue,
+                            noveltyTicks
+                        )
+                    );
+                    WorkerScheduler.submitSoundScore(batch);
+                        LAST_SUBMIT_GAME_TIME.put(mob.getUUID(), now);
+                        LAST_CANDIDATE_HASH.put(mob.getUUID(), candidateHash);
+                    }
+                }
+            } catch (Throwable t) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.error("[findNearest] submitSoundScore failed", t);
+                }
+            }
+
+            try {
+                String asyncBestId = ASYNC_BEST_SOUND_BY_MOB.get(mob.getUUID());
+                Long when = ASYNC_RESULT_GAME_TIME.get(mob.getUUID());
+                long asyncTtl2 = SoundAttractConfig.COMMON.asyncResultTtlTicks.get();
+                if (asyncBestId != null && when != null && (level.getGameTime() - when) <= asyncTtl2) {
+                    SoundRecord asyncPick = candidateRecordById.get(asyncBestId);
+                    if (asyncPick != null) {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info("[findNearest] using async-picked sound {} at {}", asyncBestId, asyncPick.pos);
+                        }
+                        return asyncPick;
+                    }
+                }
+            } catch (Throwable t) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.error("[findNearest] reading async result failed, falling back to sync", t);
                 }
             }
             if (bestSound != null) {

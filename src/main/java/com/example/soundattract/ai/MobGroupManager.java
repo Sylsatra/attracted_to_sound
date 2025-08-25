@@ -8,6 +8,10 @@ import java.util.*;
 import net.minecraft.resources.ResourceLocation;
 import com.example.soundattract.SoundAttractMod;
 import java.lang.ref.WeakReference;
+import com.example.soundattract.worker.WorkerScheduler;
+import com.example.soundattract.worker.WorkerScheduler.MobSnapshot;
+import com.example.soundattract.worker.WorkerScheduler.ConfigSnapshot;
+import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 
 public class MobGroupManager {
     private static final Map<UUID, Mob> uuidToLeader = Collections.synchronizedMap(new HashMap<>());
@@ -33,6 +37,7 @@ public class MobGroupManager {
             this.x = x; this.y = y; this.z = z; this.range = range; this.weight = weight; this.timestamp = timestamp;
             this.hash = Objects.hash(soundId, (int)x, (int)y, (int)z, (int)range, (int)(weight*100));
         }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -45,6 +50,101 @@ public class MobGroupManager {
         }
         @Override
         public int hashCode() { return hash; }
+    }
+
+    private static boolean submitGroupComputeSnapshot(ServerLevel level) {
+        try {
+            Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
+            if (attractedEntityTypes == null || attractedEntityTypes.isEmpty()) return false;
+
+            int simDistChunks = level.getServer().getPlayerList().getViewDistance();
+            int simDistBlocks = simDistChunks * 16;
+            Set<Mob> mobsSet = new HashSet<>();
+            for (net.minecraft.server.level.ServerPlayer player : level.players()) {
+                AABB box = player.getBoundingBox().inflate(simDistBlocks);
+                List<Mob> nearbyMobs = level.getEntitiesOfClass(Mob.class, box,
+                        m -> m.isAlive() && !m.isRemoved() && (attractedEntityTypes.contains(m.getType()) || com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(m) != null));
+                mobsSet.addAll(nearbyMobs);
+            }
+            if (mobsSet.isEmpty()) return false;
+
+            List<MobSnapshot> snapshots = new ArrayList<>(mobsSet.size());
+            for (Mob m : mobsSet) {
+                snapshots.add(new MobSnapshot(m.getUUID(), m.getX(), m.getY(), m.getZ(), m.getHealth(), m.isAlive()));
+            }
+            ConfigSnapshot cfg = new ConfigSnapshot(
+                    SoundAttractConfig.COMMON.leaderGroupRadius.get(),
+                    SoundAttractConfig.COMMON.maxLeaders.get(),
+                    SoundAttractConfig.COMMON.maxGroupSize.get(),
+                    SoundAttractConfig.COMMON.leaderSpacingMultiplier.get(),
+                    SoundAttractConfig.COMMON.numEdgeSectors.get()
+            );
+
+            WorkerScheduler.submitGroupCompute(snapshots, cfg);
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[MobGroupManager] Submitted async group compute for {} mobs", snapshots.size());
+            }
+            return true;
+        } catch (Throwable t) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.error("[MobGroupManager] submitGroupComputeSnapshot failed", t);
+            }
+            return false;
+        }
+    }
+
+    public static void applyGroupResult(ServerLevel level, GroupComputeResult result) {
+        if (result == null) return;
+        Map<UUID, Mob> uuidToMob = new HashMap<>();
+        int simDistBlocks = level.getServer().getPlayerList().getViewDistance() * 16;
+        for (net.minecraft.server.level.ServerPlayer player : level.players()) {
+            AABB area = player.getBoundingBox().inflate(simDistBlocks);
+            for (Mob m : level.getEntitiesOfClass(Mob.class, area)) {
+                uuidToMob.put(m.getUUID(), m);
+            }
+        }
+
+        uuidToLeader.clear();
+        leaders.clear();
+        deserterUuids.clear();
+        lastEdgeMobMap.clear();
+
+        Set<UUID> leaderUuids = new HashSet<>();
+        for (Map.Entry<UUID, UUID> e : result.mobUuidToLeaderUuid().entrySet()) {
+            UUID mobId = e.getKey();
+            UUID leaderId = e.getValue();
+            Mob mob = uuidToMob.get(mobId);
+            Mob leader = uuidToMob.get(leaderId);
+            if (mob == null || leader == null) continue;
+            uuidToLeader.put(mob.getUUID(), leader);
+            if (leaderId.equals(mobId)) {
+                leaderUuids.add(leaderId);
+            }
+        }
+        for (UUID lid : leaderUuids) {
+            Mob leader = uuidToMob.get(lid);
+            if (leader != null) {
+                leaders.add(new WeakReference<>(leader));
+            }
+        }
+
+        for (Map.Entry<UUID, java.util.Set<UUID>> e : result.edgeMobsByLeaderUuid().entrySet()) {
+            UUID lid = e.getKey();
+            Mob leader = uuidToMob.get(lid);
+            if (leader == null) continue;
+            Set<Mob> edges = new HashSet<>();
+            for (UUID mid : e.getValue()) {
+                Mob mm = uuidToMob.get(mid);
+                if (mm != null) edges.add(mm);
+            }
+            lastEdgeMobMap.put(leader, edges);
+        }
+
+        deserterUuids.addAll(result.deserterUuids());
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[MobGroupManager] Applied group result: leaders={}, deserters={}", leaderUuids.size(), deserterUuids.size());
+        }
     }
 
     public static boolean isEdgeMob(Mob mob) {
@@ -104,6 +204,10 @@ public class MobGroupManager {
         if (scanCooldown > 0 && (lastCleanupTime == -1 || time - lastCleanupTime > 10L * scanCooldown)) {
             cleanupStaleEntries(level);
             lastCleanupTime = time;
+        }
+
+        if (submitGroupComputeSnapshot(level)) {
+            return;
         }
 
         Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
