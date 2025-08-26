@@ -33,6 +33,7 @@ public class SoundAttractMod {
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::clientSetup);
         modEventBus.addListener(this::onConfigLoad);
+        modEventBus.addListener(this::onConfigReload);
         ModLootModifiers.register(modEventBus);
         modEventBus.addListener(this::registerPacketHandlers);
 
@@ -44,7 +45,6 @@ public class SoundAttractMod {
         NeoForge.EVENT_BUS.register(new SoundAttractionEvents());
         NeoForge.EVENT_BUS.register(VanillaIntegrationEvents.class);
         com.example.soundattract.integration.TaczIntegration.register();
-
 
         NeoForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
 
@@ -62,6 +62,14 @@ public class SoundAttractMod {
             SoundAttractConfig.bakeConfig();
         }
     }
+
+    private void onConfigReload(final ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
+            LOGGER.info("Re-baking SoundAttractMod config values due to config reload.");
+            SoundAttractConfig.bakeConfig();
+        }
+    }
+
     private void clientSetup(final FMLClientSetupEvent event) {
         if (ModList.get().isLoaded("voicechat")) {
             LOGGER.info("[SoundAttractMod] VoiceChat mod is loaded. Integration is active.");

@@ -135,38 +135,49 @@ public class FovEvents {
 
     /**
      * Custom LOS that ignores blocks listed in SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.
-     * Falls back to vanilla LOS if anything unexpected occurs.
+     * Uses precise ray casting against block collision shapes so partial blocks (slabs, stairs, fences)
+     * only occlude when actually intersected. Falls back to vanilla LOS on error.
      */
     private static boolean hasLineOfSightAllowlist(Mob looker, Entity target) {
         try {
             Level level = looker.level();
             Vec3 start = looker.getEyePosition();
             Vec3 end = target.getEyePosition();
-            Vec3 delta = end.subtract(start);
-            double distance = delta.length();
-            if (distance <= 0.001) return true;
 
-            int steps = Math.max(1, (int) Math.ceil(distance * 3.0));
-            Vec3 step = delta.scale(1.0 / steps);
-            Vec3 curr = start;
 
-            for (int i = 0; i <= steps; i++) {
-                BlockPos pos = BlockPos.containing(curr);
-                BlockState state = level.getBlockState(pos);
-                if (!state.isAir()) {
-                    ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
-                    if (blockId == null || !SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.contains(blockId)) {
-
-                        if (!state.getCollisionShape(level, pos).isEmpty()) {
-                            return false;
-                        }
-                    }
+            for (int i = 0; i < 64; i++) {
+                net.minecraft.world.level.ClipContext ctx = new net.minecraft.world.level.ClipContext(
+                        start, end,
+                        net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                        net.minecraft.world.level.ClipContext.Fluid.NONE,
+                        looker
+                );
+                net.minecraft.world.phys.HitResult hit = level.clip(ctx);
+                if (hit == null || hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS) {
+                    return true;
                 }
-                curr = curr.add(step);
+
+                if (hit instanceof net.minecraft.world.phys.BlockHitResult bhr) {
+                    BlockPos pos = bhr.getBlockPos();
+                    BlockState state = level.getBlockState(pos);
+                    ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+                    boolean passThrough = blockId != null && SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.contains(blockId);
+                    if (passThrough) {
+
+                        Vec3 hp = bhr.getLocation();
+                        Vec3 nudge = new Vec3(bhr.getDirection().getStepX(), bhr.getDirection().getStepY(), bhr.getDirection().getStepZ()).scale(1.0e-4);
+                        start = hp.add(nudge);
+                        if (start.distanceTo(end) < 1.0e-4) return true;
+                        continue;
+                    }
+                    return false;
+                }
+
+
+                return true;
             }
             return true;
         } catch (Exception e) {
-
             try { return looker.getSensing().hasLineOfSight(target); } catch (Exception ignored) {}
             return true;
         }

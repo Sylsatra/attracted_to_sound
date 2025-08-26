@@ -429,6 +429,25 @@ public class StealthDetectionEvents {
         baseRange *= lightFactor;
         if (SoundAttractConfig.COMMON.debugLogging.get()) SoundAttractMod.LOGGER.info("[GRSDR] Light Level: {}, Factor: {}, Range -> {}", effectiveLight, String.format("%.2f", lightFactor), String.format("%.2f", baseRange));
     
+        if (SoundAttractConfig.COMMON.enableHeldItemPenalty.get()) {
+            int heldItemCount = 0;
+            if (!player.getMainHandItem().isEmpty()) heldItemCount++;
+            if (!player.getOffhandItem().isEmpty()) heldItemCount++;
+            if (heldItemCount > 0) {
+                double penaltyPerItem = SoundAttractConfig.COMMON.heldItemPenaltyFactor.get();
+                for (int i = 0; i < heldItemCount; i++) {
+                    baseRange *= penaltyPerItem;
+                }
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[GRSDR] Held Item Penalty: {} items, factor {} (applied {} times) -> {}",
+                            heldItemCount,
+                            String.format("%.2f", penaltyPerItem),
+                            heldItemCount,
+                            String.format("%.2f", baseRange));
+                }
+            }
+        }
+
         if (SoundAttractConfig.COMMON.enableEnchantmentPenalty.get()) {
             int enchantedArmorCount = 0;
             for (ItemStack armorStack : player.getArmorSlots()) if (!armorStack.isEmpty() && armorStack.isEnchanted() && !hasConcealmentEnchant(armorStack)) enchantedArmorCount++;

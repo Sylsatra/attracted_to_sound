@@ -101,9 +101,12 @@ public class SoundAttractConfig {
     }
 
     public static class Common {
-    // --- General Settings ---
+
     public final ModConfigSpec.BooleanValue debugLogging;
     public final ModConfigSpec.BooleanValue enableRaycastCache;
+    public final ModConfigSpec.IntValue raycastCacheTtlTicks;
+    public final ModConfigSpec.IntValue raycastCacheMaxEntries;
+    public final ModConfigSpec.IntValue raycastCacheCleanupIntervalTicks;
     public final ModConfigSpec.BooleanValue edgeMobSmartBehavior;
     public final ModConfigSpec.IntValue soundLifetimeTicks;
     public final ModConfigSpec.IntValue scanCooldownTicks;
@@ -115,8 +118,13 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue soundSwitchRatio;
     public final ModConfigSpec.DoubleValue soundNoveltyBonusWeight;
     public final ModConfigSpec.IntValue soundNoveltyTimeTicks;
+    public final ModConfigSpec.DoubleValue largeSoundRangeThreshold;
 
-    // --- Group AI Settings ---
+    public final ModConfigSpec.BooleanValue enableTaskQueue;
+    public final ModConfigSpec.IntValue maxSoundEvalsPerTick;
+    public final ModConfigSpec.IntValue resultFreshnessTicks;
+
+
     public final ModConfigSpec.IntValue maxGroupSize;
     public final ModConfigSpec.DoubleValue leaderGroupRadius;
     public final ModConfigSpec.DoubleValue groupDistance;
@@ -125,17 +133,17 @@ public class SoundAttractConfig {
     public final ModConfigSpec.IntValue groupUpdateInterval;
     public final ModConfigSpec.IntValue maxLeaders;
 
-    // --- Mob Interaction ---
+
     public final ModConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
     public final ModConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
 
-    // --- Sound Properties ---
+
     public final ModConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
     public final ModConfigSpec.ConfigValue<List<? extends String>> rawSoundDefaults;
     public final ModConfigSpec.DoubleValue minSoundLevelForPlayer;
     public final ModConfigSpec.DoubleValue minSoundLevelForMob;
 
-    // --- Block Muffling ---
+
     public final ModConfigSpec.BooleanValue enableBlockMuffling;
     public final ModConfigSpec.IntValue maxMufflingBlocksToCheck;
     public final ModConfigSpec.DoubleValue mufflingFactorWool;
@@ -152,20 +160,20 @@ public class SoundAttractConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> customAirBlocks;
     public final ModConfigSpec.ConfigValue<List<? extends String>> visionPassThroughBlocks;
 
-    // --- Stealth Mechanics - General ---
+
     public final ModConfigSpec.BooleanValue enableStealthMechanics;
     public final ModConfigSpec.IntValue stealthCheckInterval;
     public final ModConfigSpec.IntValue stealthGracePeriodTicks;
     public final ModConfigSpec.DoubleValue minStealthDetectionRange;
     public final ModConfigSpec.DoubleValue maxStealthDetectionRange; 
     
-    // --- Stealth Mechanics - Player Stance Ranges ---
+
     public final ModConfigSpec.DoubleValue standingDetectionRangePlayer;
     public final ModConfigSpec.DoubleValue sneakingDetectionRangePlayer;
     public final ModConfigSpec.DoubleValue crawlingDetectionRangePlayer;
 
 
-    // --- Stealth Mechanics - Environmental Factors (Light, Weather) ---
+
     public final ModConfigSpec.IntValue neutralLightLevel;
     public final ModConfigSpec.DoubleValue lightLevelSensitivity;
     public final ModConfigSpec.DoubleValue minLightFactor;
@@ -175,20 +183,20 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue rainStealthFactor;
     public final ModConfigSpec.DoubleValue thunderStealthFactor;
 
-    // --- Stealth Mechanics - Player Actions (Movement, Invisibility) ---
+
     public final ModConfigSpec.DoubleValue movementStealthPenalty;
     public final ModConfigSpec.DoubleValue stationaryStealthBonusFactor;
     public final ModConfigSpec.DoubleValue movementThreshold;
     public final ModConfigSpec.DoubleValue invisibilityStealthFactor;
 
-    // --- Stealth Mechanics - Camouflage System ---
+
     public final ModConfigSpec.BooleanValue enableCamouflage;
     public final ModConfigSpec.BooleanValue enableHeldItemPenalty;
     public final ModConfigSpec.DoubleValue heldItemPenaltyFactor;
     public final ModConfigSpec.BooleanValue enableEnchantmentPenalty;
     public final ModConfigSpec.DoubleValue armorEnchantmentPenaltyFactor;
     public final ModConfigSpec.DoubleValue heldItemEnchantmentPenaltyFactor;
-    // Item Camouflage
+
     public final ModConfigSpec.ConfigValue<List<? extends String>> camouflageArmorItems;
     public final ModConfigSpec.BooleanValue requireFullSetForCamouflageBonus;
     public final ModConfigSpec.DoubleValue fullArmorStealthBonus;
@@ -198,7 +206,7 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue bootsCamouflageEffectiveness;
     public final ModConfigSpec.DoubleValue maxCamouflageEffectivenessCap;
     public final ModConfigSpec.BooleanValue allowPartialBonusIfFullSetRequired;
-    // Environmental Camouflage
+
     public final ModConfigSpec.BooleanValue enableEnvironmentalCamouflage;
     public final ModConfigSpec.DoubleValue environmentalCamouflageMaxEffectiveness;
     public final ModConfigSpec.IntValue environmentalCamouflageColorMatchThreshold;
@@ -211,7 +219,7 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue environmentalMismatchPenaltyFactor;
     public final ModConfigSpec.IntValue environmentalMismatchThreshold;
 
-    // --- TACZ Integration ---
+
     public final ModConfigSpec.BooleanValue enableTaczIntegration;
     public final ModConfigSpec.DoubleValue taczReloadRange;
     public final ModConfigSpec.DoubleValue taczReloadWeight;
@@ -224,18 +232,18 @@ public class SoundAttractConfig {
     public final ModConfigSpec.IntValue gunshotDetectionDurationTicks;
     public final ModConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;    
 
-    // --- Simple VC Integration ---
+
     public final ModConfigSpec.BooleanValue enableVoiceChatIntegration;
     public final ModConfigSpec.IntValue voiceChatWhisperRange;
     public final ModConfigSpec.IntValue voiceChatNormalRange;
     public final ModConfigSpec.DoubleValue voiceChatWeight;
     public final ModConfigSpec.ConfigValue<List<? extends String>> voiceChatDbThresholdMap;
 
-    // --- FOV ---
+
     public final ModConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
     public final ModConfigSpec.ConfigValue<List<? extends String>> fovExclusionList; 
 
-    // --- Block Breaking ---
+
     public final ModConfigSpec.BooleanValue enableBlockBreaking;
     public final ModConfigSpec.DoubleValue blockBreakTimeMultiplier;
     public final ModConfigSpec.BooleanValue blockBreakToolOnly;
@@ -253,6 +261,12 @@ public class SoundAttractConfig {
                                 .define("debugLogging", false);
             enableRaycastCache = builder.comment("Enable caching for raycast results to improve performance. Disable if experiencing issues with sound obstruction detection.")
                                 .define("enableRaycastCache", true);
+            raycastCacheTtlTicks = builder.comment("Time-to-live (in ticks) for entries in the raycast cache. Older entries are evicted during periodic cleanup.")
+                                .defineInRange("raycastCacheTtlTicks", 600, 1, 1000000);
+            raycastCacheMaxEntries = builder.comment("Maximum number of entries to keep in the raycast cache. When exceeded, oldest entries are evicted.")
+                                .defineInRange("raycastCacheMaxEntries", 5000, 100, 2000000);
+            raycastCacheCleanupIntervalTicks = builder.comment("Interval (in ticks) at which the raycast cache performs cleanup and eviction.")
+                                .defineInRange("raycastCacheCleanupIntervalTicks", 200, 1, 1000000);
             edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
                                 .define("edgeMobSmartBehavior", false);
             soundLifetimeTicks = builder.comment("How long a sound event remains 'interesting' to a mob, in ticks (20 ticks = 1 second).")
@@ -269,18 +283,29 @@ public class SoundAttractConfig {
                                 .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                                 .defineInRange("maxSoundsTracked", 10, 1, 1000000);
+            largeSoundRangeThreshold = builder.comment("Range threshold above which sounds are treated as 'large range' and checked across the whole dimension cache.")
+                                .defineInRange("largeSoundRangeThreshold", 64.0, 1.0, 2048.0);
+            enableTaskQueue = builder.comment("Enable server-thread task queue to process sound evaluations with a per-tick budget (safer than multi-threading).")
+                                .define("enableTaskQueue", true);
+            maxSoundEvalsPerTick = builder.comment("Maximum number of sound evaluations processed per server tick. Increase for better responsiveness, decrease for performance.")
+                                .defineInRange("maxSoundEvalsPerTick", 200, 1, 1000000);
+            resultFreshnessTicks = builder.comment("How long (in ticks) a cached evaluation result is considered fresh for consumers like AttractionGoal.")
+                                .defineInRange("resultFreshnessTicks", 5, 1, 200);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
                                 .defineInRange("maxGroupSize", 64, 1, 128);
             leaderGroupRadius = builder.comment("Radius (in blocks) used to group mobs under a leader for group AI behavior. Default: 64.0")
                                 .defineInRange("leaderGroupRadius", 64.0, 1.0, 128.0);
             groupDistance = builder.comment("Maximum distance (in blocks) for mobs to consider themselves part of a group for group behaviors. Used in AI such as FollowLeaderGoal.")
                                 .defineInRange("groupDistance", 128.0, 1.0, 128.0);
-            soundSwitchRatio = builder.comment("Minimum ratio for a new sound's weight to overcome an existing target sound's weight for a mob to switch targets (e.g., 1.2 means new sound must be 20% 'heavier').")
-                                .defineInRange("soundSwitchRatio", 0.7, 1.0, 5.0);
+            soundSwitchRatio = builder.comment(
+                "Switching threshold factor (0.0–1.0]. A mob will switch if newWeight > currentWeight × soundSwitchRatio.",
+                "Example: 0.5 means a new sound beating 70% of the current weight will trigger a switch (more eager switching).",
+                "Set closer to 1.0 for conservative switching; closer to 0.0 for very eager switching.")
+                                .defineInRange("soundSwitchRatio", 0.5, 0.0, 1.0);
             soundNoveltyBonusWeight = builder.comment("A small weight bonus given to very new sounds to make mobs more likely to switch to them.",
                  "This helps break ties and makes mobs seem more 'alert' to new threats.",
                  "Set to 0.0 to disable.")
-                                .defineInRange("soundNoveltyBonusWeight", 0.5, 0.0, 10.0);
+                                .defineInRange("soundNoveltyBonusWeight", 9.5, 0.0, 10.0);
             soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
                  "20 ticks = 1 second.")
                                 .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
@@ -680,11 +705,11 @@ public class SoundAttractConfig {
             )
             .defineList("customFovOverrides",
                     List.of(
-                        // --- 360° OMNI-DIRECTIONAL VISION ---
+
                         "minecraft:spider, 360.0, 360.0",
                         "minecraft:cave_spider, 360.0, 360.0",
 
-                        // --- AERIAL VISION (Enhanced Vertical) ---
+
                         "minecraft:phantom, 200.0, 280.0",
                         "minecraft:vex, 200.0, 280.0",
                         "minecraft:allay, 200.0, 280.0",
@@ -693,7 +718,7 @@ public class SoundAttractConfig {
                         "minecraft:ghast, 200.0, 280.0",
                         "minecraft:blaze, 200.0, 280.0",
 
-                        // --- PREY VISION (Wide Horizontal) ---
+
                         "minecraft:axolotl, 270.0, 90.0",
                         "minecraft:camel, 270.0, 90.0",
                         "minecraft:chicken, 270.0, 90.0",
@@ -715,7 +740,7 @@ public class SoundAttractConfig {
                         "minecraft:slime, 270.0, 120.0",
                         "minecraft:magma_cube, 270.0, 120.0",
                         
-                        // --- AQUATIC PREY VISION (Wide Horizontal) ---
+
                         "minecraft:cod, 300.0, 100.0",
                         "minecraft:pufferfish, 300.0, 100.0",
                         "minecraft:salmon, 300.0, 100.0",
@@ -724,7 +749,7 @@ public class SoundAttractConfig {
                         "minecraft:tadpole, 300.0, 100.0",
                         "minecraft:tropical_fish, 300.0, 100.0",
 
-                        // --- PREDATOR VISION (Focused Forward) ---
+
                         "minecraft:cat, 140.0, 140.0",
                         "minecraft:ocelot, 140.0, 140.0",
                         "minecraft:wolf, 140.0, 140.0",
@@ -732,7 +757,7 @@ public class SoundAttractConfig {
                         "minecraft:fox, 140.0, 140.0",      
                         "minecraft:frog, 140.0, 140.0",      
 
-                        // --- HUMANOID/STANDARD VISION ---
+
                         "minecraft:zombie, 200.0, 135.0",
                         "minecraft:husk, 200.0, 135.0",
                         "minecraft:drowned, 200.0, 135.0",
@@ -746,7 +771,7 @@ public class SoundAttractConfig {
                         "minecraft:piglin_brute, 200.0, 135.0",
                         "minecraft:iron_golem, 200.0, 135.0",
                         
-                        // --- SPECIAL CASES & MONSTROSITIES ---
+
                         "minecraft:creeper, 90.0, 90.0",       
                         "minecraft:enderman, 180.0, 240.0",     
                         "minecraft:guardian, 320.0, 180.0",     
@@ -788,13 +813,20 @@ public class SoundAttractConfig {
                 .defineInRange("crawlingDetectionRangePlayer", 4.0, 0.0, 128.0);
             builder.pop();
             
-            // Vision pass-through blocks: blocks that do not obstruct vision checks (e.g., glass)
+
             builder.push("vision");
             visionPassThroughBlocks = builder.comment(
                     "List of block IDs considered pass-through for vision/LOS checks. Format: 'modid:blockid'.",
                     "Entries here will be ignored when checking if a player is visible to a mob.")
-                .defineList("visionPassThroughBlocks", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
+                .defineList("visionPassThroughBlocks",
+                    java.util.List.of(
+                        "minecraft:glass_pane",
+                        "minecraft:grass",
+                        "minecraft:leaves"
+                    ),
+                    obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
             builder.pop();
+            
             builder.comment("How environmental conditions affect stealth.").push("environmental_factors");
             builder.comment("Light level effects on detection.").push("light_level");
             neutralLightLevel = builder.comment("The light level (0-15) considered neutral (no bonus or penalty to detection).")
@@ -1077,7 +1109,7 @@ public class SoundAttractConfig {
             customAirBlocks = builder.comment("List of custom air block IDs for sound muffling. Format: 'modid:blockid'. Default: empty list.")
                                          .defineList("customAirBlocks", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String)obj) != null);
 
-            // Block breaking configuration
+
             builder.push("block_breaking");
             enableBlockBreaking = builder.comment("Enable mobs to break blocks that obstruct pathing when stuck.")
                     .define("enableBlockBreaking", false);
@@ -1222,7 +1254,7 @@ public class SoundAttractConfig {
 
         parseAndCacheCustomArmorColors();
 
-        // Vision pass-through blocks
+
         VISION_PASSTHROUGH_BLOCKS_CACHE.clear();
         if (COMMON.visionPassThroughBlocks != null) {
             for (String idStr : COMMON.visionPassThroughBlocks.get()) {

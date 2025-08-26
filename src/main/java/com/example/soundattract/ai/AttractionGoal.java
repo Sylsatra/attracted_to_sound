@@ -201,7 +201,7 @@ public class AttractionGoal extends Goal {
 
         Mob leader = MobGroupManager.getLeader(mob);
         if (leader != mob && SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
-            SoundTracker.SoundRecord directSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
+            SoundTracker.SoundRecord directSound = SoundTracker.getCachedOrRequestNearest(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
             List<MobGroupManager.SoundRelay> relayedSounds = MobGroupManager.consumeRelayedSounds(this.mob);
             if (directSound == null && (relayedSounds == null || relayedSounds.isEmpty())) {
                 return false; 
@@ -235,7 +235,7 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
+        SoundTracker.SoundRecord bestSoundNow = SoundTracker.getCachedOrRequestNearest(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
         if (bestSoundNow == null) {
             return false;
         }
@@ -289,7 +289,7 @@ public class AttractionGoal extends Goal {
         if (scanCooldownCounter > 0) {
             scanCooldownCounter--;
         }
-        SoundTracker.SoundRecord freshSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
+        SoundTracker.SoundRecord freshSound = SoundTracker.getCachedOrRequestNearest(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
         boolean shouldSwitch = false;
         if (freshSound != null) {
             if (this.cachedSound == null) {
@@ -584,7 +584,7 @@ public class AttractionGoal extends Goal {
                 }
             }
         } else {
-            bestSoundOverall = SoundTracker.findNearestSound(
+            bestSoundOverall = SoundTracker.getCachedOrRequestNearest(
                 this.mob,
                 level,
                 mobPos,
