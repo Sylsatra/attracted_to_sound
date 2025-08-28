@@ -22,6 +22,9 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -51,6 +54,8 @@ public class SoundAttractMod {
         if (FMLEnvironment.dist.isClient()) {
             NeoForge.EVENT_BUS.register(new SoundAttractClientEvents());
         }
+
+        NeoForge.EVENT_BUS.register(this);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -81,5 +86,15 @@ public class SoundAttractMod {
         final PayloadRegistrar registrar = event.registrar("1");
 
         registrar.playToServer(SoundMessage.TYPE, SoundMessage.STREAM_CODEC, SoundMessage::handle);
+    }
+
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        SoundTracker.initialize();
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        SoundTracker.shutdown();
     }
 }

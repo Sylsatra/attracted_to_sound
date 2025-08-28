@@ -34,7 +34,12 @@ public class FollowLeaderGoal extends Goal {
     @Override
     public boolean canUse() {
         leader = MobGroupManager.getLeader(mob);
-        if (leader == null || leader == mob) return false; 
+        if (leader == null || leader == mob) return false;
+
+        if (this.mob.distanceToSqr(this.leader) < getGroupDistance() * getGroupDistance()) {
+            return false;
+        }
+
         boolean smartEdge = com.example.soundattract.config.SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         if (smartEdge && MobGroupManager.isEdgeMob(mob)) return false;
         if (!leader.isAlive()) return false;
@@ -52,6 +57,11 @@ public class FollowLeaderGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (leader == null || !leader.isAlive()) return false;
+
+        if (this.mob.distanceToSqr(this.leader) < getGroupDistance() * getGroupDistance()) {
+            return false;
+        }
+
         leaderAttractionGoal = StreamSupport.stream(
             leader.goalSelector.getAvailableGoals().stream()
     .filter(prioritizedGoal -> prioritizedGoal.isRunning()).spliterator(), false)
@@ -70,7 +80,10 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public void tick() {
-        if (leader == null) return;
+        if (leader == null || !leader.isAlive()) {
+            return;
+        }
+
         if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return;
         if (com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
             com.example.soundattract.SoundAttractMod.LOGGER.info(

@@ -18,6 +18,8 @@ import com.example.soundattract.ai.MobGroupManager;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,6 +35,7 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 public class SoundAttractionEvents {
 
+    private static final Map<ResourceKey<Level>, Long> dimensionLoadTimes = new ConcurrentHashMap<>();
     private static final Map<Mob, List<GoalDefinition>> PENDING_GOAL_ADDITIONS = new ConcurrentHashMap<>();
 
     private static class GoalDefinition {
@@ -158,11 +161,25 @@ public class SoundAttractionEvents {
         }
     }
 
+    private void tryUpdateGroupsWithDelay(ServerLevel serverLevel) {
+        long currentTime = serverLevel.getGameTime();
+        ResourceKey<Level> dimensionKey = serverLevel.dimension();
+
+        dimensionLoadTimes.putIfAbsent(dimensionKey, currentTime);
+
+        long timeSinceLoad = currentTime - dimensionLoadTimes.get(dimensionKey);
+        int delay = SoundAttractConfig.COMMON.initialGroupComputationDelay.get();
+
+        if (timeSinceLoad >= delay) {
+            MobGroupManager.updateGroups(serverLevel);
+        }
+    }
+
     @SubscribeEvent
     public void onLevelTick(LevelTickEvent.Post event) {
         if (!event.getLevel().isClientSide()) {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
-                MobGroupManager.updateGroups(serverLevel);
+                tryUpdateGroupsWithDelay(serverLevel);
             }
         }
     }
@@ -192,7 +209,7 @@ public class SoundAttractionEvents {
         }
 
         if (event.getLevel() instanceof ServerLevel serverLevel) {
-            MobGroupManager.updateGroups(serverLevel);
+            tryUpdateGroupsWithDelay(serverLevel);
         }
     }
 }

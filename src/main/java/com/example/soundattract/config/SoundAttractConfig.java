@@ -11,9 +11,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Mob;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.fml.ModList;
+import com.example.soundattract.config.MobProfile;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class SoundAttractConfig {
+
+    private static final int CURRENT_CONFIG_VERSION = 1;
 
     public record SoundDefaultEntry(double range, double weight) {}
     public static final Common COMMON;
@@ -40,10 +43,41 @@ public class SoundAttractConfig {
     public static boolean TACZ_ENABLED_CACHE = false;
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
-    public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();    
+    public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
+
+
+    private static <T> void moveConfigValue(com.electronwill.nightconfig.core.UnmodifiableConfig config, String oldPath, ModConfigSpec.ConfigValue<T> newValue) {
+        if (config.contains(oldPath)) {
+            T oldValue = config.get(oldPath);
+            newValue.set(oldValue);
+            SoundAttractMod.LOGGER.info("Migrated config value from '{}' to '{}'", oldPath, String.join(".", newValue.getPath()));
+        }
+    }
+
+    private static void migrateConfig(int oldVersion) {
+        SoundAttractMod.LOGGER.info("Migrating SoundAttract config from version {} to {}", oldVersion, CURRENT_CONFIG_VERSION);
+        com.electronwill.nightconfig.core.UnmodifiableConfig config = COMMON_SPEC.getValues();
+
+        if (oldVersion < 1) {
+            SoundAttractMod.LOGGER.info("Performing migration for config version 0 -> 1");
+
+
+            moveConfigValue(config, "general.scanCooldownTicks", COMMON.scanCooldownTicks);
+            moveConfigValue(config, "general.minTpsForScanCooldown", COMMON.minTpsForScanCooldown);
+            moveConfigValue(config, "general.maxTpsForScanCooldown", COMMON.maxTpsForScanCooldown);
+            moveConfigValue(config, "general.raycastCacheTtlTicks", COMMON.raycastCacheTtlTicks);
+            moveConfigValue(config, "general.raycastCacheMaxEntries", COMMON.raycastCacheMaxEntries);
+            moveConfigValue(config, "general.raycastCacheCleanupIntervalTicks", COMMON.raycastCacheCleanupIntervalTicks);
+        }
+
+        COMMON.configVersion.set(CURRENT_CONFIG_VERSION);
+        SoundAttractMod.LOGGER.info("Config migration complete. New schema version: {}. Saving config...", CURRENT_CONFIG_VERSION);
+        COMMON_SPEC.save();
+    }
+
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
-    public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
+    public static Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
     public static void parseAndCacheCustomArmorColors() {
         customArmorColors.clear();
         if (COMMON == null || COMMON.customArmorColors == null) {
@@ -102,16 +136,11 @@ public class SoundAttractConfig {
 
     public static class Common {
 
+    public final ModConfigSpec.IntValue configVersion;
     public final ModConfigSpec.BooleanValue debugLogging;
     public final ModConfigSpec.BooleanValue enableRaycastCache;
-    public final ModConfigSpec.IntValue raycastCacheTtlTicks;
-    public final ModConfigSpec.IntValue raycastCacheMaxEntries;
-    public final ModConfigSpec.IntValue raycastCacheCleanupIntervalTicks;
     public final ModConfigSpec.BooleanValue edgeMobSmartBehavior;
     public final ModConfigSpec.IntValue soundLifetimeTicks;
-    public final ModConfigSpec.IntValue scanCooldownTicks;
-    public final ModConfigSpec.DoubleValue minTpsForScanCooldown;
-    public final ModConfigSpec.DoubleValue maxTpsForScanCooldown;
     public final ModConfigSpec.DoubleValue arrivalDistance;
     public final ModConfigSpec.DoubleValue mobMoveSpeed;
     public final ModConfigSpec.IntValue maxSoundsTracked;
@@ -119,6 +148,20 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue soundNoveltyBonusWeight;
     public final ModConfigSpec.IntValue soundNoveltyTimeTicks;
     public final ModConfigSpec.DoubleValue largeSoundRangeThreshold;
+
+    public final ModConfigSpec.IntValue initialGroupComputationDelay;
+    public final ModConfigSpec.IntValue workerThreads;
+    public final ModConfigSpec.IntValue workerTaskBudgetMs;
+    public final ModConfigSpec.DoubleValue cooldownTicksPerMob;
+    public final ModConfigSpec.IntValue soundScoringSubmitCooldownTicks;
+    public final ModConfigSpec.IntValue asyncResultTtlTicks;
+    public final ModConfigSpec.IntValue groupUpdateInterval;
+    public final ModConfigSpec.IntValue scanCooldownTicks;
+    public final ModConfigSpec.DoubleValue minTpsForScanCooldown;
+    public final ModConfigSpec.DoubleValue maxTpsForScanCooldown;
+    public final ModConfigSpec.IntValue raycastCacheTtlTicks;
+    public final ModConfigSpec.IntValue raycastCacheMaxEntries;
+    public final ModConfigSpec.IntValue raycastCacheCleanupIntervalTicks;
 
     public final ModConfigSpec.BooleanValue enableTaskQueue;
     public final ModConfigSpec.IntValue maxSoundEvalsPerTick;
@@ -130,7 +173,6 @@ public class SoundAttractConfig {
     public final ModConfigSpec.DoubleValue groupDistance;
     public final ModConfigSpec.DoubleValue leaderSpacingMultiplier;
     public final ModConfigSpec.IntValue numEdgeSectors;
-    public final ModConfigSpec.IntValue groupUpdateInterval;
     public final ModConfigSpec.IntValue maxLeaders;
 
 
@@ -165,7 +207,8 @@ public class SoundAttractConfig {
     public final ModConfigSpec.IntValue stealthCheckInterval;
     public final ModConfigSpec.IntValue stealthGracePeriodTicks;
     public final ModConfigSpec.DoubleValue minStealthDetectionRange;
-    public final ModConfigSpec.DoubleValue maxStealthDetectionRange; 
+    public final ModConfigSpec.DoubleValue maxStealthDetectionRange;
+    public final ModConfigSpec.DoubleValue noLineOfSightFactor; 
     
 
     public final ModConfigSpec.DoubleValue standingDetectionRangePlayer;
@@ -255,28 +298,20 @@ public class SoundAttractConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> blockBreakBlockList;
     
 
-    public Common(ModConfigSpec.Builder builder) {
+     public Common(ModConfigSpec.Builder builder) {
+            builder.comment("Internal config version. Do not change.").push("version");
+            configVersion = builder.defineInRange("configVersion", 0, 0, CURRENT_CONFIG_VERSION);
+            builder.pop();
+
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
                                 .define("debugLogging", false);
             enableRaycastCache = builder.comment("Enable caching for raycast results to improve performance. Disable if experiencing issues with sound obstruction detection.")
                                 .define("enableRaycastCache", true);
-            raycastCacheTtlTicks = builder.comment("Time-to-live (in ticks) for entries in the raycast cache. Older entries are evicted during periodic cleanup.")
-                                .defineInRange("raycastCacheTtlTicks", 600, 1, 1000000);
-            raycastCacheMaxEntries = builder.comment("Maximum number of entries to keep in the raycast cache. When exceeded, oldest entries are evicted.")
-                                .defineInRange("raycastCacheMaxEntries", 5000, 100, 2000000);
-            raycastCacheCleanupIntervalTicks = builder.comment("Interval (in ticks) at which the raycast cache performs cleanup and eviction.")
-                                .defineInRange("raycastCacheCleanupIntervalTicks", 200, 1, 1000000);
             edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
                                 .define("edgeMobSmartBehavior", false);
             soundLifetimeTicks = builder.comment("How long a sound event remains 'interesting' to a mob, in ticks (20 ticks = 1 second).")
                                 .defineInRange("soundLifetimeTicks", 600, 20, 1000000);
-            scanCooldownTicks = builder.comment("Minimum time in ticks between mob scans for new sounds. Higher values can improve performance but reduce responsiveness.")
-                                .defineInRange("scanCooldownTicks", 25, 1, 1000000);
-            minTpsForScanCooldown = builder.comment("TPS below which scanCooldownTicks is dynamically increased to save performance. Set to 0 to disable.")
-                                .defineInRange("minTpsForScanCooldown", 15.0, 0.0, 20.0);
-            maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
-                                .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
             arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
                                 .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
@@ -313,8 +348,59 @@ public class SoundAttractConfig {
                                 .defineInRange("leaderSpacingMultiplier", 1.0, 0.1, 10.0);
             numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 8")
                                 .defineInRange("numEdgeSectors", 8, 1, 64);
-            groupUpdateInterval = builder.comment("Interval (in ticks) between group AI updates. Default: 200")
-                                .defineInRange("groupUpdateInterval", 200, 1, 200);
+            builder.comment("Performance-tuning options. Adjust these to balance responsiveness and server load.").push("performance");
+
+            initialGroupComputationDelay = builder.comment(
+                "Delay in ticks before the first mob group computation is run after server startup.",
+                "This helps prevent lag on world load by giving the server time to stabilize.",
+                "20 ticks = 1 second. Default: 50 (2.5 seconds)"
+            ).defineInRange("initialGroupComputationDelay", 50, 0, 72000);
+
+            workerThreads = builder.comment(
+                "Number of background worker threads used for off-thread computations (e.g., group building).",
+                "Increase for large servers; decrease if you observe contention."
+            ).defineInRange("workerThreads", 2, 1, 64);
+
+            workerTaskBudgetMs = builder.comment(
+                "Soft per-task time budget in milliseconds for worker computations before yielding.",
+                "Higher values allow more work per batch but can increase latency to apply results."
+            ).defineInRange("workerTaskBudgetMs", 10, 1, 1000);
+
+            scanCooldownTicks = builder.comment("Minimum time in ticks between mob scans for new sounds. Higher values can improve performance but reduce responsiveness.")
+                .defineInRange("scanCooldownTicks", 25, 1, 1000000);
+
+            cooldownTicksPerMob = builder.comment("How many ticks to add to the base scan cooldown for each active mob.",
+                "This directly controls how much the cooldown increases with more mobs.",
+                "A higher value means more cooldown per mob, slowing down scans more aggressively.",
+                "Example: 0.25 means 100 mobs will add (100 * 0.15) = 15 ticks to the base cooldown.")
+                .defineInRange("cooldownTicksPerMob", 0.15, 0.0, 10.0);
+
+            minTpsForScanCooldown = builder.comment("TPS below which scanCooldownTicks is dynamically increased to save performance. Set to 0 to disable.")
+                .defineInRange("minTpsForScanCooldown", 15.0, 0.0, 20.0);
+
+            maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
+                .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
+            groupUpdateInterval = builder.comment(
+                "Time in ticks between mob group updates. Lower values are more responsive but cost more performance."
+            ).defineInRange("groupUpdateInterval", 40, 10, 600);
+
+            soundScoringSubmitCooldownTicks = builder.comment(
+                "Cooldown in ticks before a mob can submit a new sound for async scoring.",
+                "Prevents spamming the async queue. Higher values reduce load but may delay reactions."
+            ).defineInRange("soundScoringSubmitCooldownTicks", 10, 0, 200);
+
+            asyncResultTtlTicks = builder.comment(
+                "Time-to-live in ticks for async sound scoring results.",
+                "Results older than this are discarded. Prevents mobs from acting on very old data."
+            ).defineInRange("asyncResultTtlTicks", 100, 20, 1200);
+
+            raycastCacheTtlTicks = builder.comment("Time-to-live (in ticks) for entries in the raycast cache. Older entries are evicted during periodic cleanup.")
+                                .defineInRange("raycastCacheTtlTicks", 600, 1, 1000000);
+            raycastCacheMaxEntries = builder.comment("Maximum number of entries to keep in the raycast cache. When exceeded, oldest entries are evicted.")
+                                .defineInRange("raycastCacheMaxEntries", 5000, 100, 2000000);
+            raycastCacheCleanupIntervalTicks = builder.comment("Interval (in ticks) at which the raycast cache performs cleanup and eviction.")
+                                .defineInRange("raycastCacheCleanupIntervalTicks", 200, 1, 1000000);
+
             maxLeaders = builder.comment("Maximum number of group leaders tracked for AI grouping. Default: 16")
                                 .defineInRange("maxLeaders", 16, 1, 64);
             builder.pop();
@@ -963,9 +1049,10 @@ public class SoundAttractConfig {
             builder.comment("Absolute min/max detection ranges after all modifiers are applied.").push("detection_range_limits");
             minStealthDetectionRange = builder.comment("The absolute minimum detection range (in blocks). Player cannot be harder to detect than this, regardless of modifiers.","Set > 0 to prevent mobs from being completely blind unless intended by other mechanics.")
                 .defineInRange("minStealthDetectionRange", 0.5, 0.0, 64.0);
-            maxStealthDetectionRange = builder.comment("The absolute maximum detection range (in blocks). Player cannot be easier to detect than this.","Also used as default range if 'enableStealthMechanics' is false.")
-                .defineInRange("maxStealthDetectionRange", 64.0, 1.0, 256.0);
-            builder.pop();
+            maxStealthDetectionRange = builder.comment("Maximum range (in blocks) at which a mob can detect a player under optimal conditions (e.g., clear line of sight, high light level).")
+                               .defineInRange("maxStealthDetectionRange", 64.0, 1.0, 256.0);
+            noLineOfSightFactor = builder.comment("Detection range multiplier when the mob does not have a direct line of sight to the player. 0.0 means cannot detect without LOS.")
+                               .defineInRange("noLineOfSightFactor", 0.0, 0.0, 1.0);
 
             builder.pop();
 
@@ -1155,6 +1242,11 @@ public class SoundAttractConfig {
     }
 
     public static void bakeConfig() {
+        int currentVersion = COMMON.configVersion.get();
+        if (currentVersion < CURRENT_CONFIG_VERSION) {
+            migrateConfig(currentVersion);
+        }
+
         if (COMMON == null) {
             SoundAttractMod.LOGGER.warn("SoundAttractConfig.COMMON is null during bakeConfig. Skipping cache population.");
             return;
@@ -1289,7 +1381,7 @@ public class SoundAttractConfig {
 
                 ResourceLocation mobId = null;
                 CompoundTag nbtMatcher = null;
-                Map<ResourceLocation, com.example.soundattract.config.SoundOverride> soundOverrides = new HashMap<>();
+                Map<ResourceLocation, MobProfile.SoundOverride> soundOverrides = new HashMap<>();
                 Map<PlayerStance, Double> detectionOverrides = new HashMap<>();
 
                 String mobIdString = parts[1].trim();
@@ -1315,9 +1407,10 @@ public class SoundAttractConfig {
                         raw = raw.trim();
                         if (raw.isEmpty()) continue;
                         try {
-                            com.example.soundattract.config.SoundOverride so =
-                                com.example.soundattract.config.SoundOverride.parse(raw);
-                            soundOverrides.put(so.getSoundId(), so);
+                            MobProfile.SoundOverride so = MobProfile.SoundOverride.fromString(raw, profileName);
+                            if (so != null) {
+                                soundOverrides.put(so.soundId(), so);
+                            }
                         } catch (IllegalArgumentException e) {
                             SoundAttractMod.LOGGER.warn(
                                 "Malformed sound override entry '{}' for profile '{}': {}. Skipping.",
@@ -1346,7 +1439,7 @@ public class SoundAttractConfig {
                 }
 
                 MobProfile profile = new com.example.soundattract.config.MobProfile(profileName, mobId == null ? "*" : mobId.toString(), nbtMatcher == null ? null : nbtMatcher.toString(),
-    soundOverrides.values().stream().map(so -> new com.example.soundattract.config.SoundOverride(so.getSoundId(), so.getRange(), so.getWeight())).toList(),
+    soundOverrides.values().stream().map(so -> new com.example.soundattract.config.MobProfile.SoundOverride(so.soundId(), so.range(), so.weight())).toList(),
     detectionOverrides
 );
                 SPECIAL_MOB_PROFILES_CACHE.add(profile);

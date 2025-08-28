@@ -54,6 +54,8 @@ public class AttractionGoal extends Goal {
     private int edgeArrivalTicks = 0;
     private static final int EDGE_WAIT_TICKS = 15;
     private SoundTracker.SoundRecord cachedSound;
+    private SoundTracker.SoundRecord cachedNearestSoundForTick;
+    private long lastSoundCheckTick = -1;
 
     private static class DelayedRelay {
         public final Mob leader;
@@ -199,16 +201,8 @@ public class AttractionGoal extends Goal {
         }
         scanCooldownCounter = scanCooldownTicks();
 
-        Mob leader = MobGroupManager.getLeader(mob);
-        if (leader != mob && SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
-            SoundTracker.SoundRecord directSound = SoundTracker.getCachedOrRequestNearest(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
-            List<MobGroupManager.SoundRelay> relayedSounds = MobGroupManager.consumeRelayedSounds(this.mob);
-            if (directSound == null && (relayedSounds == null || relayedSounds.isEmpty())) {
-                return false; 
-            }
-        }
 
-        SoundTracker.SoundRecord newSound = findInterestingSoundRecord();
+        SoundTracker.SoundRecord newSound = getCachedNearestSound();
         if (newSound == null) return false;
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -235,7 +229,7 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        SoundTracker.SoundRecord bestSoundNow = SoundTracker.getCachedOrRequestNearest(mob, mob.level(), mob.blockPosition(), mob.getEyePosition());
+        SoundTracker.SoundRecord bestSoundNow = getCachedNearestSound();
         if (bestSoundNow == null) {
             return false;
         }
@@ -289,7 +283,7 @@ public class AttractionGoal extends Goal {
         if (scanCooldownCounter > 0) {
             scanCooldownCounter--;
         }
-        SoundTracker.SoundRecord freshSound = SoundTracker.getCachedOrRequestNearest(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
+        SoundTracker.SoundRecord freshSound = getCachedNearestSound();
         boolean shouldSwitch = false;
         if (freshSound != null) {
             if (this.cachedSound == null) {
@@ -551,7 +545,7 @@ public class AttractionGoal extends Goal {
         }
     }
 
-    protected SoundTracker.SoundRecord findInterestingSoundRecord() {
+    private SoundTracker.SoundRecord findInterestingSoundRecord() {
         Level level = this.mob.level();
         if (level.isClientSide()) return null;
 
@@ -584,12 +578,8 @@ public class AttractionGoal extends Goal {
                 }
             }
         } else {
-            bestSoundOverall = SoundTracker.getCachedOrRequestNearest(
-                this.mob,
-                level,
-                mobPos,
-                mobEyePos
-            );
+
+            bestSoundOverall = SoundTracker.findNearestSound(this.mob, level, mobPos, mobEyePos);
         }
 
         SoundTracker.SoundRecord currentTargetSound = this.cachedSound;
@@ -636,5 +626,18 @@ public class AttractionGoal extends Goal {
 
     public boolean isPursuingSound() {
         return isPursuingSound;
+    }
+
+    /**
+     * Gets the nearest sound, cached for the current game tick.
+     * This prevents multiple expensive lookups within the same tick.
+     */
+    private SoundTracker.SoundRecord getCachedNearestSound() {
+        long currentTick = this.mob.level().getGameTime();
+        if (this.lastSoundCheckTick != currentTick) {
+            this.lastSoundCheckTick = currentTick;
+            this.cachedNearestSoundForTick = findInterestingSoundRecord();
+        }
+        return this.cachedNearestSoundForTick;
     }
 }

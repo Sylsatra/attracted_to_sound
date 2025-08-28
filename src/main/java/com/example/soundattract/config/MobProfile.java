@@ -7,11 +7,14 @@ import net.minecraft.world.entity.Mob;
 import com.example.soundattract.SoundAttractMod;
 import net.minecraft.core.registries.BuiltInRegistries;
 import javax.annotation.Nullable;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class MobProfile {
     private final String profileName;
@@ -85,8 +88,100 @@ public class MobProfile {
 
     public Optional<SoundOverride> getSoundOverride(ResourceLocation soundId) {
         return soundOverrides.stream()
-                .filter(override -> override.getSoundId().equals(soundId))
+                .filter(override -> override.soundId().equals(soundId))
                 .findFirst();
+    }
+
+    public static MobProfile fromString(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        String[] parts = raw.split(";", 5);
+        if (parts.length < 2) {
+            SoundAttractMod.LOGGER.warn("Invalid mob profile string: '{}'. Must have at least profileName and mobId.", raw);
+            return null;
+        }
+
+        String profileName = parts[0].trim();
+        String mobIdString = parts[1].trim();
+        String nbtMatcherString = parts.length > 2 ? parts[2].trim() : "";
+        String soundOverridesString = parts.length > 3 ? parts[3].trim() : "";
+        String detectionOverridesString = parts.length > 4 ? parts[4].trim() : "";
+
+        List<SoundOverride> soundOverrides = parseSoundOverrides(soundOverridesString, profileName);
+        Map<PlayerStance, Double> detectionOverrides = parseDetectionOverrides(detectionOverridesString, profileName);
+
+        return new MobProfile(profileName, mobIdString, nbtMatcherString, soundOverrides, detectionOverrides);
+    }
+
+    public record SoundOverride(ResourceLocation soundId, double range, double weight) {
+        public static SoundOverride fromString(String raw, String profileName) {
+            if (raw == null || raw.trim().isEmpty()) {
+                return null;
+            }
+            String[] parts = raw.split(":");
+            if (parts.length != 3) {
+                SoundAttractMod.LOGGER.warn("Invalid sound override format in profile '{}': '{}'. Expected 'soundId:range:weight'", profileName, raw);
+                return null;
+            }
+            ResourceLocation soundId = ResourceLocation.tryParse(parts[0].trim());
+            if (soundId == null) {
+                SoundAttractMod.LOGGER.warn("Invalid sound ID in profile '{}': '{}'", profileName, parts[0].trim());
+                return null;
+            }
+            try {
+                double range = Double.parseDouble(parts[1].trim());
+                double weight = Double.parseDouble(parts[2].trim());
+                return new SoundOverride(soundId, range, weight);
+            } catch (NumberFormatException e) {
+                SoundAttractMod.LOGGER.warn("Invalid range or weight in profile '{}': '{}'", profileName, raw, e);
+                return null;
+            }
+        }
+    }
+
+    private static List<SoundOverride> parseSoundOverrides(String soundOverridesString, String profileName) {
+        if (soundOverridesString == null || soundOverridesString.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return Arrays.stream(soundOverridesString.split(","))
+                .map(s -> SoundOverride.fromString(s.trim(), profileName))
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    private static Map<PlayerStance, Double> parseDetectionOverrides(String detectionOverridesString, String profileName) {
+        if (detectionOverridesString.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<PlayerStance, Double> overrides = new HashMap<>();
+        for (String part : detectionOverridesString.split(",")) {
+            String[] pair = part.trim().split(":");
+            if (pair.length == 2) {
+                String stanceStr = pair[0].trim().toUpperCase();
+                String valueStr = pair[1].trim();
+                PlayerStance stance = null;
+                for (PlayerStance s : PlayerStance.values()) {
+                    if (s.name().equals(stanceStr)) {
+                        stance = s;
+                        break;
+                    }
+                }
+
+                if (stance == null) {
+                    SoundAttractMod.LOGGER.warn("Invalid player stance '{}' in profile '{}'", pair[0], profileName);
+                    continue;
+                }
+
+                try {
+                    double value = Double.parseDouble(valueStr);
+                    overrides.put(stance, value);
+                } catch (NumberFormatException e) {
+                    SoundAttractMod.LOGGER.warn("Invalid detection override value '{}' for stance '{}' in profile '{}'", valueStr, stanceStr, profileName);
+                }
+            }
+        }
+        return overrides;
     }
 
     public boolean matches(Mob mob) {
