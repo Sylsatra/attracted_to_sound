@@ -435,6 +435,23 @@ public class SoundAttractConfigData {
      */
     public double mobMoveSpeed = 1.15;
 
+    public int configSchemaVersion = 1;
+
+
+    public int workerThreads = 2;
+    public int workerQueueCapacity = 1024;
+
+
+    public int asyncPathfindingCooldownTicks = 40;
+    public int asyncPathfindingMaxQueueSize = 256;
+    public int asyncPathfindingThreads = 2;
+    public int asyncMobGroupCooldownTicks = 60;
+    public int asyncMobGroupMaxQueueSize = 512;
+    public int asyncMobGroupThreads = 1;
+
+
+    public int soundEventTTL = 400;
+    public int groupCalculationTTL = 300;
 
 
 
@@ -495,6 +512,13 @@ public class SoundAttractConfigData {
      * 4–12. Minimum: 1. Maximum: 32.
      */
     public int numEdgeSectors = 6;
+
+    /**
+     * Number of mobs to select as "edge" mobs from each sector. Affects how
+     * many mobs on the group's periphery will listen for sounds.
+     * Default: 1. Recommended: 1–3. Minimum: 1. Maximum: 10.
+     */
+    public int edgeMobsPerSector = 1;
 
 
 
@@ -773,6 +797,7 @@ public class SoundAttractConfigData {
      * weight by 1.0. Default: 0.4
      */
     public double solidBlockWeightReduction = 0.4;
+
 
     /**
      * If true, non-solid blocks (like leaves) will reduce sound range and
@@ -1309,7 +1334,7 @@ public class SoundAttractConfigData {
             "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
     ));
 
-    // === Fabric-native Block Breaking (no EnhancedAI required) ===
+
     /** If true, mobs can break blocks when stuck pursuing a sound. */
     public boolean enableBlockBreaking = false;
     /** Multiplier applied to time needed to break a block. Higher = slower. Default 1.0 */
@@ -1329,7 +1354,7 @@ public class SoundAttractConfigData {
     /** List of block IDs used as blacklist or whitelist depending on mode. */
     public java.util.List<String> blockBreakBlockList = new java.util.ArrayList<>();
 
-    // === Smart LOS configuration ===
+
     /**
      * Blocks in this list are treated as NOT blocking vision by smart LOS.
      * Entries must be full block IDs like "modid:block_name".

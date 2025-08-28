@@ -12,11 +12,19 @@ import net.minecraft.registry.Registries;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import com.example.soundattract.util.WorkerScheduler;
 import net.minecraft.block.BlockState;
 import net.minecraft.world.World;
+import com.example.soundattract.ai.AttractionGoal;
+import com.example.soundattract.util.WorkerScheduler.SoundScoreResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.Entity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.MinecraftServer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -45,22 +53,20 @@ public class SoundTracker {
         public final double weight;
         public final java.util.Set<Long> coveredCells = new java.util.HashSet<>();
 
-        public static final int DEFAULT_TICKS_REMAINING = SoundAttractMod.CONFIG != null ? SoundAttractMod.CONFIG.soundLifetimeTicks : 200;
-
-        public SoundRecord(SoundEvent sound, String soundId, BlockPos pos, int lifetime, String dimensionKey, double range, double weight) {
+        public SoundRecord(SoundEvent sound, String soundId, BlockPos pos, String dimensionKey, double range, double weight) {
             this.sound = sound;
             this.soundId = soundId;
             this.pos = pos;
-            this.ticksRemaining = lifetime;
+            this.ticksRemaining = SoundAttractMod.CONFIG.soundLifetimeTicks;
             this.dimensionKey = dimensionKey;
             this.range = range;
             this.weight = weight;
         }
 
-        public SoundRecord(SoundEvent sound, BlockPos pos, int lifetime, String dimensionKey, double range, double weight) {
+        public SoundRecord(SoundEvent sound, BlockPos pos, String dimensionKey, double range, double weight) {
             this(sound,
                  (sound != null && sound.getId() != null ? sound.getId().toString() : "unknown_sound_event_id"),
-                 pos, lifetime, dimensionKey, range, weight);
+                 pos, dimensionKey, range, weight);
         }
 
         @Override
@@ -78,14 +84,22 @@ public class SoundTracker {
         public int hashCode() {
             return Objects.hash(soundId, pos, dimensionKey, range, weight);
         }
+
+        public boolean isValid() {
+            return this.pos != null && this.weight > 0;
+        }
+
+        public BlockPos getPosition() {
+            return this.pos;
+        }
     }
 
     public static class VirtualSoundRecord extends SoundRecord {
         public final UUID sourcePlayer;
         public final String animationClass;
 
-        public VirtualSoundRecord(BlockPos pos, int lifetime, String dimensionKey, double range, double weight, UUID sourcePlayer, String animationClass) {
-            super(null, "virtual_sound:" + (animationClass != null ? animationClass : "unknown"), pos, lifetime, dimensionKey, range, weight);
+        public VirtualSoundRecord(BlockPos pos, String dimensionKey, double range, double weight, UUID sourcePlayer, String animationClass) {
+            super(null, "virtual_sound:" + (animationClass != null ? animationClass : "unknown"), pos, dimensionKey, range, weight);
             this.sourcePlayer = sourcePlayer;
             this.animationClass = animationClass;
         }
@@ -187,7 +201,7 @@ public class SoundTracker {
         }
     }
 
-    public static synchronized void addSound(World world, SoundEvent se, BlockPos pos, double range, double weight, int lifetime, String explicitSoundId) {
+    public static synchronized void addSound(World world, SoundEvent se, BlockPos pos, double range, double weight, String explicitSoundId) {
         if (SoundAttractMod.CONFIG == null) {
             System.err.println("[SoundTracker] Config not loaded, cannot add sound.");
             return;
@@ -244,19 +258,19 @@ public class SoundTracker {
             );
         }
 
-        recentSounds.add(new SoundRecord(se, finalSoundId, pos, lifetime, dimensionKey, range, weight));
+        recentSounds.add(new SoundRecord(se, finalSoundId, pos, dimensionKey, range, weight));
         
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info(
                 "[SoundTracker] Registered sound {} at {} (dim: {}), range={}, weight={}, lifetime={}",
-                finalSoundId, pos, dimensionKey, String.format("%.2f",range), String.format("%.2f",weight), lifetime
+                finalSoundId, pos, dimensionKey, String.format("%.2f",range), String.format("%.2f",weight), SoundAttractMod.CONFIG.soundLifetimeTicks
             );
         }
         updateSpatialSounds(world);
     }
 
-    public static synchronized void addSound(World world, SoundEvent se, BlockPos pos, double range, double weight, int lifetime) {
-        addSound(world, se, pos, range, weight, lifetime, null);
+    public static synchronized void addSound(World world, SoundEvent se, BlockPos pos, double range, double weight) {
+        addSound(world, se, pos, range, weight, null);
     }
 
     public static synchronized void addSound(World world, SoundEvent se, BlockPos pos) {
@@ -264,11 +278,10 @@ public class SoundTracker {
              System.err.println("[SoundTracker] Config not loaded for default lifetime sound.");
              return;
         }
-        int lifetime = SoundAttractMod.CONFIG.soundLifetimeTicks;
-        addSound(world, se, pos, 16.0, 1.0, lifetime);
+        addSound(world, se, pos, 16.0, 1.0);
     }
 
-    public static synchronized void addVirtualSound(World world, BlockPos pos, double range, double weight, int lifetime, UUID sourcePlayer, String animationClass) {
+    public static synchronized void addVirtualSound(World world, BlockPos pos, double range, double weight, UUID sourcePlayer, String animationClass) {
         if (SoundAttractMod.CONFIG == null) {
              System.err.println("[SoundTracker] Config not loaded, cannot add virtual sound.");
              return;
@@ -296,13 +309,13 @@ public class SoundTracker {
             );
         }
 
-        recentSounds.add(new VirtualSoundRecord(pos, lifetime, dimensionKey, range, weight, sourcePlayer, animationClass));
+        recentSounds.add(new VirtualSoundRecord(pos, dimensionKey, range, weight, sourcePlayer, animationClass));
         
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info(
                 "[SoundTracker] Registered virtual sound (intended ID for refresh check: {}) at {} (dim: {}), range={}, weight={}, lifetime={}",
                 finalVirtualSoundId,
-                pos, dimensionKey, String.format("%.2f",range), String.format("%.2f",weight), lifetime
+                pos, dimensionKey, String.format("%.2f",range), String.format("%.2f",weight), SoundAttractMod.CONFIG.soundLifetimeTicks
             );
         }
         updateSpatialSounds(world);
@@ -324,6 +337,26 @@ public class SoundTracker {
         }
         if (soundsChanged) {
             updateSpatialSounds(world);
+        }
+    }
+
+    public static void applySoundScoreResult(MinecraftServer server, WorkerScheduler.SoundScoreResult result) {
+        if (result == null) return;
+
+        RegistryKey<World> worldKey = RegistryKey.of(RegistryKeys.WORLD, Identifier.of(result.getDimensionKey()));
+        ServerWorld world = server.getWorld(worldKey);
+        if (world == null) {
+            return;
+        }
+
+        Entity entity = world.getEntity(result.getMobUuid());
+        if (entity instanceof MobEntity mob) {
+            if (result.getBest() != null && result.getBest().isValid()) {
+                mob.getBrain().remember(SoundAttractMod.SOUND_ATTRACTION_MEMORY, result.getBest().getPosition());
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info("{} is now attracted to {}", mob.getName().getString(), result.getBest().getPosition());
+                }
+            }
         }
     }
 
@@ -603,7 +636,8 @@ public class SoundTracker {
             if (finalComparisonWeight > highestComparisonWeight || (Math.abs(finalComparisonWeight - highestComparisonWeight) < 0.001 && distSqr < closestDistSqrForBest)) {
                 highestComparisonWeight = finalComparisonWeight;
                 closestDistSqrForBest = distSqr;
-                bestSound = new SoundRecord(r.sound, soundId, r.pos, r.ticksRemaining, r.dimensionKey, muffledRange, muffledWeight);
+                bestSound = new SoundRecord(r.sound, soundId, r.pos, r.dimensionKey, muffledRange, muffledWeight);
+                bestSound.ticksRemaining = r.ticksRemaining;
             }
         }
 

@@ -11,9 +11,14 @@ import net.minecraft.text.Text;
 public class ConfigReloadListener {
     public static void reloadConfig() {
         SoundAttractMod.CONFIG = ConfigLoader.load();
+
+
+        FovEvents.buildCaches();
+        DynamicScanCooldownManager.initialize();
+
         if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-    SoundAttractMod.LOGGER.info("[ConfigReloadListener] Reloaded config from disk.");
-}
+            SoundAttractMod.LOGGER.info("[ConfigReloadListener] Reloaded config from disk and updated dependent components.");
+        }
     }
 
     public static void registerCommand() {

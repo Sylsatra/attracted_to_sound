@@ -91,10 +91,11 @@ public class AttractionGoal extends Goal {
 
     @Override
     public boolean canStart() {
+
         if (this.isPursuingSound && this.targetSoundPos != null) {
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info(
-                "[AttractionGoal] canStart() is TRUE for {} because it was given an external target: {}",
+                    "[AttractionGoal] canStart() is TRUE for {} because it was given an external target: {}",
                     this.mob.getName().getString(),
                     this.targetSoundPos
                 );
@@ -102,22 +103,28 @@ public class AttractionGoal extends Goal {
             return true;
         }
 
+
         if (this.mob.hasVehicle() || this.mob.isSleeping() || this.mob.getTarget() != null) {
             return false;
         }
+
 
         if (this.scanTickCounter > 0) {
             this.scanTickCounter--;
             return false;
         }
 
+
         SoundTracker.SoundRecord newSound = findInterestingSoundRecord();
+
+
+        this.scanTickCounter = SoundAttractMod.CONFIG.scanCooldownTicks;
+
+
         if (newSound == null) {
-            this.scanTickCounter = SoundAttractMod.CONFIG.scanCooldownTicks;
             return false;
         }
 
-        this.scanTickCounter = SoundAttractMod.CONFIG.scanCooldownTicks;
 
         if (SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info(
@@ -641,7 +648,6 @@ public class AttractionGoal extends Goal {
                         null, 
                         "relayed_sound_" + relay.hashCode(), 
                         new BlockPos((int)Math.round(relay.x), (int)Math.round(relay.y), (int)Math.round(relay.z)),
-                        SoundTracker.SoundRecord.DEFAULT_TICKS_REMAINING,
                         world.getRegistryKey().getValue().toString(),
                         relay.range,
                         relay.weight
@@ -717,9 +723,32 @@ public class AttractionGoal extends Goal {
         return isPursuingSound;
     }
 
+    public void setSoundTarget(SoundTracker.SoundRecord sound) {
+        if (sound == null) return;
+
+        double switchRatio = SoundAttractMod.CONFIG.soundSwitchRatio;
+        boolean isBetter = this.cachedSound == null || sound.weight > this.cachedSound.weight * switchRatio;
+
+        if (isBetter) {
+            this.cachedSound = sound;
+            this.targetSoundPos = sound.pos;
+            this.currentTargetWeight = sound.weight;
+            this.isPursuingSound = true;
+            this.pursuingSoundTicksRemaining = sound.ticksRemaining > 0 ? sound.ticksRemaining : SoundAttractMod.CONFIG.scanCooldownTicks;
+
+            if (SoundAttractMod.CONFIG.debugLogging) {
+                SoundAttractMod.LOGGER.info(
+                    "[AttractionGoal] Externally set new sound target for {}: pos={}, weight={}",
+                    this.mob.getName().getString(), sound.pos, String.format("%.2f", sound.weight)
+                );
+            }
+        }
+    }
+
     public static void handleSoundAttraction(MobEntity mob, SoundTracker.SoundRecord sound) {
         AttractionGoal goal = getAttractionGoal(mob);
         if (goal != null && sound != null) {
+            goal.setSoundTarget(sound);
             goal.cachedSound = sound;
             goal.targetSoundPos = sound.pos;
             goal.currentTargetWeight = sound.weight;

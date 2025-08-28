@@ -82,7 +82,7 @@ public class VanillaIntegrationEvents {
         if (soundId.equals(SoundMessagePayload.VOICE_CHAT_SOUND_ID)) {
             if (range > 0) {
 
-                SoundTracker.addSound(world, null, pos, range, weight, lifetime, soundIdStr);
+                SoundTracker.addSound(world, null, pos, range, weight, soundIdStr);
             }
         } else {
             SoundEvent se = Registries.SOUND_EVENT.get(soundId);
@@ -92,11 +92,11 @@ public class VanillaIntegrationEvents {
                             soundIdStr, range, weight, x, y, z, world.getRegistryKey().getValue());
                 }
 
-                SoundTracker.addSound(world, se, pos, range, weight, lifetime, soundIdStr);
+                SoundTracker.addSound(world, se, pos, range, weight, soundIdStr);
             } else {
                 if (animatorClass != null && !animatorClass.isEmpty()) {
 
-                    SoundTracker.addVirtualSound(world, pos, range, weight, lifetime, uuid.orElse(null), animatorClass);
+                    SoundTracker.addVirtualSound(world, pos, range, weight, uuid.orElse(null), animatorClass);
                 }
             }
         }

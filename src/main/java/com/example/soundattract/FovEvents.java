@@ -132,8 +132,9 @@ public class FovEvents {
     }
 
     public static boolean isTargetInFov(MobEntity looker, net.minecraft.entity.Entity target, boolean checkObstructions) {
-        if (USER_EXCLUSION_CACHE == null) {
-            buildCaches();
+        if (USER_EXCLUSION_CACHE == null || CONFIG_FOV_CACHE == null) {
+            SoundAttractMod.LOGGER.warn("[FovEvents] Caches not built, using default behavior. This should only happen if config fails to load.");
+            return true;
         }
 
         Identifier lookerId = Registries.ENTITY_TYPE.getId(looker.getType());
@@ -258,15 +259,14 @@ public class FovEvents {
         }
 
 
-        if (NON_BLOCKING_VISION_ALLOW == null) {
-            buildCaches();
+        if (NON_BLOCKING_VISION_ALLOW != null) {
+            try {
+                Identifier bid = Registries.BLOCK.getId(state.getBlock());
+                if (bid != null && NON_BLOCKING_VISION_ALLOW.contains(bid)) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
         }
-        try {
-            Identifier bid = Registries.BLOCK.getId(state.getBlock());
-            if (bid != null && NON_BLOCKING_VISION_ALLOW != null && NON_BLOCKING_VISION_ALLOW.contains(bid)) {
-                return true;
-            }
-        } catch (Throwable ignored) {}
 
 
 

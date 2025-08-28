@@ -58,7 +58,7 @@ public class SoundMessageHandler {
                 }
 
 
-                SoundTracker.addSound(serverWorld, null, pos, finalRange, finalWeight, lifetime, payload.soundId().toString());
+                SoundTracker.addSound(serverWorld, null, pos, finalRange, finalWeight, payload.soundId().toString());
 
                 if (SoundAttractMod.CONFIG.debugLogging) {
                     SoundAttractMod.LOGGER.info("[SoundMessage] Handled PointBlank sound: action={}, gunId={}, finalRange={}, finalWeight={}",
@@ -99,7 +99,7 @@ public class SoundMessageHandler {
                         SoundAttractMod.LOGGER.info("[SoundMessage] VOICE_CHAT handled at {} in {} with range={} weight={}",
                                 pos, serverWorld.getRegistryKey().getValue(), effectiveRange, payload.weight());
                     }
-                    SoundTracker.addSound(serverWorld, null, pos, effectiveRange, payload.weight(), lifetime, SoundMessagePayload.VOICE_CHAT_SOUND_ID.toString());
+                    SoundTracker.addSound(serverWorld, null, pos, effectiveRange, payload.weight(), SoundMessagePayload.VOICE_CHAT_SOUND_ID.toString());
                 }
             } else {
                 double range = payload.range();
@@ -111,7 +111,7 @@ public class SoundMessageHandler {
                         weight = config.weight;
                     }
                 }
-                SoundTracker.addSound(serverWorld, null, pos, range, weight, lifetime, payload.soundId().toString());
+                SoundTracker.addSound(serverWorld, null, pos, range, weight, payload.soundId().toString());
             }
         } catch (Exception e) {
             SoundAttractMod.LOGGER.error("[SoundMessage] Exception in handle for soundId={}", payload.soundId(), e);

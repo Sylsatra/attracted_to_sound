@@ -9,9 +9,7 @@ public class DynamicScanCooldownManager {
     private static volatile double lastTps = 20.0;
 
 
-    public static int currentScanCooldownTicks = (SoundAttractMod.CONFIG != null
-        ? SoundAttractMod.CONFIG.scanCooldownTicks
-        : 20);
+    public static int currentScanCooldownTicks = 20;
 
     private static final int DEFAULT_MAX_COOLDOWN = 60;
     private static final int MOBS_100_MAX_COOLDOWN = 100;
@@ -23,6 +21,16 @@ public class DynamicScanCooldownManager {
     private static final int MOBS_200_THRESHOLD = 200;
     private static final int MOBS_400_THRESHOLD = 400;
     private static final int MOBS_800_THRESHOLD = 800;
+
+    public static void initialize() {
+        if (SoundAttractMod.CONFIG != null) {
+            currentScanCooldownTicks = SoundAttractMod.CONFIG.scanCooldownTicks;
+            SoundAttractMod.LOGGER.info("[CooldownManager] Initialized scan cooldown to {} ticks from config.", currentScanCooldownTicks);
+        } else {
+            currentScanCooldownTicks = 20;
+            SoundAttractMod.LOGGER.warn("[CooldownManager] Config not available during initialization, defaulting scan cooldown to 20 ticks.");
+        }
+    }
 
 
     private static double getLowTps() {

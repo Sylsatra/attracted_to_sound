@@ -14,6 +14,7 @@ import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.example.soundattract.logic.SoundMessageHandler;
 import com.example.soundattract.loot.ModLootTables;
 import com.example.soundattract.network.SimpleNbtSyncPayload;
+import com.example.soundattract.util.WorkerScheduler;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -26,11 +27,25 @@ import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.entity.ai.brain.MemoryModuleType;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import su.plo.voice.api.server.PlasmoVoiceServer;
 
+import java.util.Optional;
 
+/**
+ * Main mod class.
+ */
 public class SoundAttractMod implements ModInitializer {
     public static final String MOD_ID = "soundattract";
+        public static final MemoryModuleType<BlockPos> SOUND_ATTRACTION_MEMORY = Registry.register(
+            Registries.MEMORY_MODULE_TYPE,
+            Identifier.of(MOD_ID, "sound_attraction_memory"),
+            new MemoryModuleType<>(Optional.of(BlockPos.CODEC))
+    );
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static SoundAttractConfigData CONFIG;
 
@@ -41,7 +56,7 @@ public class SoundAttractMod implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        CONFIG = ConfigLoader.load();
+        ConfigReloadListener.reloadConfig();
         if (CONFIG == null) {
             LOGGER.error("Failed to load SoundAttractMod configuration! Using default or limited functionality.");
             CONFIG = new SoundAttractConfigData();
@@ -60,7 +75,7 @@ public class SoundAttractMod implements ModInitializer {
         MobCellAssignmentHooks.register();
         ConfigReloadListener.registerCommand();
         VanillaIntegrationEvents.register();
-        FovEvents.buildCaches();
+
         StealthDetectionEvents.register();
 
         registerNetworkHandlers();
@@ -140,7 +155,6 @@ public class SoundAttractMod implements ModInitializer {
 
     private void registerTickEvents() {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            int totalMobCount = 0;
             if (lastTickTimeNanos == 0L) {
                 lastTickTimeNanos = System.nanoTime();
             } else {
@@ -150,17 +164,20 @@ public class SoundAttractMod implements ModInitializer {
 
                 averageTickTimeNanos = averageTickTimeNanos * (1.0 - tpsSmoothingFactor) + elapsedNanos * tpsSmoothingFactor;
                 double tps = Math.min(20.0, 1_000_000_000.0 / averageTickTimeNanos);
-                CONFIG.lastKnownTps = tps;
+                if (CONFIG != null) {
+                    CONFIG.lastKnownTps = tps;
+                }
             }
 
-            for (ServerWorld level : server.getWorlds()) {
-                totalMobCount += SoundAttractionEvents.onServerTick(level);
-            }
-            long currentTime = server.getOverworld().getTime();
-            DynamicScanCooldownManager.update(currentTime, totalMobCount);
 
+            SoundAttractionEvents.onServerTick(server);
 
             BlockBreakerManager.processPendingActions();
+
+
+            long applyBudgetMs = 2L;
+            WorkerScheduler.drainGroupResults(com.example.soundattract.ai.MobGroupManager::applyGroupResult, applyBudgetMs);
+            WorkerScheduler.drainSoundResults(result -> com.example.soundattract.SoundTracker.applySoundScoreResult(server, result), applyBudgetMs);
         });
     }
 

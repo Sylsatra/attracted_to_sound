@@ -9,6 +9,8 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.config.ConfigLoader;
+import com.example.soundattract.util.WorkerScheduler.GroupComputeResult;
 import java.lang.ref.WeakReference;
 import net.minecraft.registry.Registries;
 
@@ -17,25 +19,15 @@ import net.minecraft.world.World;
 public class MobGroupManager {
     private static List<Long> cellsToProcess = new ArrayList<>();
     private static int nextCellIndex = 0;
-    public static int CELLS_PER_TICK = 20;
-    public static int MOBS_PER_CELL_PER_TICK = 10;
-    public static int MIN_CELLS_PER_TICK = 5;
-    public static int MAX_CELLS_PER_TICK = 40;
-    public static int MIN_MOBS_PER_CELL_PER_TICK = 3;
-    public static int MAX_MOBS_PER_CELL_PER_TICK = 30;
 
     private static final Map<Long, java.util.Deque<MobEntity>> cellEdgeMobs = new java.util.HashMap<>();
-    private static final double EDGE_MARGIN = 2.0;
-    private static final int EDGE_MOBS_PER_TICK = 4;
     private static final Map<UUID, MobEntity> uuidToLeader = Collections.synchronizedMap(new HashMap<>());
     private static final List<WeakReference<MobEntity>> leaders = Collections.synchronizedList(new ArrayList<>());
     private static final Map<MobEntity, List<SoundRelay>> mobToRelayedSounds = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<MobEntity, Long> mobLastRelayTime = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Set<UUID> deserterUuids = Collections.synchronizedSet(new HashSet<>());
     private static long lastGroupUpdateTime = -1;
-    private static final int RELAY_SOUND_TTL = 40; 
-    private static final int RELAY_SOUND_RATE_LIMIT = 20; 
-    private static final double STICKY_RADIUS_MARGIN = 2.0; 
+ 
     private static long lastCleanupTime = -1;
     private static final Object cleanupLock = new Object();
     private static Map<MobEntity, Set<MobEntity>> lastEdgeMobEntityMap = new HashMap<>(); 
@@ -51,7 +43,7 @@ public class MobGroupManager {
         @Override
         public boolean equals(Object o) {
             if (!(o instanceof SoundRelay other)) return false;
-            return this.hash == other.hash && Math.abs(this.timestamp - other.timestamp) < RELAY_SOUND_TTL;
+            return this.hash == other.hash && Math.abs(this.timestamp - other.timestamp) < SoundAttractMod.CONFIG.soundEventTTL;
         }
         @Override
         public int hashCode() { return hash; }
@@ -112,20 +104,15 @@ public class MobGroupManager {
         } else if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.lastKnownTps > 0) {
             tps = com.example.soundattract.SoundAttractMod.CONFIG.lastKnownTps;
         }
-        if (com.example.soundattract.SoundAttractMod.CONFIG != null) {
-            MIN_CELLS_PER_TICK = com.example.soundattract.SoundAttractMod.CONFIG.minCellsPerTick;
-            MAX_CELLS_PER_TICK = com.example.soundattract.SoundAttractMod.CONFIG.maxCellsPerTick;
-            MIN_MOBS_PER_CELL_PER_TICK = com.example.soundattract.SoundAttractMod.CONFIG.minMobsPerCellPerTick;
-            MAX_MOBS_PER_CELL_PER_TICK = com.example.soundattract.SoundAttractMod.CONFIG.maxMobsPerCellPerTick;
-        }
         double clampedTps = Math.max(10.0, Math.min(20.0, tps));
-        double tpsFrac = (clampedTps - 10.0) / 10.0; 
-        CELLS_PER_TICK = (int)Math.round(MIN_CELLS_PER_TICK + (MAX_CELLS_PER_TICK - MIN_CELLS_PER_TICK) * tpsFrac);
-        MOBS_PER_CELL_PER_TICK = (int)Math.round(MIN_MOBS_PER_CELL_PER_TICK + (MAX_MOBS_PER_CELL_PER_TICK - MIN_MOBS_PER_CELL_PER_TICK) * tpsFrac);
-        if (MIN_CELLS_PER_TICK == MAX_CELLS_PER_TICK) CELLS_PER_TICK = MIN_CELLS_PER_TICK;
-        if (MIN_MOBS_PER_CELL_PER_TICK == MAX_MOBS_PER_CELL_PER_TICK) MOBS_PER_CELL_PER_TICK = MIN_MOBS_PER_CELL_PER_TICK;
-        if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] TPS: {} | CELLS_PER_TICK: {} | MOBS_PER_CELL_PER_TICK: {}", tps, CELLS_PER_TICK, MOBS_PER_CELL_PER_TICK);
+        double tpsFrac = (clampedTps - 10.0) / 10.0;
+        int cellsPerTick = (int) Math.round(SoundAttractMod.CONFIG.minCellsPerTick + (SoundAttractMod.CONFIG.maxCellsPerTick - SoundAttractMod.CONFIG.minCellsPerTick) * tpsFrac);
+        int mobsPerCellPerTick = (int) Math.round(SoundAttractMod.CONFIG.minMobsPerCellPerTick + (SoundAttractMod.CONFIG.maxMobsPerCellPerTick - SoundAttractMod.CONFIG.minMobsPerCellPerTick) * tpsFrac);
+        if (SoundAttractMod.CONFIG.minCellsPerTick == SoundAttractMod.CONFIG.maxCellsPerTick) cellsPerTick = SoundAttractMod.CONFIG.minCellsPerTick;
+        if (SoundAttractMod.CONFIG.minMobsPerCellPerTick == SoundAttractMod.CONFIG.maxMobsPerCellPerTick) mobsPerCellPerTick = SoundAttractMod.CONFIG.minMobsPerCellPerTick;
+
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[MobGroupManager] TPS: {} | cellsPerTick: {} | mobsPerCellPerTick: {}", tps, cellsPerTick, mobsPerCellPerTick);
         }
 
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging)
@@ -150,13 +137,13 @@ public class MobGroupManager {
         }
         int cellsProcessed = 0;
         List<MobEntity> mobs = new ArrayList<>();
-        for (; nextCellIndex < cellsToProcess.size() && cellsProcessed < CELLS_PER_TICK; nextCellIndex++, cellsProcessed++) {
+        for (; nextCellIndex < cellsToProcess.size() && cellsProcessed < cellsPerTick; nextCellIndex++, cellsProcessed++) {
             Long cellKey = cellsToProcess.get(nextCellIndex);
             LongOpenHashSet uuidSet = com.example.soundattract.ai.SpatialPartitionModule.cellToMobUuids.get(cellKey);
             if (uuidSet == null) continue;
             int mobsProcessed = 0;
             for (long uuidLsb : uuidSet) {
-                if (mobsProcessed >= MOBS_PER_CELL_PER_TICK) break;
+                if (mobsProcessed >= mobsPerCellPerTick) break;
                 for (UUID uuid : com.example.soundattract.ai.SpatialPartitionModule.uuidToMobCache.keySet()) {
                     if (uuid.getLeastSignificantBits() == uuidLsb) {
                         MobEntity mob = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(uuid);
@@ -276,8 +263,8 @@ public class MobGroupManager {
         for (MobEntity leader : leaderToGroup.keySet()) {
             List<MobEntity> group = leaderToGroup.get(leader);
             if (group == null) continue;
-            int sectors = com.example.soundattract.SoundAttractMod.CONFIG.numEdgeSectors;
-            int edgePerSector = 4;
+            int sectors = SoundAttractMod.CONFIG.numEdgeSectors;
+            int edgePerSector = SoundAttractMod.CONFIG.edgeMobsPerSector;
             Map<Integer, List<MobEntity>> sectorToFarthestList = new HashMap<>();
             double leaderX = leader.getX(), leaderZ = leader.getZ();
             for (MobEntity m : group) {
@@ -320,7 +307,7 @@ public class MobGroupManager {
         }
         mobToRelayedSounds.entrySet().removeIf(e -> e.getKey().isRemoved());
         for (List<SoundRelay> relays : mobToRelayedSounds.values()) {
-            relays.removeIf(r -> time - r.timestamp > RELAY_SOUND_TTL);
+            relays.removeIf(r -> time - r.timestamp > SoundAttractMod.CONFIG.soundEventTTL);
         }
         mobLastRelayTime.entrySet().removeIf(e -> e.getKey().isRemoved());
         List<MobEntity> allAttractedMobEntities = new ArrayList<>();
@@ -357,7 +344,7 @@ public class MobGroupManager {
         MobEntity leader = getLeader(mob);
         if (leader == mob) return;
         Long lastRelay = mobLastRelayTime.get(mob);
-        if (lastRelay != null && timestamp - lastRelay < RELAY_SOUND_RATE_LIMIT) return;
+        if (lastRelay != null && timestamp - lastRelay < SoundAttractMod.CONFIG.asyncMobGroupCooldownTicks) return;
         mobLastRelayTime.put(mob, timestamp);
         SoundRelay relay = new SoundRelay(x, y, z, range, weight, timestamp);
         List<SoundRelay> relays = mobToRelayedSounds.computeIfAbsent(leader, k -> new ArrayList<>());
@@ -381,7 +368,7 @@ public class MobGroupManager {
         long now = leader.getWorld().getTime();
         Set<SoundRelay> deduped = new HashSet<>();
         for (SoundRelay r : relays) {
-            if (now - r.timestamp <= RELAY_SOUND_TTL) {
+            if (now - r.timestamp <= SoundAttractMod.CONFIG.soundEventTTL) {
                 deduped.add(r);
             }
         }
@@ -417,6 +404,14 @@ public class MobGroupManager {
                     com.example.soundattract.DynamicScanCooldownManager.scheduler.scheduleCell(cellKey, 0, scheduledTick);
                 }
             }
+        }
+    }
+
+    public static void applyGroupResult(GroupComputeResult result) {
+
+
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[MobGroupManager] Received group result, but handler is not yet implemented.");
         }
     }
 
