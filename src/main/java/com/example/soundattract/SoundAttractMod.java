@@ -11,6 +11,7 @@ import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import com.example.soundattract.config.ConfigHelper;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.loot.ModLootModifiers;
@@ -29,7 +30,7 @@ public class SoundAttractMod {
         modEventBus.addListener(this::onCommonSetup);
         modEventBus.addListener(SoundAttractMod::onClientSetup);
 
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, "soundattract-common.toml");
+                ConfigHelper.register();
         
         MinecraftForge.EVENT_BUS.register(new FovEvents());
         MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());

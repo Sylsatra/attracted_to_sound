@@ -59,6 +59,8 @@ public class AttractionGoal extends Goal {
     private int edgeArrivalTicks = 0;
     private static final int EDGE_WAIT_TICKS = 15;
     private BlockBreakerPosGoal blockBreakerGoal = null;
+    private SoundTracker.SoundRecord soundResultCache = null;
+    private long cacheTick = -1L;
 
     private static class DelayedRelay {
 
@@ -221,12 +223,7 @@ public class AttractionGoal extends Goal {
         scanCooldownCounter = scanCooldownTicks();
 
         if (leader != mob && smartEdge) {
-            SoundTracker.SoundRecord directSound = SoundTracker.findNearestSound(
-                    this.mob,
-                    this.mob.level(),
-                    this.mob.blockPosition(),
-                    this.mob.getEyePosition()
-            );
+            SoundTracker.SoundRecord directSound = getCachedNearestSound();
             List<MobGroupManager.SoundRelay> relayedSounds = MobGroupManager.consumeRelayedSounds(this.mob);
             boolean hasDirectSound = directSound != null;
             boolean hasRelayedSound = relayedSounds != null && !relayedSounds.isEmpty();
@@ -297,12 +294,7 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        SoundTracker.SoundRecord bestSoundNow = SoundTracker.findNearestSound(
-                mob,
-                mob.level(),
-                mob.blockPosition(),
-                mob.getEyePosition(),
-                this.cachedSound != null ? this.cachedSound.soundId : null);
+        SoundTracker.SoundRecord bestSoundNow = getCachedNearestSound();
         if (bestSoundNow == null) {
 
             return false;
@@ -310,7 +302,7 @@ public class AttractionGoal extends Goal {
 
         if (bestSoundNow.pos.equals(this.targetSoundPos)) {
             this.cachedSound = bestSoundNow;
-            this.currentTargetWeight = bestSoundNow.weight; // refresh to avoid stale high weight blocking switches
+            this.currentTargetWeight = bestSoundNow.weight;
             this.lastSoundTicksRemaining = bestSoundNow.ticksRemaining;
             this.continueEvalCooldown = Math.max(1, scanCooldownTicks() / 2);
             return true;
@@ -326,6 +318,26 @@ public class AttractionGoal extends Goal {
 
 
         return true;
+    }
+
+    private SoundTracker.SoundRecord getCachedNearestSound() {
+        long currentTick = this.mob.level().getGameTime();
+        if (this.cacheTick == currentTick) {
+            return this.soundResultCache;
+        }
+    
+        this.cacheTick = currentTick;
+
+
+
+        this.soundResultCache = SoundTracker.findNearestSound(
+            this.mob,
+            this.mob.level(),
+            this.mob.blockPosition(),
+            this.mob.getEyePosition(),
+            this.cachedSound != null ? this.cachedSound.soundId : null
+        );
+        return this.soundResultCache;
     }
 
     @Override
@@ -366,12 +378,7 @@ public class AttractionGoal extends Goal {
         if (this.blockBreakerGoal != null && this.mob.goalSelector.getRunningGoals().anyMatch(g -> g.getGoal() == this.blockBreakerGoal)) {
 
 
-            SoundTracker.SoundRecord bestPossibleSound = SoundTracker.findNearestSound(
-                    this.mob,
-                    this.mob.level(),
-                    this.mob.blockPosition(),
-                    this.mob.getEyePosition(),
-                    this.cachedSound != null ? this.cachedSound.soundId : null);
+            SoundTracker.SoundRecord bestPossibleSound = getCachedNearestSound();
 
 
             if (bestPossibleSound != null && this.cachedSound != null && !areSoundsEffectivelySame(bestPossibleSound, this.cachedSound)) {
@@ -402,7 +409,7 @@ public class AttractionGoal extends Goal {
         SoundTracker.SoundRecord fresh = findInterestingSoundRecord();
         double switchRatio = SoundAttractConfig.COMMON.soundSwitchRatio.get();
         if (fresh != null) {
-            // Refresh weight when staying on the same target to prevent stale high values from blocking switches
+
             if (this.targetSoundPos != null && fresh.pos.equals(this.targetSoundPos)) {
                 this.cachedSound = fresh;
                 this.currentTargetWeight = fresh.weight;
@@ -830,13 +837,7 @@ public class AttractionGoal extends Goal {
                 }
             }
         } else {
-            bestSoundOverall = SoundTracker.findNearestSound(
-                    this.mob,
-                    level,
-                    mobPos,
-                    mobEyePos,
-                    this.cachedSound != null ? this.cachedSound.soundId : null
-            );
+            bestSoundOverall = getCachedNearestSound();
         }
 
         SoundTracker.SoundRecord currentTargetSound = this.cachedSound;

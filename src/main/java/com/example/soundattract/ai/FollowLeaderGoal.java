@@ -35,6 +35,7 @@ public class FollowLeaderGoal extends Goal {
     public boolean canUse() {
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false; 
+        if (this.mob.distanceToSqr(leader) > getGroupDistance() * getGroupDistance()) return false; 
         boolean smartEdge = com.example.soundattract.config.SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         if (smartEdge && MobGroupManager.isEdgeMob(mob)) return false;
         if (!leader.isAlive()) return false;
@@ -51,6 +52,7 @@ public class FollowLeaderGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (leader == null || !leader.isAlive()) return false;
+        if (this.mob.distanceToSqr(leader) > getGroupDistance() * getGroupDistance()) return false;
         leaderAttractionGoal = StreamSupport.stream(
             leader.goalSelector.getRunningGoals().spliterator(), false)
             .map(WrappedGoal::getGoal)

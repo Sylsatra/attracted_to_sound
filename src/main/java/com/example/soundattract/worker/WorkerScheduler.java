@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import net.minecraft.resources.ResourceLocation;
 
 public final class WorkerScheduler {
     private static final BlockingQueue<GroupComputeResult> GROUP_RESULTS = new LinkedBlockingQueue<>();
@@ -56,7 +57,7 @@ public final class WorkerScheduler {
         }
     }
 
-    public static Future<?> submitGroupCompute(List<MobSnapshot> mobs, ConfigSnapshot cfg) {
+        public static Future<?> submitGroupCompute(List<MobSnapshot> mobs, ConfigSnapshot cfg, ResourceLocation dimension) {
         ensureInit();
         long computedDeadline = System.currentTimeMillis() + 10L;
         try {
@@ -69,7 +70,7 @@ public final class WorkerScheduler {
         final long deadlineMs = computedDeadline;
         return EXECUTOR.submit(() -> {
             try {
-                GroupComputeResult result = computeGroups(mobs, cfg, deadlineMs);
+                GroupComputeResult result = computeGroups(mobs, cfg, deadlineMs, dimension);
                 if (result != null) GROUP_RESULTS.offer(result);
             } catch (Throwable t) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -114,7 +115,7 @@ public final class WorkerScheduler {
         return list;
     }
 
-    private static GroupComputeResult computeGroups(List<MobSnapshot> mobs, ConfigSnapshot cfg, long deadlineMs) {
+    private static GroupComputeResult computeGroups(List<MobSnapshot> mobs, ConfigSnapshot cfg, long deadlineMs, ResourceLocation dimension) {
         if (mobs == null || mobs.isEmpty()) return null;
         List<MobSnapshot> candidates = new ArrayList<>();
         for (MobSnapshot m : mobs) {
@@ -227,7 +228,7 @@ public final class WorkerScheduler {
             if (!assigned.contains(m.uuid())) deserters.add(m.uuid());
         }
 
-        return new GroupComputeResult(mobToLeader, edgeByLeader, deserters);
+        return new GroupComputeResult(dimension, mobToLeader, edgeByLeader, deserters);
     }
 
     private static void computeSoundScores(List<SoundScoreRequest> batch, long deadlineMs) {
@@ -309,7 +310,8 @@ public final class WorkerScheduler {
                                  double leaderSpacingMultiplier,
                                  int numEdgeSectors) {}
 
-    public record GroupComputeResult(Map<UUID, UUID> mobUuidToLeaderUuid,
+    public record GroupComputeResult(ResourceLocation dimension,
+                                     Map<UUID, UUID> mobUuidToLeaderUuid,
                                      Map<UUID, Set<UUID>> edgeMobsByLeaderUuid,
                                      Set<UUID> deserterUuids) {}
 
