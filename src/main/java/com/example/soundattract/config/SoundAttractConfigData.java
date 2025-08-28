@@ -318,6 +318,23 @@ public class SoundAttractConfigData {
     public boolean debugLogging = false;
 
     /**
+     * Internal schema version for config migrations. Increment when structure changes.
+     */
+    public int configSchemaVersion = 1;
+
+
+    /** Number of worker threads for off-thread computations. <= 0 uses (CPUs-1). */
+    public int workerThreads = 0;
+    /** Capacity of the worker task queue before DiscardOldestPolicy kicks in. */
+    public int workerQueueCapacity = 1024;
+    /** Budget in milliseconds per tick to drain and apply async results on main thread. */
+    public long workerTaskBudgetMs = 2L;
+    /** Per-mob cooldown in ticks between async submissions to avoid spamming. */
+    public int asyncSubmitCooldownTicks = 10;
+    /** TTL in milliseconds for async sound results cache before considered stale. */
+    public long asyncResultTtlMs = 2500L;
+
+    /**
      * The lifetime of a sound event in ticks (20 ticks = 1 second). Higher
      * values mean mobs will be attracted to sounds for longer. Default: 200 (10
      * seconds) Recommended: 40–400. Minimum: 1. Maximum: 1200. Lower values =
@@ -1312,7 +1329,7 @@ public class SoundAttractConfigData {
             "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
     ));
 
-        // === Fabric-native Block Breaking (no EnhancedAI required) ===
+
     /** If true, mobs can break blocks when stuck pursuing a sound. */
     public boolean enableBlockBreaking = false;
     /** Multiplier applied to time needed to break a block. Higher = slower. Default 1.0 */
@@ -1332,7 +1349,7 @@ public class SoundAttractConfigData {
     /** List of block IDs used as blacklist or whitelist depending on mode. */
     public java.util.List<String> blockBreakBlockList = new java.util.ArrayList<>();
 
-    // === Smart LOS configuration ===
+
     /**
      * Blocks in this list are treated as NOT blocking vision by smart LOS.
      * Entries must be full block IDs like "modid:block_name".

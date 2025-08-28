@@ -106,6 +106,17 @@ public class SoundAttractionEvents {
                 com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundAttractionEvents] mobEntities.size: {}, checked: {}, skipped: {}", mobEntities.size(), checkedEntities, skippedEntities);
             }
             long processStart = System.nanoTime();
+
+
+            for (MobEntity mob : mobEntities) {
+                try {
+                    com.example.soundattract.SoundTracker.submitAsyncSoundScore(serverWorld, mob, mob.getBlockPos());
+                } catch (Throwable t) {
+                    if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+                        com.example.soundattract.SoundAttractMod.LOGGER.debug("[SoundAttractionEvents] submitAsyncSoundScore failed for mob {}: {}", mob.getUuid(), t.toString());
+                    }
+                }
+            }
             for (SoundTracker.SoundRecord sound : SoundTracker.getRecentSounds()) {
                 java.util.List<MobEntity> mobs = SoundTracker.getMobsForSound(
                     serverWorld,
@@ -218,12 +229,12 @@ public class SoundAttractionEvents {
         boolean attractionGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
                 .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
         if (!attractionGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(0, new AttractionGoal(mob, moveSpeed));
+            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new AttractionGoal(mob, moveSpeed));
         }
         boolean followLeaderGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
                 .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof FollowLeaderGoal);
         if (!followLeaderGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(1, new FollowLeaderGoal(mob, moveSpeed));
+            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new FollowLeaderGoal(mob, moveSpeed));
         }
     }
 

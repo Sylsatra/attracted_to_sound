@@ -13,6 +13,7 @@ import java.lang.ref.WeakReference;
 import net.minecraft.registry.Registries;
 
 import net.minecraft.world.World;
+import com.example.soundattract.util.ThreadingChecks;
 
 public class MobGroupManager {
     private static List<Long> cellsToProcess = new ArrayList<>();
@@ -39,6 +40,27 @@ public class MobGroupManager {
     private static long lastCleanupTime = -1;
     private static final Object cleanupLock = new Object();
     private static Map<MobEntity, Set<MobEntity>> lastEdgeMobEntityMap = new HashMap<>(); 
+
+
+    static final class MemberInfo {
+        final UUID uuid; final double x; final double z;
+        MemberInfo(UUID uuid, double x, double z) { this.uuid = uuid; this.x = x; this.z = z; }
+    }
+    static final class LeaderGroupSnapshot {
+        final UUID leaderUuid; final double leaderX; final double leaderZ; final java.util.List<MemberInfo> members;
+        LeaderGroupSnapshot(UUID leaderUuid, double leaderX, double leaderZ, java.util.List<MemberInfo> members) {
+            this.leaderUuid = leaderUuid; this.leaderX = leaderX; this.leaderZ = leaderZ; this.members = members;
+        }
+    }
+    static final class GroupEdgeSnapshot {
+        final java.util.List<LeaderGroupSnapshot> groups;
+        GroupEdgeSnapshot(java.util.List<LeaderGroupSnapshot> groups) { this.groups = groups; }
+    }
+    static final class GroupEdgeComputeOutput {
+        final java.util.Map<UUID, java.util.Set<UUID>> leaderToEdgeUuids;
+        GroupEdgeComputeOutput(java.util.Map<UUID, java.util.Set<UUID>> leaderToEdgeUuids) { this.leaderToEdgeUuids = leaderToEdgeUuids; }
+        @Override public String toString() { return "GroupEdgeComputeOutput{" + leaderToEdgeUuids.size() + " groups}"; }
+    }
 
     public static class SoundRelay {
         public final double x, y, z, range, weight;
@@ -73,6 +95,7 @@ public class MobGroupManager {
         }
     }
     public static boolean isEdgeMobEntity(MobEntity mob) {
+        if (mob != null) com.example.soundattract.util.ThreadingChecks.warnIfOffServerThread(mob.getWorld(), "MobGroupManager.isEdgeMobEntity");
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging)
             com.example.soundattract.SoundAttractMod.LOGGER.info("[isEdgeMobEntity] Checking mob {} (pos: {}, {})", mob.getName().getString(), mob.getX(), mob.getZ());
         MobEntity leader = getLeader(mob);
@@ -118,6 +141,7 @@ public class MobGroupManager {
     }
 
     public static void updateGroups(ServerWorld level) {
+        ThreadingChecks.warnIfOffServerThread(level, "MobGroupManager.updateGroups");
         double tps = 20.0;
         if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.serverTpsSupplier != null) {
             tps = com.example.soundattract.SoundAttractMod.CONFIG.serverTpsSupplier.get();
@@ -274,6 +298,10 @@ public class MobGroupManager {
         }
 
 
+
+        submitEdgeSelectionAsync(leaderToGroup);
+
+
         for (MobEntity mob : attractedMobEntities) {
             if (!uuidToLeader.containsKey(mob.getUuid())) {
                 deserterUuids.add(mob.getUuid());
@@ -284,6 +312,7 @@ public class MobGroupManager {
                 deserterUuids.remove(mob.getUuid());
             }
         }
+
         lastEdgeMobEntityMap.clear();
         for (MobEntity leader : leaderToGroup.keySet()) {
             List<MobEntity> group = leaderToGroup.get(leader);
@@ -300,9 +329,8 @@ public class MobGroupManager {
                 sectorToFarthestList.computeIfAbsent(sector, k -> new ArrayList<>()).add(m);
             }
             Set<MobEntity> edgeMobEntities = new HashSet<>();
-            for (Map.Entry<Integer, List<MobEntity>> entry : sectorToFarthestList.entrySet()) {
-                int sector = entry.getKey();
-                List<MobEntity> mobsInSector = entry.getValue();
+            for (Map.Entry<Integer, List<MobEntity>> entry2 : sectorToFarthestList.entrySet()) {
+                List<MobEntity> mobsInSector = entry2.getValue();
                 mobsInSector.sort((a, b) -> Double.compare(b.distanceTo(leader), a.distanceTo(leader)));
                 int edgeCount = Math.min(edgePerSector, mobsInSector.size());
                 if (edgeCount == 0 && !mobsInSector.isEmpty()) edgeCount = 1;
@@ -316,10 +344,7 @@ public class MobGroupManager {
                 for (MobEntity m : group) {
                     if (m == leader) continue;
                     double dist = m.distanceTo(leader);
-                    if (dist > maxDist) {
-                        maxDist = dist;
-                        farthest = m;
-                    }
+                    if (dist > maxDist) { maxDist = dist; farthest = m; }
                 }
                 if (farthest != null) edgeMobEntities.add(farthest);
             }
@@ -327,7 +352,7 @@ public class MobGroupManager {
             if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
                 StringBuilder sb = new StringBuilder();
                 for (MobEntity edge : edgeMobEntities) sb.append(edge.getName().getString()).append(", ");
-                com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Edge mobs for leader {}: {}", leader.getName().getString(), sb.toString());
+                com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] Edge mobs for leader {} (sync): {}", leader.getName().getString(), sb.toString());
             }
         }
         mobToRelayedSounds.entrySet().removeIf(e -> e.getKey().isRemoved());
@@ -366,6 +391,7 @@ public class MobGroupManager {
     }
 
     public static void relaySoundToLeader(MobEntity mob, double x, double y, double z, double range, double weight, long timestamp) {
+        if (mob != null) ThreadingChecks.warnIfOffServerThread(mob.getWorld(), "MobGroupManager.relaySoundToLeader");
         MobEntity leader = getLeader(mob);
         if (leader == mob) return;
         Long lastRelay = mobLastRelayTime.get(mob);
@@ -379,6 +405,7 @@ public class MobGroupManager {
     }
 
     public static List<SoundRelay> consumeRelayedSounds(MobEntity leader) {
+        if (leader != null) ThreadingChecks.warnIfOffServerThread(leader.getWorld(), "MobGroupManager.consumeRelayedSounds");
         List<SoundRelay> relays = mobToRelayedSounds.remove(leader);
         if (relays == null) return Collections.emptyList();
         long now = leader.getWorld().getTime();
@@ -404,6 +431,7 @@ public class MobGroupManager {
     }
 
     public static void updateCellGroup(long cellKey, ServerWorld level) {
+        ThreadingChecks.warnIfOffServerThread(level, "MobGroupManager.updateCellGroup");
         List<String> attracted = com.example.soundattract.SoundAttractMod.CONFIG.attractedEntities.stream().map(Object::toString).toList();
         List<MobEntity> mobsInCell = new ArrayList<>();
         LongOpenHashSet uuidSet = com.example.soundattract.ai.SpatialPartitionModule.cellToMobUuids.get(cellKey);
@@ -499,6 +527,7 @@ public class MobGroupManager {
     }
 
     public static void scheduleCellsForSound(BlockPos soundPos, double range, ServerWorld level, long currentTick) {
+        ThreadingChecks.warnIfOffServerThread(level, "MobGroupManager.scheduleCellsForSound");
         int partitionSize = com.example.soundattract.SoundAttractMod.CONFIG.spatialPartitionSize;
         int gridRadius = (int)Math.ceil(range / partitionSize);
         int baseX = soundPos.getX() / partitionSize;
@@ -519,6 +548,7 @@ public class MobGroupManager {
     }
 
     public static void scheduleNearbyCellsForPlayers(ServerWorld level, long currentTick) {
+        ThreadingChecks.warnIfOffServerThread(level, "MobGroupManager.scheduleNearbyCellsForPlayers");
         int[] tierRadii = new int[] {3, 5, 8, 12};
         for (net.minecraft.server.network.ServerPlayerEntity player : level.getPlayers()) {
             net.minecraft.util.math.BlockPos pos = player.getBlockPos();
@@ -535,5 +565,105 @@ public class MobGroupManager {
             }
         }
     }
-}
 
+
+    public static void applyGroupResult(com.example.soundattract.util.WorkerScheduler.GroupComputeResult result) {
+        if (result == null || result.data == null) return;
+
+        net.minecraft.world.World guardWorld = null;
+        if (result.data instanceof GroupEdgeComputeOutput edgeOut) {
+            for (java.util.UUID leaderId : edgeOut.leaderToEdgeUuids.keySet()) {
+                MobEntity leaderRef = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(leaderId);
+                if (leaderRef != null) { guardWorld = leaderRef.getWorld(); break; }
+            }
+        }
+        if (guardWorld != null) {
+            com.example.soundattract.util.ThreadingChecks.warnIfOffServerThread(guardWorld, "MobGroupManager.applyGroupResult");
+        }
+        if (result.data instanceof GroupEdgeComputeOutput out) {
+            Map<MobEntity, Set<MobEntity>> newMap = new HashMap<>();
+            for (Map.Entry<UUID, java.util.Set<UUID>> e : out.leaderToEdgeUuids.entrySet()) {
+                MobEntity leader = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(e.getKey());
+                if (leader == null || leader.isRemoved()) continue;
+                Set<MobEntity> edges = new HashSet<>();
+                for (UUID edgeUuid : e.getValue()) {
+                    MobEntity mob = com.example.soundattract.ai.SpatialPartitionModule.getMobFromCache(edgeUuid);
+                    if (mob != null && mob.isAlive()) edges.add(mob);
+                }
+                if (!edges.isEmpty()) newMap.put(leader, edges);
+            }
+            if (!newMap.isEmpty()) {
+                lastEdgeMobEntityMap.clear();
+                lastEdgeMobEntityMap.putAll(newMap);
+                if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.debug("[MobGroupManager] Applied async edge selection for {} groups.", newMap.size());
+                }
+            }
+        } else {
+            if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+                com.example.soundattract.SoundAttractMod.LOGGER.debug("[MobGroupManager] Ignoring unknown group result type: {}", result.data.getClass().getName());
+            }
+        }
+    }
+
+
+    private static void submitEdgeSelectionAsync(Map<MobEntity, List<MobEntity>> leaderToGroup) {
+        if (leaderToGroup == null || leaderToGroup.isEmpty()) return;
+        java.util.List<LeaderGroupSnapshot> groupSnaps = new ArrayList<>();
+        for (Map.Entry<MobEntity, List<MobEntity>> e : leaderToGroup.entrySet()) {
+            MobEntity leader = e.getKey();
+            if (leader == null || leader.isRemoved()) continue;
+            java.util.List<MemberInfo> members = new ArrayList<>();
+            for (MobEntity m : e.getValue()) {
+                if (m == null || m.isRemoved()) continue;
+                members.add(new MemberInfo(m.getUuid(), m.getX(), m.getZ()));
+            }
+            groupSnaps.add(new LeaderGroupSnapshot(leader.getUuid(), leader.getX(), leader.getZ(), members));
+        }
+        GroupEdgeSnapshot snapshot = new GroupEdgeSnapshot(groupSnaps);
+
+        if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
+            com.example.soundattract.SoundAttractMod.LOGGER.debug("[MobGroupManager] Submitting async group edge compute for {} groups", groupSnaps.size());
+        }
+        com.example.soundattract.util.WorkerScheduler.submitGroupTask(() -> {
+            int sectors = com.example.soundattract.SoundAttractMod.CONFIG != null ? com.example.soundattract.SoundAttractMod.CONFIG.numEdgeSectors : 8;
+            int edgePerSector = 4;
+            java.util.Map<UUID, java.util.Set<UUID>> out = new java.util.HashMap<>();
+            for (LeaderGroupSnapshot g : snapshot.groups) {
+                if (g == null || g.members == null || g.members.isEmpty()) continue;
+                java.util.Map<Integer, java.util.List<MemberInfo>> sectorMap = new java.util.HashMap<>();
+                for (MemberInfo mi : g.members) {
+                    if (mi.uuid.equals(g.leaderUuid)) continue;
+                    double dx = mi.x - g.leaderX;
+                    double dz = mi.z - g.leaderZ;
+                    double angle = Math.atan2(dz, dx);
+                    int sector = (int) Math.floor(((angle + Math.PI) / (2 * Math.PI)) * sectors) % sectors;
+                    sectorMap.computeIfAbsent(sector, k -> new java.util.ArrayList<>()).add(mi);
+                }
+                java.util.Set<UUID> edges = new java.util.HashSet<>();
+                for (java.util.List<MemberInfo> list : sectorMap.values()) {
+                    list.sort((a, b) -> {
+                        double da = (a.x - g.leaderX) * (a.x - g.leaderX) + (a.z - g.leaderZ) * (a.z - g.leaderZ);
+                        double db = (b.x - g.leaderX) * (b.x - g.leaderX) + (b.z - g.leaderZ) * (b.z - g.leaderZ);
+                        return Double.compare(db, da);
+                    });
+                    int edgeCount = Math.min(edgePerSector, list.size());
+                    if (edgeCount == 0 && !list.isEmpty()) edgeCount = 1;
+                    for (int i = 0; i < edgeCount; i++) edges.add(list.get(i).uuid);
+                }
+                if (edges.isEmpty() && g.members.size() > 1) {
+
+                    MemberInfo farthest = null; double max = -1;
+                    for (MemberInfo mi : g.members) {
+                        if (mi.uuid.equals(g.leaderUuid)) continue;
+                        double d = (mi.x - g.leaderX) * (mi.x - g.leaderX) + (mi.z - g.leaderZ) * (mi.z - g.leaderZ);
+                        if (d > max) { max = d; farthest = mi; }
+                    }
+                    if (farthest != null) edges.add(farthest.uuid);
+                }
+                if (!edges.isEmpty()) out.put(g.leaderUuid, edges);
+            }
+            return new com.example.soundattract.util.WorkerScheduler.GroupComputeResult(new GroupEdgeComputeOutput(out));
+        });
+    }
+}

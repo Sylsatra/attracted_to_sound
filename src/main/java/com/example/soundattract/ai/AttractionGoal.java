@@ -641,9 +641,15 @@ public class AttractionGoal extends Goal {
         MobEntity leader = MobGroupManager.getLeader(mob);
 
         SoundTracker.SoundRecord bestNewSoundEvent;
+        String dimensionKey = world.getRegistryKey().getValue().toString();
 
         if (leader == mob) {
-            SoundTracker.SoundRecord directSound = SoundTracker.findNearestSound(world, mob, mobPos, mob.getEyePos());
+
+            SoundTracker.SoundRecord directSound = SoundTracker.getCachedBestFor(mob, dimensionKey);
+            if (directSound == null) {
+                SoundTracker.submitAsyncSoundScore(world, mob, mobPos);
+                directSound = SoundTracker.findNearestSound(world, mob, mobPos, mob.getEyePos());
+            }
             List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(mob);
 
             bestNewSoundEvent = directSound;
@@ -667,7 +673,12 @@ public class AttractionGoal extends Goal {
                 }
             }
         } else {
-            bestNewSoundEvent = SoundTracker.findNearestSound(world, mob, mobPos, mob.getEyePos());
+
+            bestNewSoundEvent = SoundTracker.getCachedBestFor(mob, dimensionKey);
+            if (bestNewSoundEvent == null) {
+                SoundTracker.submitAsyncSoundScore(world, mob, mobPos);
+                bestNewSoundEvent = SoundTracker.findNearestSound(world, mob, mobPos, mob.getEyePos());
+            }
         }
 
         SoundTracker.SoundRecord finalDecisionSound;

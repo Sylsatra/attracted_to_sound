@@ -14,6 +14,7 @@ import com.example.soundattract.integration.VanillaIntegrationEvents;
 import com.example.soundattract.network.FabricSimpleNbtSync;
 import com.example.soundattract.loot.ModLootTables;
 import com.example.soundattract.FovEvents;
+import com.example.soundattract.util.WorkerScheduler;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -139,6 +140,15 @@ public class SoundAttractMod implements ModInitializer {
             for (ServerWorld level : server.getWorlds()) {
                 SoundAttractionEvents.onServerTick(level);
             }
+
+
+            long applyBudgetMs = 2L;
+            if (CONFIG != null) {
+                long cfgMs = CONFIG.workerTaskBudgetMs;
+                if (cfgMs > 0) applyBudgetMs = Math.min(20L, cfgMs);
+            }
+            WorkerScheduler.drainGroupResults(com.example.soundattract.ai.MobGroupManager::applyGroupResult, applyBudgetMs);
+            WorkerScheduler.drainSoundResults(com.example.soundattract.SoundTracker::applySoundScoreResult, applyBudgetMs);
         });
 
         ServerTickEvents.END_WORLD_TICK.register((ServerWorld world) -> {

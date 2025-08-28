@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Objects;
+import com.example.soundattract.util.ThreadingChecks;
 
 public class SoundTracker {
 
@@ -118,6 +119,53 @@ public class SoundTracker {
 
     public static final List<SoundRecord> RECENT_SOUNDS = Collections.synchronizedList(new ArrayList<>());
     private static final Map<String, Map<Long, List<SoundRecord>>> SPATIAL_SOUNDS = Collections.synchronizedMap(new HashMap<>());
+
+
+    private static final class CachedBest {
+        final SoundRecord best;
+        final long createdAtNanos;
+        final String dimensionKey;
+
+        CachedBest(SoundRecord best, long createdAtNanos, String dimensionKey) {
+            this.best = best;
+            this.createdAtNanos = createdAtNanos;
+            this.dimensionKey = dimensionKey;
+        }
+    }
+    private static final Map<java.util.UUID, CachedBest> ASYNC_BEST_BY_MOB = new java.util.concurrent.ConcurrentHashMap<>();
+    private static long getAsyncResultTtlNanos() {
+        long ms = 2500L;
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.asyncResultTtlMs > 0) {
+            ms = SoundAttractMod.CONFIG.asyncResultTtlMs;
+        }
+        return java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(ms);
+    }
+
+    public static void applySoundScoreResult(com.example.soundattract.util.WorkerScheduler.SoundScoreResult result) {
+        if (result == null || result.mobUuid == null) return;
+        CachedBest cb = new CachedBest(result.best, result.createdAtNanos, result.dimensionKey);
+        ASYNC_BEST_BY_MOB.put(result.mobUuid, cb);
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.debug("[SoundTracker] Applied async best for mob {} in dim {}", result.mobUuid, result.dimensionKey);
+        }
+    }
+
+    public static SoundRecord getCachedBestFor(MobEntity mob, String dimensionKey) {
+        if (mob == null) return null;
+        CachedBest cb = ASYNC_BEST_BY_MOB.get(mob.getUuid());
+        if (cb == null) return null;
+        if (dimensionKey != null && cb.dimensionKey != null && !dimensionKey.equals(cb.dimensionKey)) return null;
+        long ttl = getAsyncResultTtlNanos();
+        long age = System.nanoTime() - cb.createdAtNanos;
+        if (age > ttl) {
+            ASYNC_BEST_BY_MOB.remove(mob.getUuid());
+            return null;
+        }
+        return cb.best;
+    }
+    public static void clearCachedBest(java.util.UUID mobUuid) {
+        if (mobUuid != null) ASYNC_BEST_BY_MOB.remove(mobUuid);
+    }
 
     private static synchronized void updateSpatialSounds() {
         SPATIAL_SOUNDS.clear(); 
@@ -307,7 +355,39 @@ public class SoundTracker {
     }
     private static final WeakHashMap<RaycastCacheKey, double[]> RAYCAST_CACHE = new WeakHashMap<>();
 
+
+    private static boolean isCustomWool(BlockState state, Block block) {
+        try {
+            if (state.isIn(net.minecraft.registry.tag.BlockTags.WOOL)) return true;
+        } catch (Throwable ignored) {}
+        String id = net.minecraft.registry.Registries.BLOCK.getId(block).toString();
+        return id.contains("wool") || id.contains("carpet");
+    }
+
+    private static boolean isCustomThin(BlockState state, Block block) {
+        String id = net.minecraft.registry.Registries.BLOCK.getId(block).toString();
+        return id.contains("pane") || id.contains("bars") || id.contains("trapdoor") || id.contains("carpet") || id.contains("fence") || id.contains("wall") || id.contains("slab") || id.contains("door");
+    }
+
+    private static boolean isCustomNonSolid(BlockState state, Block block) {
+        if (state.isAir()) return true;
+        String id = net.minecraft.registry.Registries.BLOCK.getId(block).toString();
+        return id.contains("leaves") || id.contains("flower") || id.contains("plant") || id.contains("torch") || id.contains("vine") || id.contains("grass") || id.contains("mushroom") || id.contains("kelp") || id.contains("coral") || id.contains("cactus") || id.contains("sugar_cane") || id.contains("ladder");
+    }
+
+    private static boolean isCustomSolid(BlockState state, Block block) {
+
+        return !isCustomThin(state, block) && !isCustomNonSolid(state, block);
+    }
+
+    private static boolean isCustomLiquid(Block block) {
+        if (block instanceof net.minecraft.block.FluidBlock) return true;
+        String id = net.minecraft.registry.Registries.BLOCK.getId(block).toString();
+        return id.contains("water") || id.contains("lava");
+    }
+
     public static double[] applyBlockMuffling(World level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
+        ThreadingChecks.warnIfOffServerThread(level, "SoundTracker.applyBlockMuffling");
         if (SoundAttractMod.CONFIG == null) {
             System.err.println("[SoundTracker] Config not loaded, cannot apply muffling.");
             return new double[]{origRange, origWeight}; 
@@ -418,55 +498,11 @@ public class SoundTracker {
         return result;
     }
 
-    private static boolean isBlockInConfigList(BlockState state, Block block, java.util.List<String> configList) {
-        if (configList == null || configList.isEmpty()) return false;
-        Identifier id = Registries.BLOCK.getId(block); 
-        if (id != null && configList.contains(id.toString())) return true;
-        for (String entry : configList) {
-            if (entry.startsWith("#")) {
-                String tagName = entry.substring(1);
-                TagKey<Block> tag = TagKey.of(net.minecraft.registry.RegistryKeys.BLOCK, new Identifier(tagName));
-                if (state.isIn(tag)) return true;
-            }
-        }
-        return false;
-    }
-    private static boolean isCustomWool(BlockState state, Block block) {
-        if (SoundAttractMod.CONFIG == null) return state.isIn(BlockTags.WOOL);
-        return isBlockInConfigList(state, block, SoundAttractMod.CONFIG.customWoolBlocks) || state.isIn(BlockTags.WOOL);
-    }
-    private static boolean isCustomSolid(BlockState state, Block block) {
-         if (SoundAttractMod.CONFIG == null) return state.isSolid();
-        return isBlockInConfigList(state, block, SoundAttractMod.CONFIG.customSolidBlocks) || state.isSolid();
-    }
-    private static boolean isCustomNonSolid(BlockState state, Block block) {
-         if (SoundAttractMod.CONFIG == null) return !state.isSolid();
-
-        return isBlockInConfigList(state, block, SoundAttractMod.CONFIG.customNonSolidBlocks) || !state.isSolid();
-    }
-    private static boolean isCustomThin(BlockState state, Block block) {
-        if (SoundAttractMod.CONFIG == null) return false; 
-        if (isBlockInConfigList(state, block, SoundAttractMod.CONFIG.customThinBlocks)) return true;
-        
-        Identifier id = Registries.BLOCK.getId(block);
-        if (id == null) return false;
-        String path = id.getPath();
-        return path.contains("pane") || path.contains("iron_bars") || path.contains("painting") ||
-               path.contains("fence") || path.contains("trapdoor") || path.contains("door") ||
-               path.contains("ladder") || path.contains("scaffolding") || path.contains("rail") ||
-               path.contains("chain"); 
-    }
-
-    private static boolean isCustomLiquid(Block block) {
-        if (SoundAttractMod.CONFIG == null) return false;
-        String blockId = Registries.BLOCK.getId(block).toString();
-        return SoundAttractMod.CONFIG.customLiquidBlocks.contains(blockId);
-    }
-
     private static int pruneIndex = 0;
     private static final int SOUNDS_PRUNED_PER_TICK = 1; 
 
     public static synchronized void pruneIrrelevantSounds(World level) {
+        ThreadingChecks.warnIfOffServerThread(level, "SoundTracker.pruneIrrelevantSounds");
         if (RECENT_SOUNDS.isEmpty() || SoundAttractMod.CONFIG == null) return;
         
         int total = RECENT_SOUNDS.size();
@@ -545,11 +581,12 @@ public class SoundTracker {
 
 
     public static synchronized SoundRecord findNearestSound(
-            World level,
-            MobEntity mob,
-            BlockPos mobPos,
-            Vec3d mobEyePos
-    ) {
+        World level,
+        MobEntity mob,
+        BlockPos mobPos,
+        Vec3d mobEyePos
+) {
+        ThreadingChecks.warnIfOffServerThread(level, "SoundTracker.findNearestSound");
         if (SoundAttractMod.CONFIG == null) {
             System.err.println("[SoundTracker] Config not loaded, cannot find nearest sound.");
             return null;
@@ -623,11 +660,149 @@ public class SoundTracker {
         return bestSound;
     }
 
+
+    private static final Map<java.util.UUID, Long> LAST_SUBMIT_TICK = new java.util.concurrent.ConcurrentHashMap<>();
+    private static int getSubmitCooldownTicks() {
+        int ticks = 10;
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.asyncSubmitCooldownTicks > 0) {
+            ticks = SoundAttractMod.CONFIG.asyncSubmitCooldownTicks;
+        }
+        return ticks;
+    }
+
+    private static final class CandidateSnapshot {
+        final BlockPos pos;
+        final String soundId;
+        final double muffledRange;
+        final double muffledWeight;
+        final double distSqr;
+        final int ticksRemaining;
+        CandidateSnapshot(BlockPos pos, String soundId, double muffledRange, double muffledWeight, double distSqr, int ticksRemaining) {
+            this.pos = pos;
+            this.soundId = soundId;
+            this.muffledRange = muffledRange;
+            this.muffledWeight = muffledWeight;
+            this.distSqr = distSqr;
+            this.ticksRemaining = ticksRemaining;
+        }
+    }
+
+    private static final class SoundScoreRequestSnapshot {
+        final java.util.UUID mobUuid;
+        final String dimensionKey;
+        final BlockPos mobPos;
+        final int noveltyTicks;
+        final double noveltyBonusValue;
+        final int maxLifetime;
+        final java.util.List<CandidateSnapshot> candidates;
+        SoundScoreRequestSnapshot(java.util.UUID mobUuid, String dimensionKey, BlockPos mobPos,
+                                  int noveltyTicks, double noveltyBonusValue, int maxLifetime,
+                                  java.util.List<CandidateSnapshot> candidates) {
+            this.mobUuid = mobUuid;
+            this.dimensionKey = dimensionKey;
+            this.mobPos = mobPos;
+            this.noveltyTicks = noveltyTicks;
+            this.noveltyBonusValue = noveltyBonusValue;
+            this.maxLifetime = maxLifetime;
+            this.candidates = candidates;
+        }
+    }
+
+    public static void submitAsyncSoundScore(World level, MobEntity mob, BlockPos mobPos) {
+        ThreadingChecks.warnIfOffServerThread(level, "SoundTracker.submitAsyncSoundScore");
+        if (level == null || mob == null || SoundAttractMod.CONFIG == null) return;
+        if (!(level instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
+
+        long nowTick = serverWorld.getTime();
+        Long last = LAST_SUBMIT_TICK.get(mob.getUuid());
+        int cooldown = getSubmitCooldownTicks();
+        if (last != null && (nowTick - last) < cooldown) return;
+        LAST_SUBMIT_TICK.put(mob.getUuid(), nowTick);
+
+        String dimensionKey = level.getRegistryKey().getValue().toString();
+        java.util.List<SoundRecord> current = new java.util.ArrayList<>(RECENT_SOUNDS);
+        if (current.isEmpty()) return;
+
+        MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
+        java.util.List<CandidateSnapshot> cands = new java.util.ArrayList<>(current.size());
+
+        for (SoundRecord r : current) {
+            if (r == null || r.pos == null || !java.util.Objects.equals(r.dimensionKey, dimensionKey)) continue;
+            String soundId = (r.soundId != null) ? r.soundId : "unknown_sound_in_recent_list";
+            if (!SoundAttractMod.CONFIG.soundIdWhitelist.isEmpty() &&
+                !SoundAttractMod.CONFIG.soundIdWhitelist.contains(soundId) &&
+                !soundId.startsWith("virtual_sound:") &&
+                !soundId.equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID.toString())) {
+                continue;
+            }
+
+            double effRange = r.range;
+            double effWeight = r.weight;
+            if (profile != null) {
+                Identifier rl = Identifier.tryParse(soundId);
+                if (rl != null) {
+                    java.util.Optional<com.example.soundattract.config.SoundOverride> ov = profile.getSoundOverride(rl);
+                    if (ov.isPresent()) {
+                        effRange = ov.get().getRange();
+                        effWeight = ov.get().getWeight();
+                    }
+                }
+            }
+
+            double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effRange, effWeight, soundId);
+            double mr = muffled[0];
+            double mw = muffled[1];
+            if (mw <= 0 || mr <= 0) continue;
+            double distSqr = mobPos.getSquaredDistance(r.pos);
+            if (distSqr > mr * mr) continue;
+            cands.add(new CandidateSnapshot(r.pos, soundId, mr, mw, distSqr, r.ticksRemaining));
+        }
+
+        if (cands.isEmpty()) return;
+
+        int noveltyTicks = SoundAttractMod.CONFIG.soundNoveltyTimeTicks;
+        double noveltyBonus = SoundAttractMod.CONFIG.soundNoveltyBonusWeight;
+        int maxLifetime = SoundAttractMod.CONFIG.soundLifetimeTicks;
+        SoundScoreRequestSnapshot req = new SoundScoreRequestSnapshot(mob.getUuid(), dimensionKey, mobPos, noveltyTicks, noveltyBonus, maxLifetime, java.util.Collections.unmodifiableList(cands));
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.debug("[SoundTracker] Submitting async sound score for mob {} in dim {} with {} candidates", mob.getUuid(), dimensionKey, cands.size());
+        }
+
+        com.example.soundattract.util.WorkerScheduler.submitSoundTask(() -> {
+            CandidateSnapshot best = null;
+            double bestWeight = -1.0;
+            double bestDist = Double.MAX_VALUE;
+            for (CandidateSnapshot c : req.candidates) {
+                double bonus = (req.noveltyBonusValue > 0 && c.ticksRemaining > (req.maxLifetime - req.noveltyTicks)) ? req.noveltyBonusValue : 0.0;
+                double w = c.muffledWeight + bonus;
+                if (w > bestWeight || (Math.abs(w - bestWeight) < 0.001 && c.distSqr < bestDist)) {
+                    bestWeight = w;
+                    bestDist = c.distSqr;
+                    best = c;
+                }
+            }
+            com.example.soundattract.SoundTracker.SoundRecord bestRecord = null;
+            if (best != null) {
+                bestRecord = new com.example.soundattract.SoundTracker.SoundRecord(
+                        null,
+                        best.soundId,
+                        best.pos,
+                        Math.min(req.maxLifetime, Math.max(1, best.ticksRemaining)),
+                        req.dimensionKey,
+                        best.muffledRange,
+                        best.muffledWeight
+                );
+            }
+            return new com.example.soundattract.util.WorkerScheduler.SoundScoreResult(req.mobUuid, req.dimensionKey, bestRecord);
+        });
+    }
+
     public static java.util.List<net.minecraft.entity.mob.MobEntity> getMobsForSound(
-            World world, 
-            SoundRecord sound,
-            java.util.function.Predicate<MobEntity> filter 
-    ) {
+        World world, 
+        SoundRecord sound,
+        java.util.function.Predicate<MobEntity> filter 
+) {
+        ThreadingChecks.warnIfOffServerThread(world, "SoundTracker.getMobsForSound");
         java.util.List<MobEntity> result = new java.util.ArrayList<>();
         if (sound == null || world == null || SoundAttractMod.CONFIG == null) return result;
         
