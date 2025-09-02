@@ -1,0 +1,8 @@
+{
+  "type": "soundattract:add_enchanted_book",
+  "conditions": [
+    { "condition": "forge:loot_table_id", "loot_table_id": "minecraft:chests/stronghold_crossing" }
+  ],
+  "enchantment": "soundattract:conceal",
+  "level": 1
+}

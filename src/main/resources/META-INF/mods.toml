@@ -1,0 +1,49 @@
+modLoader="javafml" 
+loaderVersion="[43,)"
+license="GPLv3"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.mixins.json"
+[[mods]]
+modId="soundattract" 
+version="4.1.0" 
+logoFile="attract-to-sound-mod-logo.jpg"
+displayName="Sound Attract Mod" 
+authors="Sylsatra" 
+description='''
+A mod to make mobs lured into sound.
+Also camouflage is a thing.
+'''
+[[dependencies.soundattract]] 
+    modId="forge"
+    mandatory=true 
+    versionRange="[43,)" 
+    ordering="NONE"
+    side="BOTH"
+[[dependencies.soundattract]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.19.2,1.20)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="voicechat"
+    mandatory=false
+    versionRange="[1.19.2-2.4.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="enhanceai"
+    mandatory=false
+    versionRange="[1.8.7,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="plasmovoice"
+    mandatory=false
+    versionRange="[2.0.0,)"
+    ordering="NONE"
+    side="BOTH"

@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:loot_table",
+  "pools": [
+    {
+      "name": "add_conceal_book_pool",
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:enchanted_book",
+          "weight": 1,
+          "functions": [
+            {
+              "function": "minecraft:set_nbt",
+              "tag": "{StoredEnchantments:[{id:\"soundattract:conceal\",lvl:1s}]}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

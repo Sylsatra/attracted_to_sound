@@ -1,0 +1,23 @@
+{
+  "replace": false,
+  "entries": [
+    "soundattract:add_conceal_book_ancient_city",
+    "soundattract:add_conceal_book_bastion_treasure",
+    "soundattract:add_conceal_book_nether_bridge",
+    "soundattract:add_conceal_book_end_city_treasure",
+    "soundattract:add_conceal_book_stronghold_crossing",
+    "soundattract:add_conceal_book_bastion_other",
+    "soundattract:enchant_conceal_tool_ancient_city",
+    "soundattract:enchant_conceal_tool_bastion_treasure",
+    "soundattract:enchant_conceal_tool_nether_bridge",
+    "soundattract:enchant_conceal_tool_end_city_treasure",
+    "soundattract:enchant_conceal_tool_stronghold_crossing",
+    "soundattract:enchant_conceal_tool_bastion_other",
+    "soundattract:enchant_conceal_armor_ancient_city",
+    "soundattract:enchant_conceal_armor_bastion_treasure",
+    "soundattract:enchant_conceal_armor_nether_bridge",
+    "soundattract:enchant_conceal_armor_end_city_treasure",
+    "soundattract:enchant_conceal_armor_stronghold_crossing",
+    "soundattract:enchant_conceal_armor_bastion_other"
+  ]
+}

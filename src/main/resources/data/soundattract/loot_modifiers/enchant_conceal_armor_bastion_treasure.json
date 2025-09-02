@@ -1,0 +1,7 @@
+{
+  "type": "soundattract:enchant_random_armor",
+  "conditions": [
+    { "condition": "forge:loot_table_id", "loot_table_id": "minecraft:chests/bastion_treasure" }
+  ],
+  "enchantment": "soundattract:conceal"
+}
