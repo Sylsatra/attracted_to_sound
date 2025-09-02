@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.Entity;
@@ -13,18 +15,27 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceBlock;
+import net.minecraft.world.level.block.IceBlock;
+import net.minecraft.world.level.block.IronBarsBlock;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import net.minecraft.world.level.block.state.BlockState;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
 public class FovEvents {
@@ -153,22 +164,125 @@ public class FovEvents {
             return true;
         }
 
-        if (checkObstructions && !hasVisualLineOfSight(looker, target)) {
+        if (checkObstructions && !hasSmartLineOfSight(looker, target)) {
             return false;
         }
 
         return isWithinFieldOfView(looker, target, fov.horizontal(), fov.vertical());
     }
 
-    private static boolean hasVisualLineOfSight(Mob looker, Entity target) {
-        Vec3 startVec = looker.getEyePosition();
-        Vec3 endVec = target.position().add(0, target.getBbHeight() / 2.0, 0);
+    public static boolean hasSmartLineOfSight(Mob looker, Entity target) {
+        Level level = looker.level();
 
-        ClipContext context = new ClipContext(startVec, endVec, ClipContext.Block.VISUAL, ClipContext.Fluid.NONE, looker);
+        Vec3 eyeToEye = target.getEyePosition();
+        Vec3 center = target.position().add(0, target.getBbHeight() * 0.5, 0);
+        Vec3 feet = target.position().add(0, Math.max(0.1, target.getBbHeight() * 0.15), 0);
 
-        BlockHitResult hitResult = looker.level().clip(context);
+        Vec3 start = looker.getEyePosition();
+        return raycastIgnoringNonBlocking(level, start, eyeToEye, looker)
+                || raycastIgnoringNonBlocking(level, start, center, looker)
+                || raycastIgnoringNonBlocking(level, start, feet, looker);
+    }
 
-        return hitResult.getType() == BlockHitResult.Type.MISS;
+    private static boolean raycastIgnoringNonBlocking(Level level, Vec3 start, Vec3 end, Mob looker) {
+        final int maxPassThroughs = 24;
+        Vec3 currStart = start;
+        Vec3 dir = end.subtract(start);
+        double totalDist = dir.length();
+        if (totalDist < 1.0e-4) return true;
+        dir = dir.normalize();
+
+        for (int i = 0; i < maxPassThroughs; i++) {
+            ClipContext ctx = new ClipContext(
+                    currStart,
+                    end,
+                    ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE,
+                    looker
+            );
+            BlockHitResult hit = level.clip(ctx);
+            if (hit.getType() == HitResult.Type.MISS) {
+                return true;
+            }
+
+            BlockPos pos = hit.getBlockPos();
+            BlockState state = level.getBlockState(pos);
+            if (isNonBlockingVision(state, level, pos)) {
+                Vec3 step = dir.scale(0.6);
+                currStart = hit.getLocation().add(step);
+                continue;
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    private static boolean isNonBlockingVision(BlockState state, Level level, BlockPos pos) {
+        if (state == null || level == null || pos == null) {
+            return false;
+        }
+
+        if (state.isAir()) return true;
+
+        if (state.getBlock() instanceof DoorBlock) {
+            try {
+                Boolean open = state.getValue(DoorBlock.OPEN);
+                if (open != null && open) return true;
+            } catch (Throwable ignored) {}
+        }
+        if (state.getBlock() instanceof TrapDoorBlock) {
+            try {
+                Boolean open = state.getValue(TrapDoorBlock.OPEN);
+                if (open != null && open) return true;
+            } catch (Throwable ignored) {}
+        }
+
+        try {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            if (id != null) {
+                if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.isEmpty()) {
+                    List<? extends String> list = SoundAttractConfig.COMMON != null
+                            ? SoundAttractConfig.COMMON.nonBlockingVisionAllowList.get()
+                            : java.util.Collections.emptyList();
+                    if (list != null && !list.isEmpty()) {
+                        SoundAttractConfig.parseAndCacheNonBlockingVisionAllowList();
+                    }
+                }
+                if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.contains(id)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            String path = id != null ? id.getPath() : "";
+            if (path.contains("glass") && !path.contains("tinted")) {
+                return true;
+            }
+        } catch (Throwable ignored) {}
+
+        if (state.getBlock() instanceof IceBlock || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE)) {
+            return true;
+        }
+
+        if (state.getBlock() instanceof FenceBlock
+                || state.getBlock() instanceof WallBlock
+                || state.getBlock() instanceof IronBarsBlock) {
+            return true;
+        }
+
+        try {
+            VoxelShape shape = state.getCollisionShape(level, pos, CollisionContext.empty());
+            if (shape.isEmpty()) return true;
+        } catch (Throwable ignored) {}
+
+        try {
+            if (!state.isViewBlocking(level, pos)) return true;
+        } catch (Throwable ignored) {}
+
+        return false;
     }
 
     private static boolean isWithinFieldOfView(Mob looker, Entity target, double horizontalFovDegrees, double verticalFovDegrees) {

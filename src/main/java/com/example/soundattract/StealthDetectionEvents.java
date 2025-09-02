@@ -397,29 +397,41 @@ public class StealthDetectionEvents {
                     );
                 }
             } else {
-                switch (currentStance) {
-                    case CRAWLING:
-                        baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
-                        break;
-                    case SNEAKING:
-                        baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
-                        break;
-                    case STANDING:
-                    default:
-                        baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
-                        break;
-                }
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    if (mobProfile != null) {
+                com.example.soundattract.config.PlayerProfile playerProfile = SoundAttractConfig.getMatchingPlayerProfile(player);
+                Optional<Double> playerOverride = (playerProfile != null) ? playerProfile.getDetectionOverride(currentStance) : Optional.empty();
+                if (playerOverride.isPresent()) {
+                    baseRange = playerOverride.get();
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] Mob {} profile '{}' has no override for stance {}, using default: {}",
-                        mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                                "[GRSDR_Update] Player {} matched player profile '{}' for stance {}: {}",
+                                player.getName().getString(), playerProfile.getProfileName(), currentStance, baseRange
                         );
-                    } else {
-                        SoundAttractMod.LOGGER.info(
-                        "[GRSDR_Update] No profile for Mob {}, using default for stance {}: {}",
-                        mob.getName().getString(), currentStance, baseRange
-                        );
+                    }
+                } else {
+                    switch (currentStance) {
+                        case CRAWLING:
+                            baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
+                            break;
+                        case SNEAKING:
+                            baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
+                            break;
+                        case STANDING:
+                        default:
+                            baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
+                            break;
+                    }
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        if (mobProfile != null) {
+                            SoundAttractMod.LOGGER.info(
+                                    "[GRSDR_Update] Mob {} profile '{}' has no override for stance {}. No matching player profile override. Using default: {}",
+                                    mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                            );
+                        } else {
+                            SoundAttractMod.LOGGER.info(
+                                    "[GRSDR_Update] No mob profile override and no player profile override for Mob {}. Using default for stance {}: {}",
+                                    mob.getName().getString(), currentStance, baseRange
+                            );
+                        }
                     }
                 }
             }

@@ -14,7 +14,7 @@ import java.nio.file.Path;
 public class ConfigHelper {
 
 
-    private static final int CURRENT_SCHEMA_VERSION = 1;
+    private static final int CURRENT_SCHEMA_VERSION = 3;
 
     public static void register() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
@@ -63,6 +63,11 @@ public class ConfigHelper {
             if (configVersion < 1) {
 
 
+            }
+
+            if (configVersion < 3) {
+                renameKey(config, "muffling.specialMobProfilesRaw", "profiles.specialMobProfilesRaw");
+                renameKey(config, "muffling.specialPlayerProfilesRaw", "profiles.specialPlayerProfilesRaw");
             }
 
 

@@ -10,6 +10,12 @@ import net.minecraftforge.fml.event.config.ModConfigEvent;
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class ConfigReloadListener {
     @SubscribeEvent
+    public static void onConfigLoad(ModConfigEvent.Loading event) {
+        if (event.getConfig().getModId().equals(SoundAttractMod.MOD_ID)) {
+            SoundAttractConfig.bakeConfig();
+        }
+    }
+    @SubscribeEvent
     public static void onConfigReload(ModConfigEvent.Reloading event) {
         if (event.getConfig().getModId().equals(SoundAttractMod.MOD_ID)) {
             SoundAttractConfig.bakeConfig();

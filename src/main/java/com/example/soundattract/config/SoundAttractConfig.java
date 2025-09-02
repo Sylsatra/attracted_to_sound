@@ -21,6 +21,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModList;
 
@@ -46,6 +47,7 @@ public class SoundAttractConfig {
     public static Set<ResourceLocation> CUSTOM_NON_SOLID_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_THIN_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_AIR_BLOCKS_CACHE = new HashSet<>();
+    public static Set<ResourceLocation> NON_BLOCKING_VISION_ALLOW_CACHE = new HashSet<>();
     public static double TACZ_RELOAD_RANGE_CACHE = 10.0;
     public static double TACZ_RELOAD_WEIGHT_CACHE = 1.0;
     public static double TACZ_SHOOT_RANGE_CACHE = 140.0;
@@ -55,6 +57,7 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
+    public static List<com.example.soundattract.config.PlayerProfile> SPECIAL_PLAYER_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
 
@@ -116,6 +119,39 @@ public class SoundAttractConfig {
         }
     }
 
+    public static void parseAndCacheNonBlockingVisionAllowList() {
+        NON_BLOCKING_VISION_ALLOW_CACHE.clear();
+        if (COMMON == null || COMMON.nonBlockingVisionAllowList == null) {
+            if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("SoundAttractConfig: COMMON or nonBlockingVisionAllowList is null, skipping parsing.");
+            }
+            return;
+        }
+
+        List<? extends String> cfg = COMMON.nonBlockingVisionAllowList.get();
+        if (cfg == null || cfg.isEmpty()) {
+            return;
+        }
+
+        for (String entry : cfg) {
+            if (entry == null || entry.trim().isEmpty()) continue;
+            try {
+                ResourceLocation loc = ResourceLocation.tryParse(entry.trim());
+                if (loc != null) {
+                    NON_BLOCKING_VISION_ALLOW_CACHE.add(loc);
+                } else {
+                    SoundAttractMod.LOGGER.warn("SoundAttractConfig: Invalid ResourceLocation in nonBlockingVisionAllowList: {}", entry);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("SoundAttractConfig: Error parsing nonBlockingVisionAllowList entry '{}': {}", entry, e.getMessage());
+            }
+        }
+
+        if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("SoundAttractConfig: Loaded {} entries into NON_BLOCKING_VISION_ALLOW_CACHE.", NON_BLOCKING_VISION_ALLOW_CACHE.size());
+        }
+    }
+
     public static class Common {
 
 
@@ -156,6 +192,7 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialPlayerProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> mobBlacklist;
 
 
@@ -262,6 +299,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue defaultVerticalFov;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovExclusionList;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> nonBlockingVisionAllowList;
 
 
         public final ForgeConfigSpec.BooleanValue enableBlockBreaking;
@@ -273,8 +311,10 @@ public class SoundAttractConfig {
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 2, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 3, 0, Integer.MAX_VALUE);
             builder.pop();
+
+            
 
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
@@ -1737,6 +1777,12 @@ public class SoundAttractConfig {
                             ),
                             obj -> obj instanceof String);
 
+            nonBlockingVisionAllowList = builder.comment(
+                            "Blocks in this allowlist are treated as see-through for line-of-sight checks (e.g., modded glass).",
+                            "Format: ['modid:block_id']"
+                    )
+                    .defineList("nonBlockingVisionAllowList", Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
+
             builder.pop();
 
             builder.comment("General Stealth System Settings").push("general_stealth_settings");
@@ -2068,6 +2114,10 @@ public class SoundAttractConfig {
             customAirBlocks = builder.comment("List of custom air block IDs for sound muffling. Format: 'modid:blockid'. Default: empty list.")
                     .defineList("customAirBlocks", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
 
+            builder.pop();
+
+            builder.push("profiles");
+
             specialMobProfilesRaw = builder.comment(
                     "List of special mob profiles. Each profile is a string with 5 parts separated by ';'.",
                     "Format: profileName;mobId;nbtMatcher;soundOverridesString;detectionOverridesString",
@@ -2087,6 +2137,24 @@ public class SoundAttractConfig {
                     ),
                     obj -> obj instanceof String
             );
+
+            specialPlayerProfilesRaw = builder.comment(
+                    "List of special player profiles. Each string has 3 parts separated by ';'.",
+                    "Format: profileName;nbtMatcher;detectionOverridesString",
+                    "- profileName: A unique name (e.g., 'FelineOrigin').",
+                    "- nbtMatcher: Any compound NBT to match on the player (capabilities included). Use valid SNBT. Keys containing ':' must be quoted (e.g., '{\"ForgeCaps\":{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}}'). Leave empty to match all players.",
+                    "- detectionOverridesString: Comma-separated 'stanceName:value' (e.g., 'standing:40.0,sneaking:20.0,crawling:10.0'). Valid stances: standing, sneaking, crawling.",
+                    "Example: FelineOrigin;{\"ForgeCaps\":{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}};standing:24.0,sneaking:10.0,crawling:3.0"
+            ).defineList(
+                    "specialPlayerProfilesRaw",
+                    Arrays.asList(
+                            "FelineOrigin;{\"ForgeCaps\":{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}};standing:24.0,sneaking:10.0,crawling:3.0",
+                            "DinosaurHatched;{\"ForgeCaps\":{\"fossil:player\":{\"HatchedDinosaur\":1b}}};standing:50.0"
+                    ),
+                    obj -> obj instanceof String
+            );
+
+            builder.pop();
         }
 
     }
@@ -2115,6 +2183,18 @@ public class SoundAttractConfig {
 
             COMMON.configSchemaVersion.set(2);
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 2. Saving config...");
+            COMMON_SPEC.save();
+        }
+
+        if (COMMON.configSchemaVersion.get() < 3) {
+            SoundAttractMod.LOGGER.info("Migrating config from version 2 to 3 (relocating special profiles to 'profiles' section).");
+            com.electronwill.nightconfig.core.UnmodifiableConfig config = COMMON_SPEC.getValues();
+
+            moveConfigValue(config, "muffling.specialMobProfilesRaw", COMMON.specialMobProfilesRaw);
+            moveConfigValue(config, "muffling.specialPlayerProfilesRaw", COMMON.specialPlayerProfilesRaw);
+
+            COMMON.configSchemaVersion.set(3);
+            SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 3. Saving config...");
             COMMON_SPEC.save();
         }
 
@@ -2180,6 +2260,8 @@ public class SoundAttractConfig {
         if (COMMON.customAirBlocks != null) {
             COMMON.customAirBlocks.get().forEach(id -> CUSTOM_AIR_BLOCKS_CACHE.add(ResourceLocation.parse(id)));
         }
+
+        parseAndCacheNonBlockingVisionAllowList();
 
         TACZ_ENABLED_CACHE = ModList.get().isLoaded("tacz") && COMMON.enableTaczIntegration.get();
         TACZ_RELOAD_RANGE_CACHE = COMMON.taczReloadRange.get();
@@ -2319,10 +2401,57 @@ public class SoundAttractConfig {
             }
         }
 
+        SPECIAL_PLAYER_PROFILES_CACHE = new ArrayList<>();
+        if (COMMON.specialPlayerProfilesRaw != null) {
+            List<String> rawPlayerProfiles = new ArrayList<>(COMMON.specialPlayerProfilesRaw.get());
+            for (String profileString : rawPlayerProfiles) {
+                String[] parts = profileString.split(";", -1);
+
+                if (parts.length < 1 || parts[0].trim().isEmpty()) {
+                    SoundAttractMod.LOGGER.warn("Skipping player profile with empty or missing name: '{}'", profileString);
+                    continue;
+                }
+                String profileName = parts[0].trim();
+
+                if (parts.length < 3) {
+                    SoundAttractMod.LOGGER.warn("Skipping malformed player profile string for '{}' (expected 3 parts, got {}): '{}'", profileName, parts.length, profileString);
+                    continue;
+                }
+
+                String nbtMatcherString = parts[1].trim();
+                java.util.Map<PlayerStance, Double> detectionOverrides = new java.util.HashMap<>();
+
+                String detectionOverridesString = parts[2].trim();
+                if (!detectionOverridesString.isEmpty()) {
+                    for (String detectionOverrideEntry : detectionOverridesString.split(",")) {
+                        String[] doParts = detectionOverrideEntry.trim().split(":");
+                        if (doParts.length == 2) {
+                            try {
+                                PlayerStance stance = PlayerStance.valueOf(doParts[0].trim().toUpperCase(java.util.Locale.ROOT));
+                                double value = Double.parseDouble(doParts[1].trim());
+                                detectionOverrides.put(stance, value);
+                            } catch (IllegalArgumentException e) {
+                                SoundAttractMod.LOGGER.warn("Invalid player stance or value in detection override '{}' for player profile '{}'. Valid stances: STANDING, SNEAKING, CRAWLING. Skipping this override.", detectionOverrideEntry.trim(), profileName, e);
+                            }
+                        } else {
+                            SoundAttractMod.LOGGER.warn("Malformed detection override entry '{}' for player profile '{}'. Expected 'stanceName:value'. Skipping this override.", detectionOverrideEntry.trim(), profileName);
+                        }
+                    }
+                }
+
+                com.example.soundattract.config.PlayerProfile profile = new com.example.soundattract.config.PlayerProfile(profileName, nbtMatcherString.isEmpty() ? null : nbtMatcherString, detectionOverrides);
+                SPECIAL_PLAYER_PROFILES_CACHE.add(profile);
+                if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("Successfully parsed and cached player profile: {}", profileName);
+                }
+            }
+        }
+
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
-                    "SoundAttractConfig: Baked config. {} special mob profiles loaded. {} sound defaults. {} whitelist.",
+                    "SoundAttractConfig: Baked config. {} special mob profiles loaded. {} special player profiles loaded. {} sound defaults. {} whitelist.",
                     SPECIAL_MOB_PROFILES_CACHE.size(),
+                    SPECIAL_PLAYER_PROFILES_CACHE.size(),
                     SOUND_DEFAULT_ENTRIES_CACHE.size(),
                     SOUND_ID_WHITELIST_CACHE.size()
             );
@@ -2336,6 +2465,18 @@ public class SoundAttractConfig {
         }
         for (MobProfile profile : SPECIAL_MOB_PROFILES_CACHE) {
             if (profile.matches(mob)) {
+                return profile;
+            }
+        }
+        return null;
+    }
+
+    public static PlayerProfile getMatchingPlayerProfile(Player player) {
+        if (SPECIAL_PLAYER_PROFILES_CACHE == null || SPECIAL_PLAYER_PROFILES_CACHE.isEmpty()) {
+            return null;
+        }
+        for (PlayerProfile profile : SPECIAL_PLAYER_PROFILES_CACHE) {
+            if (profile.matches(player)) {
                 return profile;
             }
         }

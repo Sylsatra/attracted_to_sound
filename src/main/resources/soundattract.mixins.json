@@ -6,7 +6,8 @@
   "refmap": "soundattract.refmap.json",
   "mixins": [
     "ItemStackMixin",
-    "HurtByTargetGoalMixin"
+    "HurtByTargetGoalMixin",
+    "SensingMixin"
   ],
   "client": [
   ],
