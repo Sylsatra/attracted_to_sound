@@ -5,7 +5,8 @@
   "mixins": [
     "ItemStackMixin",
     "HurtByTargetGoalMixin",
-    "LivingEntityAccessorMixin"
+    "LivingEntityAccessorMixin",
+    "SensingMixin"
   ],
   "injectors": {
     "defaultRequire": 1

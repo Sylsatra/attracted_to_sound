@@ -1,36 +1,52 @@
 package com.example.soundattract;
 
-import com.example.soundattract.config.SoundAttractConfig;
-import com.mojang.logging.LogUtils; 
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.ICancellableEvent;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.entity.living.LivingEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
-import org.slf4j.Logger;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+
+import com.example.soundattract.config.SoundAttractConfig;
+import com.mojang.logging.LogUtils;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceBlock;
+import net.minecraft.world.level.block.IceBlock;
+import net.minecraft.world.level.block.IronBarsBlock;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingEvent;
+
 public class FovEvents {
+
     public static final Logger LOGGER = LogUtils.getLogger();
 
     private static final double BACKSTAB_DAMAGE_MULTIPLIER = 1.2;
 
-    private record FovData(double horizontal, double vertical) {}
+    private record FovData(double horizontal, double vertical) {
+
+    }
     private static final FovData DEFAULT_FOV = new FovData(200.0, 135.0);
 
     private static final Set<EntityType<?>> DEVELOPER_EXCLUSIONS = Set.of(
@@ -85,10 +101,16 @@ public class FovEvents {
 
     @SubscribeEvent
     public void onLivingVisibility(LivingEvent.LivingVisibilityEvent event) {
-        if (event.getVisibilityModifier() <= 0) return;
-        if (!(event.getEntity() instanceof Mob looker)) return;
+        if (event.getVisibilityModifier() <= 0) {
+            return;
+        }
+        if (!(event.getEntity() instanceof Mob looker)) {
+            return;
+        }
         Entity target = event.getLookingEntity();
-        if (target == null) return;
+        if (target == null) {
+            return;
+        }
 
         if (!isTargetInFov(looker, target, false)) {
             event.modifyVisibility(0.0);
@@ -97,10 +119,14 @@ public class FovEvents {
 
     @SubscribeEvent
     public void onMobHurt(LivingDamageEvent.Pre event) {
-        if (!(event.getEntity() instanceof Mob mob)) return;
+        if (!(event.getEntity() instanceof Mob mob)) {
+            return;
+        }
 
-        Entity attacker = event.getSource().getDirectEntity(); 
-        if (attacker == null || attacker == mob) return;
+        Entity attacker = event.getSource().getDirectEntity();
+        if (attacker == null || attacker == mob) {
+            return;
+        }
 
         if (!isTargetInFov(mob, attacker, true)) {
             float originalDamage = event.getOriginalDamage();
@@ -120,81 +146,170 @@ public class FovEvents {
 
         ResourceLocation lookerId = EntityType.getKey(looker.getType());
 
-        if (DEVELOPER_EXCLUSIONS.contains(looker.getType())) return true;
-        if (USER_EXCLUSION_CACHE.contains(lookerId)) return true;
+        if (DEVELOPER_EXCLUSIONS.contains(looker.getType())) {
+            return true;
+        }
+        if (USER_EXCLUSION_CACHE.contains(lookerId)) {
+            return true;
+        }
 
         FovData fov = CONFIG_FOV_CACHE.getOrDefault(lookerId, DEFAULT_FOV);
-        if (fov.horizontal() >= 360) return true;
+        if (fov.horizontal() >= 360) {
+            return true;
+        }
 
-        if (checkObstructions && !hasLineOfSightAllowlist(looker, target)) {
+        if (checkObstructions && !hasSmartLineOfSight(looker, target)) {
             return false;
         }
 
         return isWithinFieldOfView(looker, target, fov.horizontal(), fov.vertical());
     }
 
-    /**
-     * Custom LOS that ignores blocks listed in SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.
-     * Uses precise ray casting against block collision shapes so partial blocks (slabs, stairs, fences)
-     * only occlude when actually intersected. Falls back to vanilla LOS on error.
-     */
-    private static boolean hasLineOfSightAllowlist(Mob looker, Entity target) {
-        try {
-            Level level = looker.level();
-            Vec3 start = looker.getEyePosition();
-            Vec3 end = target.getEyePosition();
+    public static boolean hasSmartLineOfSight(Mob looker, Entity target) {
+        Level level = looker.level();
 
+        Vec3 eyeToEye = target.getEyePosition();
+        Vec3 center = target.position().add(0, target.getBbHeight() * 0.5, 0);
+        Vec3 feet = target.position().add(0, Math.max(0.1, target.getBbHeight() * 0.15), 0);
 
-            for (int i = 0; i < 64; i++) {
-                net.minecraft.world.level.ClipContext ctx = new net.minecraft.world.level.ClipContext(
-                        start, end,
-                        net.minecraft.world.level.ClipContext.Block.COLLIDER,
-                        net.minecraft.world.level.ClipContext.Fluid.NONE,
-                        looker
-                );
-                net.minecraft.world.phys.HitResult hit = level.clip(ctx);
-                if (hit == null || hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS) {
-                    return true;
-                }
+        Vec3 start = looker.getEyePosition();
+        return raycastIgnoringNonBlocking(level, start, eyeToEye, looker)
+                || raycastIgnoringNonBlocking(level, start, center, looker)
+                || raycastIgnoringNonBlocking(level, start, feet, looker);
+    }
 
-                if (hit instanceof net.minecraft.world.phys.BlockHitResult bhr) {
-                    BlockPos pos = bhr.getBlockPos();
-                    BlockState state = level.getBlockState(pos);
-                    ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
-                    boolean passThrough = blockId != null && SoundAttractConfig.VISION_PASSTHROUGH_BLOCKS_CACHE.contains(blockId);
-                    if (passThrough) {
-
-                        Vec3 hp = bhr.getLocation();
-                        Vec3 nudge = new Vec3(bhr.getDirection().getStepX(), bhr.getDirection().getStepY(), bhr.getDirection().getStepZ()).scale(1.0e-4);
-                        start = hp.add(nudge);
-                        if (start.distanceTo(end) < 1.0e-4) return true;
-                        continue;
-                    }
-                    return false;
-                }
-
-
-                return true;
-            }
-            return true;
-        } catch (Exception e) {
-            try { return looker.getSensing().hasLineOfSight(target); } catch (Exception ignored) {}
+    private static boolean raycastIgnoringNonBlocking(Level level, Vec3 start, Vec3 end, Mob looker) {
+        final int maxPassThroughs = 24;
+        Vec3 currStart = start;
+        Vec3 dir = end.subtract(start);
+        double totalDist = dir.length();
+        if (totalDist < 1.0e-4) {
             return true;
         }
+        dir = dir.normalize();
+
+        for (int i = 0; i < maxPassThroughs; i++) {
+            ClipContext ctx = new ClipContext(
+                    currStart,
+                    end,
+                    ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE,
+                    looker
+            );
+            BlockHitResult hit = level.clip(ctx);
+            if (hit.getType() == HitResult.Type.MISS) {
+                return true;
+            }
+
+            BlockPos pos = hit.getBlockPos();
+            BlockState state = level.getBlockState(pos);
+            if (isNonBlockingVision(state, level, pos)) {
+                Vec3 step = dir.scale(0.6);
+                currStart = hit.getLocation().add(step);
+                continue;
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    private static boolean isNonBlockingVision(BlockState state, Level level, BlockPos pos) {
+        if (state == null || level == null || pos == null) {
+            return false;
+        }
+
+        if (state.isAir()) {
+            return true;
+        }
+
+        if (state.getBlock() instanceof DoorBlock) {
+            try {
+                Boolean open = state.getValue(DoorBlock.OPEN);
+                if (open != null && open) {
+                    return true;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (state.getBlock() instanceof TrapDoorBlock) {
+            try {
+                Boolean open = state.getValue(TrapDoorBlock.OPEN);
+                if (open != null && open) {
+                    return true;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        try {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            if (id != null) {
+                if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.isEmpty()) {
+                    List<? extends String> list = SoundAttractConfig.COMMON != null
+                            ? SoundAttractConfig.COMMON.nonBlockingVisionAllowList.get()
+                            : java.util.Collections.emptyList();
+                    if (list != null && !list.isEmpty()) {
+                        SoundAttractConfig.parseAndCacheNonBlockingVisionAllowList();
+                    }
+                }
+                if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.contains(id)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            String path = id != null ? id.getPath() : "";
+            if (path.contains("glass") && !path.contains("tinted")) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (state.getBlock() instanceof IceBlock || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE)) {
+            return true;
+        }
+
+        if (state.getBlock() instanceof FenceBlock
+                || state.getBlock() instanceof WallBlock
+                || state.getBlock() instanceof IronBarsBlock) {
+            return true;
+        }
+
+        try {
+            VoxelShape shape = state.getCollisionShape(level, pos, CollisionContext.empty());
+            if (shape.isEmpty()) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            if (!state.isViewBlocking(level, pos)) {
+                return true;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return false;
     }
 
     private static boolean isWithinFieldOfView(Mob looker, Entity target, double horizontalFovDegrees, double verticalFovDegrees) {
         Vec3 lookVector = looker.getLookAngle();
         Vec3 toTargetVector = target.position()
-                                    .add(0, target.getEyeHeight() / 2.0, 0)
-                                    .subtract(looker.getEyePosition())
-                                    .normalize();
-        
+                .add(0, target.getEyeHeight() / 2.0, 0)
+                .subtract(looker.getEyePosition())
+                .normalize();
+
         Vec3 lookHorizontal = new Vec3(lookVector.x, 0, lookVector.z).normalize();
         Vec3 targetHorizontal = new Vec3(toTargetVector.x, 0, toTargetVector.z).normalize();
         double dotHorizontal = lookHorizontal.dot(targetHorizontal);
         double angleHorizontal = Math.toDegrees(Math.acos(Math.max(-1.0, Math.min(1.0, dotHorizontal))));
-        if (angleHorizontal > horizontalFovDegrees / 2.0) return false;
+        if (angleHorizontal > horizontalFovDegrees / 2.0) {
+            return false;
+        }
 
         double pitchLook = Math.toDegrees(Math.asin(lookVector.y));
         double pitchTarget = Math.toDegrees(Math.asin(Math.max(-1.0, Math.min(1.0, toTargetVector.y))));
