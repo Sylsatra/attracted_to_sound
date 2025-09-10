@@ -6,7 +6,7 @@ license="GPLv3"
   config = "soundattract.mixins.json"
 [[mods]]
 modId="soundattract" 
-version="4.1.0" 
+version="4.1.1" 
 logoFile="attract-to-sound-mod-logo.jpg"
 displayName="Sound Attract Mod" 
 authors="Sylsatra" 

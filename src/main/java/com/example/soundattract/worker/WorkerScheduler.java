@@ -133,6 +133,7 @@ public final class WorkerScheduler {
         int maxLeaders = cfg.maxLeaders();
         int maxGroupSize = cfg.maxGroupSize();
         int sectors = cfg.numEdgeSectors();
+        int perSector = cfg.edgeMobsPerSector();
 
         for (MobSnapshot p : candidates) {
             if (leaders.size() >= maxLeaders) break;
@@ -205,7 +206,7 @@ public final class WorkerScheduler {
                     double db = (mb==null)?0:distance(mb, leader);
                     return Double.compare(db, da);
                 });
-                int count = Math.min(4, ids.size());
+                int count = Math.min(perSector, ids.size());
                 for (int i=0;i<count;i++) edge.add(ids.get(i));
             }
             if (edge.isEmpty() && group.size() > 1) {
@@ -308,7 +309,8 @@ public final class WorkerScheduler {
                                  int maxLeaders,
                                  int maxGroupSize,
                                  double leaderSpacingMultiplier,
-                                 int numEdgeSectors) {}
+                                 int numEdgeSectors,
+                                 int edgeMobsPerSector) {}
 
     public record GroupComputeResult(ResourceLocation dimension,
                                      Map<UUID, UUID> mobUuidToLeaderUuid,

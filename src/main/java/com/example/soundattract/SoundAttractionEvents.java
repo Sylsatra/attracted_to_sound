@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.FollowLeaderGoal;
+import com.example.soundattract.ai.FollowerEdgeRelayGoal;
+import com.example.soundattract.ai.LeaderAttractionGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
@@ -224,6 +226,8 @@ public class SoundAttractionEvents {
             if (event.level instanceof ServerLevel serverLevel) {
                 if (initialDelayHasPassed) {
                     com.example.soundattract.ai.MobGroupManager.updateGroups(serverLevel);
+
+                    com.example.soundattract.ai.RaidManager.tick(serverLevel);
                 }
             }
         }
@@ -251,7 +255,16 @@ public class SoundAttractionEvents {
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
 
-        scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+
+
+
+            scheduleAddGoal(mob, 0, new LeaderAttractionGoal(mob, moveSpeed));
+            scheduleAddGoal(mob, 0, new FollowerEdgeRelayGoal(mob, moveSpeed));
+        } else {
+
+            scheduleAddGoal(mob, 4, new AttractionGoal(mob, moveSpeed));
+        }
         scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {

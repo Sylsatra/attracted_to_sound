@@ -157,7 +157,8 @@ public class MobGroupManager {
         SoundAttractConfig.COMMON.maxLeaders.get(),
         SoundAttractConfig.COMMON.maxGroupSize.get(),
         SoundAttractConfig.COMMON.leaderSpacingMultiplier.get(),
-        SoundAttractConfig.COMMON.numEdgeSectors.get()
+        SoundAttractConfig.COMMON.numEdgeSectors.get(),
+        SoundAttractConfig.COMMON.edgeMobsPerSector.get()
       );
       WorkerScheduler.submitGroupCompute(snapshots, cfg, level.dimension().location());
       if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -388,7 +389,8 @@ public class MobGroupManager {
         mobsInSector.sort(
           (a, b) -> Double.compare(b.distanceTo(leader), a.distanceTo(leader))
         );
-        int edgeCount = Math.min(4, mobsInSector.size());
+        int perSector = SoundAttractConfig.COMMON.edgeMobsPerSector.get();
+        int edgeCount = Math.min(perSector, mobsInSector.size());
         for (int i = 0; i < edgeCount; i++) {
           edgeMobs.add(mobsInSector.get(i));
         }
@@ -435,6 +437,29 @@ public class MobGroupManager {
   public static Mob getLeader(Mob mob) {
     PerWorldData data = getData(mob.level().dimension().location());
     return data.uuidToLeader.getOrDefault(mob.getUUID(), mob);
+  }
+
+  /**
+   * Returns the nearest known leader in the mob's dimension, or null if none exist.
+   * Useful for deserters whose leader mapping resolves to themselves.
+   */
+  public static Mob getNearestLeader(Mob mob) {
+    PerWorldData data = getData(mob.level().dimension().location());
+    Mob best = null;
+    double bestDistSq = Double.MAX_VALUE;
+    synchronized (data.leaders) {
+      data.leaders.removeIf(ref -> ref.get() == null || ref.get().isRemoved());
+      for (WeakReference<Mob> ref : data.leaders) {
+        Mob candidate = ref.get();
+        if (candidate == null || candidate == mob || candidate.isRemoved() || !candidate.isAlive()) continue;
+        double d = mob.distanceToSqr(candidate);
+        if (d < bestDistSq) {
+          bestDistSq = d;
+          best = candidate;
+        }
+      }
+    }
+    return best;
   }
 
   public static void promoteToDeserter(Mob mob) {

@@ -4,6 +4,7 @@ import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.FovEvents;
 import com.example.soundattract.enchantment.ModEnchantments;
+import com.example.soundattract.ai.MobGroupManager;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -46,6 +47,21 @@ public class StealthDetectionEvents {
     private static final Map<Player, net.minecraft.world.phys.Vec3> lastPlayerPositions = new HashMap<>();
     private static long lastStealthCheckTick = -1;
     private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
+
+    private static final Set<UUID> suppressedEdgeDetections = new HashSet<>();
+
+    public static void recordSuppressedEdgeDetection(Mob mob) {
+        if (mob != null) suppressedEdgeDetections.add(mob.getUUID());
+    }
+
+    public static boolean consumeSuppressedEdgeDetection(Mob mob) {
+        if (mob == null) return false;
+        UUID id = mob.getUUID();
+        if (suppressedEdgeDetections.remove(id)) {
+            return true;
+        }
+        return false;
+    }
 
     private static int getStealthCheckInterval() {
         return SoundAttractConfig.COMMON.stealthCheckInterval.get();
@@ -188,6 +204,26 @@ public class StealthDetectionEvents {
             }
             return false;
         }
+
+
+
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            try {
+                boolean isEdge = MobGroupManager.isEdgeMob(mob);
+                boolean isDeserter = MobGroupManager.isDeserter(mob);
+                if (isEdge && !isDeserter) {
+                    recordSuppressedEdgeDetection(mob);
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info("[CanDetectPlayer] Suppressing EDGE mob {} (non-deserter) despite detectability; signaling RAID.", mob.getName().getString());
+                    }
+                    return false;
+                }
+            } catch (Throwable t) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Edge suppression check failed: {}", t.getMessage());
+                }
+            }
+        }
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
                     "[StealthQuery] Player {} IS DETECTABLE by mob {} (in range and in FOV).",
@@ -233,10 +269,11 @@ public class StealthDetectionEvents {
         lastStealthCheckTick = gameTime;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
-            int simDistBlocks = level.getServer().getPlayerList().getViewDistance() * 16;
+
+            int scanningRadius = Math.max(32, (int) Math.ceil(SoundAttractConfig.COMMON.maxStealthDetectionRange.get()) + 16);
             Set<Mob> mobsToCheck = new HashSet<>();
             for (net.minecraft.server.level.ServerPlayer serverPlayer : level.players()) {
-                AABB scanArea = serverPlayer.getBoundingBox().inflate(simDistBlocks);
+                AABB scanArea = serverPlayer.getBoundingBox().inflate(scanningRadius);
                 mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && entity.getTarget() instanceof Player));
             }
             for (Mob mob : mobsToCheck) {

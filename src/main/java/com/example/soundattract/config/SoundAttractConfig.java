@@ -184,6 +184,10 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue numEdgeSectors;
         public final ForgeConfigSpec.IntValue groupUpdateInterval;
         public final ForgeConfigSpec.IntValue maxLeaders;
+        public final ForgeConfigSpec.IntValue edgeMobsPerSector;
+        public final ForgeConfigSpec.DoubleValue groupSprintMultiplier;
+        public final ForgeConfigSpec.DoubleValue leaderReturnArrivalDistance;
+        public final ForgeConfigSpec.IntValue raidCountdownTicks;
         public final ForgeConfigSpec.IntValue initialGroupComputationDelay;
 
         public final ForgeConfigSpec.IntValue workerThreads;
@@ -311,30 +315,14 @@ public class SoundAttractConfig {
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 3, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 5, 0, Integer.MAX_VALUE);
             builder.pop();
-
-            
 
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
                     .define("debugLogging", false);
-            edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
-                    .define("edgeMobSmartBehavior", false);
-            soundLifetimeTicks = builder.comment("How long a sound event remains 'interesting' to a mob, in ticks (20 ticks = 1 second).")
-                    .defineInRange("soundLifetimeTicks", 1200, 20, 1000000);
-            arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
-                    .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
-            mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
-                    .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                     .defineInRange("maxSoundsTracked", 20, 1, 1000000);
-            maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
-                    .defineInRange("maxGroupSize", 64, 1, 128);
-            leaderGroupRadius = builder.comment("Radius (in blocks) used to group mobs under a leader for group AI behavior. Default: 64.0")
-                    .defineInRange("leaderGroupRadius", 64.0, 1.0, 128.0);
-            groupDistance = builder.comment("Maximum distance (in blocks) for mobs to consider themselves part of a group for group behaviors. Used in AI such as FollowLeaderGoal.")
-                    .defineInRange("groupDistance", 128.0, 1.0, 128.0);
             soundSwitchRatio = builder.comment(
                             "Switching threshold factor (0.0–1.0]. A mob will switch if newWeight > currentWeight × soundSwitchRatio.",
                             "Example: 0.5 means a new sound beating 70% of the current weight will trigger a switch (more eager switching).",
@@ -347,15 +335,41 @@ public class SoundAttractConfig {
             soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
                     "20 ticks = 1 second.")
                     .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
+
+            builder.pop();
+
+
+            builder.comment("Mob grouping and squad behavior").push("groups");
+            edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
+                    .define("edgeMobSmartBehavior", false);
+            soundLifetimeTicks = builder.comment("How long a sound event remains 'interesting' to a mob, in ticks (20 ticks = 1 second).")
+                    .defineInRange("soundLifetimeTicks", 1200, 20, 1000000);
+            arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
+                    .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
+            mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
+                    .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
+            maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
+                    .defineInRange("maxGroupSize", 64, 1, 128);
+            leaderGroupRadius = builder.comment("Radius (in blocks) used to group mobs under a leader for group AI behavior. Default: 64.0")
+                    .defineInRange("leaderGroupRadius", 64.0, 1.0, 128.0);
+            groupDistance = builder.comment("Maximum distance (in blocks) for mobs to consider themselves part of a group for group behaviors. Used in AI such as FollowLeaderGoal.")
+                    .defineInRange("groupDistance", 128.0, 1.0, 256.0);
             leaderSpacingMultiplier = builder.comment("Multiplier for spacing between mob leaders in a group. Default: 1.0")
                     .defineInRange("leaderSpacingMultiplier", 1.0, 0.1, 10.0);
-            numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 8")
-                    .defineInRange("numEdgeSectors", 8, 1, 64);
+            numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 4")
+                    .defineInRange("numEdgeSectors", 4, 1, 64);
             groupUpdateInterval = builder.comment("Interval (in ticks) between group AI updates. Default: 200")
                     .defineInRange("groupUpdateInterval", 200, 1, 20000);
             maxLeaders = builder.comment("Maximum number of group leaders tracked for AI grouping. Default: 16")
                     .defineInRange("maxLeaders", 16, 1, 64);
-
+            edgeMobsPerSector = builder.comment("Maximum number of edge mobs to select per angular sector. Default: 4")
+                    .defineInRange("edgeMobsPerSector", 1, 1, 64);
+            groupSprintMultiplier = builder.comment("Sprint speed multiplier used when followers rally/advance during RAID and when edge mobs return to the leader.")
+                    .defineInRange("sprintMultiplier", 1.1, 1.0, 5.0);
+            leaderReturnArrivalDistance = builder.comment("Distance (in blocks) within which an edge mob considers itself 'returned' to its leader.")
+                    .defineInRange("leaderReturnArrivalDistance", 2.0, 0.5, 16.0);
+            raidCountdownTicks = builder.comment("Countdown duration (in ticks) before a RAID advances to the target. 20 ticks = 1 second.")
+                    .defineInRange("raidCountdownTicks", 100, 20, 72000);
             builder.pop();
 
             builder.comment("Performance-tuning options. Adjust these to balance responsiveness and server load.").push("performance");
@@ -2195,6 +2209,37 @@ public class SoundAttractConfig {
 
             COMMON.configSchemaVersion.set(3);
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 3. Saving config...");
+            COMMON_SPEC.save();
+        }
+
+        if (COMMON.configSchemaVersion.get() < 4) {
+            SoundAttractMod.LOGGER.info("Migrating config from version 3 to 4 (moving group settings to 'groups' section).");
+            com.electronwill.nightconfig.core.UnmodifiableConfig config = COMMON_SPEC.getValues();
+
+            moveConfigValue(config, "general.maxGroupSize", COMMON.maxGroupSize);
+            moveConfigValue(config, "general.leaderGroupRadius", COMMON.leaderGroupRadius);
+            moveConfigValue(config, "general.groupDistance", COMMON.groupDistance);
+            moveConfigValue(config, "general.leaderSpacingMultiplier", COMMON.leaderSpacingMultiplier);
+            moveConfigValue(config, "general.numEdgeSectors", COMMON.numEdgeSectors);
+            moveConfigValue(config, "general.groupUpdateInterval", COMMON.groupUpdateInterval);
+            moveConfigValue(config, "general.maxLeaders", COMMON.maxLeaders);
+
+            moveConfigValue(config, "general.edgeMobSmartBehavior", COMMON.edgeMobSmartBehavior);
+            moveConfigValue(config, "general.soundLifetimeTicks", COMMON.soundLifetimeTicks);
+            moveConfigValue(config, "general.arrivalDistance", COMMON.arrivalDistance);
+            moveConfigValue(config, "general.mobMoveSpeed", COMMON.mobMoveSpeed);
+
+            COMMON.configSchemaVersion.set(4);
+            SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 4. Saving config...");
+            COMMON_SPEC.save();
+        }
+
+
+        if (COMMON.configSchemaVersion.get() < 5) {
+            SoundAttractMod.LOGGER.info("Migrating config from version 4 to 5.");
+
+            COMMON.configSchemaVersion.set(5);
+            SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 5. Saving config...");
             COMMON_SPEC.save();
         }
 
