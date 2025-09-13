@@ -3,6 +3,7 @@ import net.minecraft.util.math.Box;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.FovEvents;
 import com.example.soundattract.config.MobProfile;
+import com.example.soundattract.config.PlayerProfile;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.enchantment.ModEnchantments;
 import net.minecraft.util.math.BlockPos;
@@ -12,6 +13,7 @@ import net.minecraft.item.DyeableArmorItem;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.EntityPose;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ArmorItem;
@@ -41,6 +43,16 @@ public class StealthDetectionEvents {
     }
 
     private static final Map<UUID, GunshotInfo> playerGunshotInfo = new ConcurrentHashMap<>();
+
+    private static final java.util.Set<java.util.UUID> suppressedEdgeDetections = new java.util.HashSet<>();
+
+    public static void recordSuppressedEdgeDetection(net.minecraft.entity.mob.MobEntity mob) {
+        if (mob != null) suppressedEdgeDetections.add(mob.getUuid());
+    }
+
+    public static boolean consumeSuppressedEdgeDetection(net.minecraft.entity.mob.MobEntity mob) {
+        return mob != null && suppressedEdgeDetections.remove(mob.getUuid());
+    }
 
     public static void recordPlayerGunshot(PlayerEntity player, double detectionRange) {
         if (player == null || SoundAttractMod.CONFIG == null) return;
@@ -187,23 +199,35 @@ public static boolean canMobDetectPlayer(MobEntity mob, PlayerEntity player) {
 
     if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
         if (SoundAttractMod.CONFIG.debugLogging) {
-            SoundAttractMod.LOGGER.info("[CanDetectPlayer] Player {} is creative/spectator/dead. Bypassing stealth. Mob {}.", player.getDisplayName().getString(), mob.getDisplayName().getString());
+            SoundAttractMod.LOGGER.info("[CanDetectPlayer] Player {} is creative/spectator/dead → NOT detectable by {}.", player.getDisplayName().getString(), mob.getDisplayName().getString());
         }
-        return true;
+        return false;
+    }
+
+    boolean canSee = FovEvents.hasSmartLineOfSight(mob, player);
+    if (SoundAttractMod.CONFIG.debugLogging && !canSee) {
+        SoundAttractMod.LOGGER.info("[CanDetectPlayer] mob.canSee() returned false for {}.", player.getName().getString());
     }
 
 
 
-
-
-
-    
-
-    boolean canSee = FovEvents.hasSmartLineOfSight(mob, player);
-    
-    if (SoundAttractMod.CONFIG.debugLogging && !canSee) {
-
-        SoundAttractMod.LOGGER.info("[CanDetectPlayer] mob.canSee() returned false for {}.", player.getName().getString());
+    try {
+        if (SoundAttractMod.CONFIG.edgeMobSmartBehavior && canSee) {
+            boolean isEdge = com.example.soundattract.ai.MobGroupManager.isEdgeMobEntity(mob);
+            boolean isDeserter = com.example.soundattract.ai.MobGroupManager.isDeserter(mob);
+            double detectRange = computeFullDetectionRange(mob, player, mob.getWorld());
+            if (isEdge && !isDeserter && mob.distanceTo(player) <= detectRange) {
+                recordSuppressedEdgeDetection(mob);
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info("[CanDetectPlayer] Suppressing EDGE mob {} despite detectability; signaling RAID.", mob.getName().getString());
+                }
+                return false;
+            }
+        }
+    } catch (Throwable t) {
+        if (SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Edge suppression check failed: {}", t.toString());
+        }
     }
 
     return canSee;
@@ -247,34 +271,56 @@ public static double computeFullDetectionRange(MobEntity mob,
 
         if (overrideOpt.isPresent()) {
             range = overrideOpt.get();
+            if (SoundAttractMod.CONFIG.debugLogging) {
+                SoundAttractMod.LOGGER.info(
+                    "[StealthDetection] Applied mob profile override for mob {} with stance {} → range {}",
+                    mob.getName().getString(),
+                    stance,
+                    String.format("%.2f", range)
+                );
+            }
         } else {
-            double base, camo;
-            if (stance == PlayerStance.CRAWLING) {
-                base = SoundAttractMod.CONFIG.crawlDetectionRange;
-                camo = SoundAttractMod.CONFIG.crawlDetectionRangeCamouflage;
-            } else if (stance == PlayerStance.SNEAKING) {
-                base = SoundAttractMod.CONFIG.sneakDetectionRange;
-                camo = SoundAttractMod.CONFIG.sneakDetectionRangeCamouflage;
+            PlayerProfile pProfile = SoundAttractMod.CONFIG.getMatchingPlayerProfile(player);
+            Optional<Double> pOverrideOpt = (pProfile != null) ? pProfile.getDetectionOverride(stance) : Optional.empty();
+            if (pOverrideOpt.isPresent()) {
+                range = pOverrideOpt.get();
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info(
+                        "[StealthDetection] Applied player profile override for {} with stance {} → range {}",
+                        player.getName().getString(),
+                        stance,
+                        String.format("%.2f", range)
+                    );
+                }
             } else {
-                base = SoundAttractMod.CONFIG.standingDetectionRange;
-                camo = SoundAttractMod.CONFIG.standingDetectionRangeCamouflage;
-            }
+                double base, camo;
+                if (stance == PlayerStance.CRAWLING) {
+                    base = SoundAttractMod.CONFIG.crawlDetectionRange;
+                    camo = SoundAttractMod.CONFIG.crawlDetectionRangeCamouflage;
+                } else if (stance == PlayerStance.SNEAKING) {
+                    base = SoundAttractMod.CONFIG.sneakDetectionRange;
+                    camo = SoundAttractMod.CONFIG.sneakDetectionRangeCamouflage;
+                } else {
+                    base = SoundAttractMod.CONFIG.standingDetectionRange;
+                    camo = SoundAttractMod.CONFIG.standingDetectionRangeCamouflage;
+                }
 
-            CamouflageFactorResult camoResult;
-            if (stance == PlayerStance.CRAWLING) {
-                camoResult = getCrawlingCamouflageFactor(player, level);
-            } else if (stance == PlayerStance.SNEAKING) {
-                camoResult = getSneakingCamouflageFactor(player, level);
-            } else {
-                camoResult = getStandingCamouflageFactor(player, level);
+                CamouflageFactorResult camoResult;
+                if (stance == PlayerStance.CRAWLING) {
+                    camoResult = getCrawlingCamouflageFactor(player, level);
+                } else if (stance == PlayerStance.SNEAKING) {
+                    camoResult = getSneakingCamouflageFactor(player, level);
+                } else {
+                    camoResult = getStandingCamouflageFactor(player, level);
+                }
+                double factor = camoResult.factor;
+                
+                range = (factor <= 0.0)
+                     ? base
+                     : (factor >= 1.0)
+                       ? camo
+                       : base - (base - camo) * factor;
             }
-            double factor = camoResult.factor;
-            
-            range = (factor <= 0.0)
-                 ? base
-                 : (factor >= 1.0)
-                   ? camo
-                   : base - (base - camo) * factor;
         }
     }
 
@@ -457,13 +503,24 @@ public static double computeFullDetectionRange(MobEntity mob,
 }
 
 private static PlayerStance determinePlayerStance(PlayerEntity player) {
-    if (player.getPose().name().equalsIgnoreCase("SWIMMING")) {
+    EntityPose pose = player.getPose();
+    float poseHeight = player.getDimensions(pose).height;
+    boolean crawlingLike = pose == EntityPose.SWIMMING
+            || pose == EntityPose.FALL_FLYING
+            || pose == EntityPose.SPIN_ATTACK
+            || player.isSwimming()
+            || poseHeight <= 1.0f;
+    if (crawlingLike) {
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[DetermineStance] Player {} treated as CRAWLING (pose={}, isSwimming={}, height={})",
+                    player.getName().getString(), pose, player.isSwimming(), String.format("%.2f", poseHeight));
+        }
         return PlayerStance.CRAWLING;
-    } else if (player.isSneaking()) {
-        return PlayerStance.SNEAKING;
-    } else {
-        return PlayerStance.STANDING;
     }
+    if (player.isSneaking()) {
+        return PlayerStance.SNEAKING;
+    }
+    return PlayerStance.STANDING;
 }
 
 private static boolean hasConcealmentEnchant(ItemStack stack) {
@@ -482,7 +539,7 @@ private static boolean hasConcealmentEnchant(ItemStack stack) {
 
 
 private static double getStealthCamouflageFactor(PlayerEntity player, net.minecraft.world.World level, double mobDist) {
-    boolean isCrawl = player.getPose().name().equalsIgnoreCase("SWIMMING");
+    boolean isCrawl = isCrawling(player);
     CamouflageFactorResult camoResult;
     if (isCrawl) camoResult = getCrawlingCamouflageFactor(player, level);
     else if (player.isSneaking()) camoResult = getSneakingCamouflageFactor(player, level);
@@ -623,7 +680,13 @@ private static CamouflageFactorResult getCrawlingCamouflageFactor(PlayerEntity p
 }
 
 private static boolean isCrawling(PlayerEntity player) {
-    return player.getPose().name().equalsIgnoreCase("SWIMMING");
+    EntityPose pose = player.getPose();
+    float poseHeight = player.getDimensions(pose).height;
+    return pose == EntityPose.SWIMMING
+        || pose == EntityPose.FALL_FLYING
+        || pose == EntityPose.SPIN_ATTACK
+        || player.isSwimming()
+        || poseHeight <= 1.0f;
 }
 
 private static String getCamouflageArmorColorHex(PlayerEntity player) {

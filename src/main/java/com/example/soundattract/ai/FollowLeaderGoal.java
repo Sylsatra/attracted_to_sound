@@ -47,8 +47,23 @@ public class FollowLeaderGoal extends Goal {
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false; 
         boolean smartEdge = SoundAttractMod.CONFIG.edgeMobSmartBehavior;
-        if (smartEdge && MobGroupManager.isEdgeMobEntity(mob)) return false;
         if (!leader.isAlive()) return false;
+
+        if (com.example.soundattract.ai.RaidManager.isRaidTicking(this.leader)) {
+            this.leaderObjectivePos = this.leader.getBlockPos();
+            this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+            return true;
+        }
+        if (com.example.soundattract.ai.RaidManager.isRaidAdvancing(this.leader)) {
+            net.minecraft.util.math.BlockPos raidTarget = com.example.soundattract.ai.RaidManager.getRaidTarget(this.leader);
+            if (raidTarget != null) {
+                this.leaderObjectivePos = raidTarget;
+                this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+                return true;
+            }
+        }
+
+
         leaderAttractionGoal = null;
         try {
             java.lang.reflect.Field field = leader.getClass().getSuperclass().getDeclaredField("goalSelector");
@@ -67,12 +82,35 @@ public class FollowLeaderGoal extends Goal {
 
     public boolean canContinueToUse() {
         if (leader == null || !leader.isAlive()) return false;
+
+        if (com.example.soundattract.ai.RaidManager.isRaidTicking(this.leader) || com.example.soundattract.ai.RaidManager.isRaidAdvancing(this.leader)) {
+            return true;
+        }
+
         if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) return false;
         return true;
     }
 
     @Override
     public void tick() {
+
+        if (this.leader != null) {
+            double sprintMult = com.example.soundattract.SoundAttractMod.CONFIG.groupSprintMultiplier;
+            if (com.example.soundattract.ai.RaidManager.isRaidTicking(this.leader)) {
+                this.leaderObjectivePos = this.leader.getBlockPos();
+                this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+                startMovingToDestinationWithSpeed(this.moveSpeed * sprintMult);
+                return;
+            } else if (com.example.soundattract.ai.RaidManager.isRaidAdvancing(this.leader)) {
+                net.minecraft.util.math.BlockPos raidTarget = com.example.soundattract.ai.RaidManager.getRaidTarget(this.leader);
+                if (raidTarget != null) {
+                    this.leaderObjectivePos = raidTarget;
+                    this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+                    startMovingToDestinationWithSpeed(this.moveSpeed * sprintMult);
+                    return;
+                }
+            }
+        }
         if (this.leaderAttractionGoal != null && this.leaderAttractionGoal.isPursuingSound()) {
             this.timeToLive = MAX_TIME_TO_LIVE;
         } else {
@@ -99,8 +137,14 @@ public class FollowLeaderGoal extends Goal {
         }
 
 
-        if (myStableDestination != null && !this.mob.getNavigation().isFollowingPath() && this.mob.getBlockPos().getSquaredDistance(myStableDestination) > 4.0) {
-            startMovingToDestination();
+        if (myStableDestination != null) {
+            if (this.mob.getNavigation().isIdle() || (this.stuckTicks > 10)) {
+                this.myStableDestination = calculateMyStableDestination(this.leaderObjectivePos);
+                startMovingToDestination();
+                this.stuckTicks = 0;
+            }
+        } else if (this.mob.getNavigation().isIdle()) {
+             startMovingToDestination();
         }
 
 
@@ -204,6 +248,18 @@ public class FollowLeaderGoal extends Goal {
                 this.myStableDestination.getY(),
                 this.myStableDestination.getZ() + 0.5,
                 this.moveSpeed
+            );
+        }
+    }
+
+
+    private void startMovingToDestinationWithSpeed(double speed) {
+        if (this.myStableDestination != null) {
+            this.mob.getNavigation().startMovingTo(
+                this.myStableDestination.getX() + 0.5,
+                this.myStableDestination.getY(),
+                this.myStableDestination.getZ() + 0.5,
+                speed
             );
         }
     }

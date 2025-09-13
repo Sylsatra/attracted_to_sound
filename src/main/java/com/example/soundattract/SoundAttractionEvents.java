@@ -151,36 +151,12 @@ public class SoundAttractionEvents {
                                 }
                             }
                         } else {
-                            long now = System.currentTimeMillis();
-                            com.example.soundattract.ai.EdgeRelayManager.RelayState state = com.example.soundattract.ai.EdgeRelayManager.getRelayState(mob);
-                            if (state == null) {
-                                com.example.soundattract.ai.EdgeRelayManager.startRelay(mob, sound.pos, 2 * 60 * 1000L, now);
-                                com.example.soundattract.ai.AttractionGoal.handleEdgeInvestigate(mob, sound);
-                                if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Edge {} starts delayed relay for sound {}", mob.getUuid(), sound.pos);
-                                }
-                            } else if (!state.cancelled && !state.completed) {
-                                if (now - state.startTime > state.delayMillis) {
-                                    MobEntity leader = com.example.soundattract.ai.MobGroupManager.getLeader(mob);
-                                    if (leader != null && leader != mob) {
-                                        com.example.soundattract.ai.AttractionGoal.handleRelayToLeader(leader, sound, mob);
-                                        com.example.soundattract.ai.EdgeRelayManager.completeRelay(mob);
-                                        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                                            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Edge {} delayed relay expired, relaying sound {} to leader {}", mob.getUuid(), sound.pos, leader.getUuid());
-                                        }
-                                    }
-                                } else {
 
-                                }
-                            }
                         }
                         continue;
                     }
                     if (isLeader) {
-                        com.example.soundattract.ai.AttractionGoal.handleLeaderObjective(mob, sound);
-                        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
-                            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Leader {} ready to update group objective for sound {}", mob.getUuid(), sound.pos);
-                        }
+
                         continue;
                     }
                 }
@@ -209,11 +185,14 @@ public class SoundAttractionEvents {
 
     public static void onWorldTick(ServerWorld serverWorld) {
         SoundTracker.pruneIrrelevantSounds(serverWorld);
+
+        com.example.soundattract.ai.RaidManager.tick(serverWorld);
+
+
         com.example.soundattract.DynamicScanCooldownManager.update(serverWorld.getTime(), 0);
-        if (!com.example.soundattract.DynamicScanCooldownManager.shouldScanThisTick(0, serverWorld.getTime())) {
-            return;
+        if (com.example.soundattract.DynamicScanCooldownManager.shouldScanThisTick(0, serverWorld.getTime())) {
+            com.example.soundattract.ai.MobGroupManager.updateGroups(serverWorld);
         }
-        com.example.soundattract.ai.MobGroupManager.updateGroups(serverWorld);
 
         BlockBreakerManager.processPendingActions();
     }
@@ -226,15 +205,31 @@ public class SoundAttractionEvents {
             return;
         }
         double moveSpeed = SoundAttractMod.CONFIG.mobMoveSpeed;
-        boolean attractionGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
-                .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
-        if (!attractionGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new AttractionGoal(mob, moveSpeed));
+        boolean edgeSmart = SoundAttractMod.CONFIG.edgeMobSmartBehavior;
+        if (edgeSmart) {
+
+            boolean leaderGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+                    .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof com.example.soundattract.ai.LeaderAttractionGoal);
+            if (!leaderGoalExists) {
+                ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(0, new com.example.soundattract.ai.LeaderAttractionGoal(mob, moveSpeed));
+            }
+            boolean followerGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+                    .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof com.example.soundattract.ai.FollowerEdgeRelayGoal);
+            if (!followerGoalExists) {
+                ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(0, new com.example.soundattract.ai.FollowerEdgeRelayGoal(mob, moveSpeed));
+            }
+        } else {
+
+            boolean attractionGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+                    .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
+            if (!attractionGoalExists) {
+                ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(4, new AttractionGoal(mob, moveSpeed));
+            }
         }
         boolean followLeaderGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
                 .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof FollowLeaderGoal);
         if (!followLeaderGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new FollowLeaderGoal(mob, moveSpeed));
+            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(4, new FollowLeaderGoal(mob, moveSpeed));
         }
     }
 

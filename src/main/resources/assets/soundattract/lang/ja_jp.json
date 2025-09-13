@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "隠匿"
+  "enchantment.soundattract.conceal": "隠蔽",
+  "enchantment.soundattract.conceal.desc": "モブからの検知範囲を減少させる。"
 }

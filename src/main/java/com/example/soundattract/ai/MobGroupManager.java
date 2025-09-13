@@ -169,6 +169,10 @@ public class MobGroupManager {
         long time = level.getTime();
         int scanCooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
         int groupAssignInterval = com.example.soundattract.DynamicScanCooldownManager.getGroupAssignmentInterval();
+
+        if (com.example.soundattract.SoundAttractMod.CONFIG != null && com.example.soundattract.SoundAttractMod.CONFIG.groupUpdateInterval > 0) {
+            groupAssignInterval = com.example.soundattract.SoundAttractMod.CONFIG.groupUpdateInterval;
+        }
         if (lastGroupUpdateTime >= 0 && time - lastGroupUpdateTime < groupAssignInterval) return;
         lastGroupUpdateTime = time;
 
@@ -256,6 +260,9 @@ public class MobGroupManager {
         double groupRadius = com.example.soundattract.SoundAttractMod.CONFIG.groupDistance;
         int maxGroupSize = com.example.soundattract.SoundAttractMod.CONFIG.maxGroupSize;
         double cellSize = groupRadius;
+        int maxLeadersCfg = com.example.soundattract.SoundAttractMod.CONFIG.maxLeaders;
+        double leaderSpacingMult = com.example.soundattract.SoundAttractMod.CONFIG.leaderSpacingMultiplier;
+        double leaderSpacingDist = groupRadius * Math.max(0.0, leaderSpacingMult);
         Map<Long, List<MobEntity>> cellToMobs = new HashMap<>();
         for (MobEntity mob : attractedMobEntities) {
             long cellKey = SpatialPartitioner.getKey(new BlockPos((int)mob.getX(), 0, (int)mob.getZ()), SoundAttractMod.CONFIG.spatialPartitionSize);
@@ -270,26 +277,73 @@ public class MobGroupManager {
             if (group.isEmpty()) continue;
             for (MobEntity mob : group) {
                 MobEntity currentLeader = uuidToLeader.get(mob.getUuid());
-                MobEntity nearestLeader = currentLeader != null && currentLeader.isAlive() ? currentLeader : null;
+                MobEntity nearestLeader = (currentLeader != null && currentLeader.isAlive()) ? currentLeader : null;
                 double nearestDistSq = Double.MAX_VALUE;
                 if (nearestLeader == null) {
+
                     for (MobEntity leader : assignedLeaders) {
+                        if (maxGroupSize > 0) {
+                            int size = leaderToGroup.getOrDefault(leader, java.util.Collections.emptyList()).size();
+                            if (size >= maxGroupSize) continue;
+                        }
                         double distSq = mob.squaredDistanceTo(leader);
                         if (distSq <= groupRadius * groupRadius && distSq < nearestDistSq) {
                             nearestLeader = leader;
                             nearestDistSq = distSq;
                         }
                     }
+
                     if (nearestLeader == null) {
-                        assignedLeaders.add(mob);
-                        leaders.add(new WeakReference<>(mob));
-                        leaderCount++;
-                        nearestLeader = mob;
+                        for (WeakReference<MobEntity> ref : leaders) {
+                            MobEntity existing = ref.get();
+                            if (existing == null || existing.isRemoved()) continue;
+                            if (maxGroupSize > 0) {
+                                int size = leaderToGroup.getOrDefault(existing, java.util.Collections.emptyList()).size();
+                                if (size >= maxGroupSize) continue;
+                            }
+                            double distSq = mob.squaredDistanceTo(existing);
+                            if (distSq <= groupRadius * groupRadius && distSq < nearestDistSq) {
+                                nearestLeader = existing;
+                                nearestDistSq = distSq;
+                            }
+                        }
+                    }
+
+                    if (nearestLeader == null) {
+                        boolean underMax = (maxLeadersCfg <= 0) || (leaders.size() < maxLeadersCfg);
+                        boolean respectsSpacing = true;
+                        if (leaderSpacingDist > 0.0) {
+                            for (WeakReference<MobEntity> ref : leaders) {
+                                MobEntity existing = ref.get();
+                                if (existing == null || existing.isRemoved()) continue;
+                                if (mob.squaredDistanceTo(existing) < (leaderSpacingDist * leaderSpacingDist)) {
+                                    respectsSpacing = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (underMax && respectsSpacing) {
+                            assignedLeaders.add(mob);
+                            leaders.add(new WeakReference<>(mob));
+                            leaderCount++;
+                            nearestLeader = mob;
+                        }
                     }
                 }
-                uuidToLeader.put(mob.getUuid(), nearestLeader);
-                leaderToGroup.computeIfAbsent(nearestLeader, k -> new ArrayList<>()).add(mob);
-                totalGroupSize++;
+                if (nearestLeader != null) {
+                    if (maxGroupSize > 0) {
+                        java.util.List<MobEntity> curGroup = leaderToGroup.computeIfAbsent(nearestLeader, k -> new ArrayList<>());
+                        if (curGroup.size() < maxGroupSize) {
+                            uuidToLeader.put(mob.getUuid(), nearestLeader);
+                            curGroup.add(mob);
+                            totalGroupSize++;
+                        }
+                    } else {
+                        uuidToLeader.put(mob.getUuid(), nearestLeader);
+                        leaderToGroup.computeIfAbsent(nearestLeader, k -> new ArrayList<>()).add(mob);
+                        totalGroupSize++;
+                    }
+                }
             }
         }
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging) {
@@ -318,7 +372,7 @@ public class MobGroupManager {
             List<MobEntity> group = leaderToGroup.get(leader);
             if (group == null) continue;
             int sectors = com.example.soundattract.SoundAttractMod.CONFIG.numEdgeSectors;
-            int edgePerSector = 4;
+            int edgePerSector = Math.max(0, com.example.soundattract.SoundAttractMod.CONFIG.edgeMobsPerSector);
             Map<Integer, List<MobEntity>> sectorToFarthestList = new HashMap<>();
             double leaderX = leader.getX(), leaderZ = leader.getZ();
             for (MobEntity m : group) {
@@ -448,6 +502,13 @@ public class MobGroupManager {
             }
         }
         if (mobsInCell.isEmpty()) return;
+
+        int maxLeadersCfg = com.example.soundattract.SoundAttractMod.CONFIG.maxLeaders;
+        int maxGroupSize = com.example.soundattract.SoundAttractMod.CONFIG.maxGroupSize;
+        double groupRadius = com.example.soundattract.SoundAttractMod.CONFIG.groupDistance;
+        double spacingMult = com.example.soundattract.SoundAttractMod.CONFIG.leaderSpacingMultiplier;
+        double spacingDist = groupRadius * Math.max(0.0, spacingMult);
+
         MobEntity leader = null;
         java.util.Deque<MobEntity> edgeBuffer = cellEdgeMobs.computeIfAbsent(cellKey, k -> new java.util.LinkedList<>());
         edgeBuffer.clear();
@@ -459,23 +520,89 @@ public class MobGroupManager {
         double maxX = minX + cellSize;
         double maxZ = minZ + cellSize;
 
+
         for (MobEntity candidate : mobsInCell) {
-            if (isEligibleLeader(candidate)) {
-                leader = candidate;
-                break;
+            if (!isEligibleLeader(candidate)) continue;
+            boolean alreadyLeader = false;
+            for (WeakReference<MobEntity> ref : leaders) {
+                if (ref.get() == candidate) { alreadyLeader = true; break; }
             }
+            if (!alreadyLeader) {
+
+                if (maxLeadersCfg > 0 && leaders.size() >= maxLeadersCfg) {
+                    MobEntity nearestExisting = null;
+                    double best = Double.MAX_VALUE;
+                    for (WeakReference<MobEntity> ref : leaders) {
+                        MobEntity ex = ref.get();
+                        if (ex == null || ex.isRemoved()) continue;
+                        double d2 = candidate.squaredDistanceTo(ex);
+                        if (d2 <= groupRadius * groupRadius && d2 < best) {
+                            best = d2; nearestExisting = ex;
+                        }
+                    }
+                    if (nearestExisting != null) { leader = nearestExisting; break; }
+
+                    continue;
+                }
+
+                if (spacingDist > 0.0) {
+                    boolean tooClose = false;
+                    for (WeakReference<MobEntity> ref : leaders) {
+                        MobEntity ex = ref.get();
+                        if (ex == null || ex.isRemoved()) continue;
+                        if (candidate.squaredDistanceTo(ex) < spacingDist * spacingDist) { tooClose = true; break; }
+                    }
+                    if (tooClose) {
+
+                        MobEntity nearestExisting = null;
+                        double best = Double.MAX_VALUE;
+                        for (WeakReference<MobEntity> ref : leaders) {
+                            MobEntity ex = ref.get();
+                            if (ex == null || ex.isRemoved()) continue;
+                            double d2 = candidate.squaredDistanceTo(ex);
+                            if (d2 < best) { best = d2; nearestExisting = ex; }
+                        }
+                        if (nearestExisting != null) { leader = nearestExisting; break; }
+                        continue;
+                    }
+                }
+            }
+
+            leader = candidate;
+            break;
         }
         if (leader == null) {
             return;
         }
 
+
+        int currentGroupSize = 0;
+        synchronized (uuidToLeader) {
+            for (MobEntity mappedLeader : uuidToLeader.values()) {
+                if (mappedLeader == leader) currentGroupSize++;
+            }
+        }
+        int assignedThisCall = 0;
+
         for (int i = 0; i < mobsInCell.size(); i++) {
             MobEntity mob = mobsInCell.get(i);
             if (mob == leader) {
-                uuidToLeader.put(mob.getUuid(), mob);
-                leaders.add(new WeakReference<>(mob));
+                if (maxGroupSize <= 0 || currentGroupSize < maxGroupSize) {
+                    uuidToLeader.put(mob.getUuid(), mob);
+                    leaders.add(new WeakReference<>(mob));
+                    currentGroupSize++;
+                    assignedThisCall++;
+                } else {
+                    deserterUuids.add(mob.getUuid());
+                }
             } else {
-                uuidToLeader.put(mob.getUuid(), leader);
+                if (maxGroupSize <= 0 || currentGroupSize < maxGroupSize) {
+                    uuidToLeader.put(mob.getUuid(), leader);
+                    currentGroupSize++;
+                    assignedThisCall++;
+                } else {
+                    deserterUuids.add(mob.getUuid());
+                }
             }
             double x = mob.getX();
             double z = mob.getZ();
@@ -522,7 +649,7 @@ public class MobGroupManager {
             if (edgeMob.isAlive()) edgeBuffer.add(edgeMob);
         }
         if (com.example.soundattract.SoundAttractMod.CONFIG.debugLogging && leader != null) {
-            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] updateCellGroup: cellKey={} leader={} groupSize={}", cellKey, leader.getName().getString(), mobsInCell.size());
+            com.example.soundattract.SoundAttractMod.LOGGER.info("[MobGroupManager] updateCellGroup: cellKey={} leader={} assigned={} (existingGroupSize now ~{})", cellKey, leader.getName().getString(), assignedThisCall, currentGroupSize);
         }
     }
 

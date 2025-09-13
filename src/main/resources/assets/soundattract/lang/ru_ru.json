@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Сокрытие чар"
+  "enchantment.soundattract.conceal": "Скрытие",
+  "enchantment.soundattract.conceal.desc": "Уменьшает дальность обнаружения мобами."
 }

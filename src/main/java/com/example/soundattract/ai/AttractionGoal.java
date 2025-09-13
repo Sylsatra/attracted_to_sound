@@ -1,22 +1,21 @@
 package com.example.soundattract.ai;
 
+import com.example.soundattract.FovEvents;
+import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.SoundTracker;
+import com.example.soundattract.StealthDetectionEvents;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
-import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundTracker;
-import com.example.soundattract.FovEvents;
-import com.example.soundattract.StealthDetectionEvents;
-
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.server.world.ServerWorld;
 
 public class AttractionGoal extends Goal {
 
@@ -54,21 +53,7 @@ public class AttractionGoal extends Goal {
     private int edgeArrivalTicks = 0;
     private SoundTracker.SoundRecord cachedBestSound;
     private int bestSoundCacheTicks;
-    private static final Map<MobEntity, DelayedRelay> pendingDelayedRelays = new HashMap<>();
 
-    private static class DelayedRelay {
-
-        public final MobEntity leader;
-        public final BlockPos soundPos;
-        public final long triggerTime;
-        public boolean cancelled = false;
-
-        public DelayedRelay(MobEntity leader, BlockPos soundPos, long triggerTime) {
-            this.leader = leader;
-            this.soundPos = soundPos;
-            this.triggerTime = triggerTime;
-        }
-    }
 
     public AttractionGoal(MobEntity mob, double moveSpeed) {
         this.mob = mob;
@@ -88,6 +73,12 @@ public class AttractionGoal extends Goal {
     @Override
     public boolean canStart() {
         if (this.mob.hasVehicle() || this.mob.isSleeping() || this.mob.getTarget() != null) {
+            return false;
+        }
+
+
+
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.edgeMobSmartBehavior) {
             return false;
         }
 
@@ -121,43 +112,27 @@ public class AttractionGoal extends Goal {
     @Override
     public boolean shouldContinue() {
 
-        if (!this.isPursuingSound || this.mob.hasVehicle() || this.mob.isSleeping() || this.mob.getTarget() != null) {
+        if (this.mob.hasVehicle() || this.mob.isSleeping() || this.mob.getTarget() != null) {
             return false;
         }
 
-        if (this.pursuingSoundTicksRemaining <= 0) {
-            return false;
+
+        boolean isPursuingSound = this.isPursuingSound && this.targetSoundPos != null;
+
+        if (!isPursuingSound) {
+            return this.blockBreakerGoal != null;
         }
 
-        if (this.targetSoundPos == null) {
-            return false;
-        }
 
-        SoundTracker.SoundRecord bestSoundNow = findInterestingSoundRecord();
-        if (bestSoundNow == null) {
-            return false;
-        }
-
-        if (bestSoundNow.pos.equals(this.targetSoundPos)) {
-            return true;
-        }
-
-        double switchRatio = SoundAttractMod.CONFIG.soundSwitchRatio;
-        if (bestSoundNow.weight > this.currentTargetWeight * switchRatio) {
-            if (SoundAttractMod.CONFIG.debugLogging) {
-                SoundAttractMod.LOGGER.info(
-                        "[AttractionGoal] Mob {} will switch from target {} (w:{}) to {} (w:{})",
-                        mob.getName().getString(), this.targetSoundPos, String.format("%.2f", this.currentTargetWeight),
-                        bestSoundNow.pos, String.format("%.2f", bestSoundNow.weight)
-                );
+        if (this.mob.getNavigation().isIdle()) {
+            if (this.targetSoundPos != null && this.mob.getBlockPos().getSquaredDistance(this.targetSoundPos) < 4.0D) { 
+                return false;
             }
-
-            return false;
         }
+
 
         return true;
     }
-
     @Override
     public void stop() {
         if (this.blockBreakerGoal != null) {
@@ -307,11 +282,24 @@ public class AttractionGoal extends Goal {
         boolean hasArrived = distSqToTarget < arrivalDistSq;
         if (isLeader) {
 
-            List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(this.mob);
-            if (relays != null && !relays.isEmpty()) {
+            if (com.example.soundattract.ai.RaidManager.isRaidTicking(this.mob)) {
+                this.mob.getNavigation().stop();
+                return;
+            } else if (com.example.soundattract.ai.RaidManager.isRaidAdvancing(this.mob)) {
+                BlockPos raidTarget = com.example.soundattract.ai.RaidManager.getRaidTarget(this.mob);
+                if (raidTarget != null) {
+                    navigateTo(raidTarget, this.moveSpeed);
+                    return;
+                }
+            }
 
-                if (SoundAttractMod.CONFIG.debugLogging) {
-                    SoundAttractMod.LOGGER.info("Leader {} received {} sound relays.", mob.getName().getString(), relays.size());
+            if (!com.example.soundattract.ai.RaidManager.isRaidTicking(this.mob)) {
+                List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(this.mob);
+                if (relays != null && !relays.isEmpty()) {
+
+                    if (SoundAttractMod.CONFIG.debugLogging) {
+                        SoundAttractMod.LOGGER.info("Leader {} received {} sound relays.", mob.getName().getString(), relays.size());
+                    }
                 }
             }
             if (this.blockBreakerGoal == null && SoundAttractMod.CONFIG.enableBlockBreaking && this.targetSoundPos != null) {
@@ -443,21 +431,7 @@ public class AttractionGoal extends Goal {
                 edgeArrivalTicks = 0;
                 mob.getNavigation().stop();
 
-                if (leader != null && leader != mob && this.targetSoundPos != null) {
-                    long triggerTime = mob.getWorld().getTime() + SoundAttractMod.CONFIG.delayedRelayTicks;
-                    DelayedRelay relay = new DelayedRelay(leader, this.targetSoundPos, triggerTime);
-                    pendingDelayedRelays.put(mob, relay);
-                    if (SoundAttractMod.CONFIG.debugLogging) {
-                        SoundAttractMod.LOGGER.info(
-                                "[AttractionGoal] Smart {} {} scheduled delayed relay to {} for sound at {} (trigger @ {})",
-                                isEdge ? "Edge" : "Deserter",
-                                mob.getName().getString(),
-                                leader.getName().getString(),
-                                this.targetSoundPos,
-                                triggerTime
-                        );
-                    }
-                }
+
             } else {
                 this.cachedSound = null;
                 this.targetSoundPos = null;
@@ -555,9 +529,7 @@ public class AttractionGoal extends Goal {
             if (leader == null || leader == mob || !leader.isAlive()) {
                 edgeMobState = null;
                 mob.getNavigation().stop();
-                if (pendingDelayedRelays.containsKey(mob)) {
-                    pendingDelayedRelays.get(mob).cancelled = true;
-                }
+
                 return;
             }
 
@@ -570,6 +542,8 @@ public class AttractionGoal extends Goal {
                             this.cachedSound.weight,
                             mob.getWorld().getTime()
                     );
+
+                    com.example.soundattract.ai.RaidManager.scheduleRaid(leader, this.targetSoundPos, mob.getWorld().getTime());
                     relayedToLeader = true;
                     if (SoundAttractMod.CONFIG.debugLogging) {
                         SoundAttractMod.LOGGER.info(
@@ -584,12 +558,7 @@ public class AttractionGoal extends Goal {
                     );
                 }
 
-                if (pendingDelayedRelays.containsKey(mob)) {
-                    pendingDelayedRelays.get(mob).cancelled = true;
-                    if (SoundAttractMod.CONFIG.debugLogging) {
-                        SoundAttractMod.LOGGER.info("[AttractionGoal] Delayed relay for {} cancelled (returned to leader).", mob.getName().getString());
-                    }
-                }
+
 
                 edgeMobState = null;
                 foundPlayerOrHit = false;
@@ -650,7 +619,7 @@ public class AttractionGoal extends Goal {
                 SoundTracker.submitAsyncSoundScore(world, mob, mobPos);
                 directSound = SoundTracker.findNearestSound(world, mob, mobPos, mob.getEyePos());
             }
-            List<MobGroupManager.SoundRelay> relays = MobGroupManager.consumeRelayedSounds(mob);
+            List<MobGroupManager.SoundRelay> relays = com.example.soundattract.ai.RaidManager.isRaidTicking(this.mob) ? null : MobGroupManager.consumeRelayedSounds(mob);
 
             bestNewSoundEvent = directSound;
             if (relays != null) {
@@ -755,6 +724,7 @@ public class AttractionGoal extends Goal {
                     || (goal.mob.getNavigation().getTargetPos() != null && !goal.mob.getNavigation().getTargetPos().equals(sound.pos))) {
                 goal.mob.getNavigation().startMovingTo(sound.pos.getX() + 0.5, sound.pos.getY() + 0.5, sound.pos.getZ() + 0.5, goal.moveSpeed);
             }
+            
             if (SoundAttractMod.CONFIG.debugLogging) {
                 SoundAttractMod.LOGGER.info("[AttractionGoal] {} commanded to attract to sound: {}", mob.getName().getString(), sound.soundId);
             }
@@ -778,67 +748,86 @@ public class AttractionGoal extends Goal {
                 goal.pursuingSoundTicksRemaining = SoundAttractMod.CONFIG.scanCooldownTicks * 2;
                 goal.edgeMobState = null;
                 goal.relayedToLeader = true;
-
                 if (SoundAttractMod.CONFIG.debugLogging) {
-                    SoundAttractMod.LOGGER.info("[AttractionGoal] Leader {} taking relayed sound {} from {}", leader.getName().getString(), leaderEvaluatedRelay.pos, edgeMob != null ? edgeMob.getName().getString() : "unknown source");
+                    SoundAttractMod.LOGGER.info("[AttractionGoal] Leader {} received relayed sound {}", leader.getName().getString(), leaderEvaluatedRelay.soundId);
+                }
+
+                if (goal.mob.getWorld() instanceof net.minecraft.server.world.ServerWorld sw) {
+                    com.example.soundattract.ai.RaidManager.scheduleRaid(leader, leaderEvaluatedRelay.pos, sw.getTime());
                 }
                 if (goal.mob.getNavigation().isIdle()
                         || (goal.mob.getNavigation().getTargetPos() != null && !goal.mob.getNavigation().getTargetPos().equals(leaderEvaluatedRelay.pos))) {
-                    goal.mob.getNavigation().startMovingTo(leaderEvaluatedRelay.pos.getX() + 0.5, leaderEvaluatedRelay.pos.getY() + 0.5, leaderEvaluatedRelay.pos.getZ() + 0.5, goal.moveSpeed);
+                    goal.mob.getNavigation().startMovingTo(
+                            leaderEvaluatedRelay.pos.getX() + 0.5,
+                            leaderEvaluatedRelay.pos.getY() + 0.5,
+                            leaderEvaluatedRelay.pos.getZ() + 0.5,
+                            goal.moveSpeed
+                    );
                 }
             }
         }
     }
 
-    public static void handleLeaderObjective(MobEntity leader, SoundTracker.SoundRecord sound) {
-        AttractionGoal goal = getAttractionGoal(leader);
+
+    public static void handleEdgeInvestigate(MobEntity edge, SoundTracker.SoundRecord sound) {
+        AttractionGoal goal = getAttractionGoal(edge);
         if (goal != null && sound != null) {
             goal.cachedSound = sound;
             goal.targetSoundPos = sound.pos;
             goal.currentTargetWeight = sound.weight;
             goal.isPursuingSound = true;
-            goal.pursuingSoundTicksRemaining = SoundAttractMod.CONFIG.scanCooldownTicks * 2;
-            goal.edgeMobState = null;
-            goal.relayedToLeader = false;
-            if (SoundAttractMod.CONFIG.debugLogging) {
-                SoundAttractMod.LOGGER.info("[AttractionGoal] Leader {} received direct objective sound {}", leader.getName().getString(), sound.soundId);
-            }
-            if (goal.mob.getNavigation().isIdle()
-                    || (goal.mob.getNavigation().getTargetPos() != null && !goal.mob.getNavigation().getTargetPos().equals(sound.pos))) {
-                goal.mob.getNavigation().startMovingTo(sound.pos.getX() + 0.5, sound.pos.getY() + 0.5, sound.pos.getZ() + 0.5, goal.moveSpeed);
-            }
-        }
-    }
 
-    public static void handleEdgeInvestigate(MobEntity edge, SoundTracker.SoundRecord sound) {
-        AttractionGoal goal = getAttractionGoal(edge);
-        if (goal != null && sound != null && SoundAttractMod.CONFIG.edgeMobSmartBehavior) {
-            goal.cachedSound = sound;
-            goal.targetSoundPos = sound.pos;
-            goal.currentTargetWeight = sound.weight;
-            goal.isPursuingSound = true;
-            goal.pursuingSoundTicksRemaining = SoundAttractMod.CONFIG.scanCooldownTicks * 2;
-
+            goal.pursuingSoundTicksRemaining = Math.max(sound.ticksRemaining, SoundAttractMod.CONFIG.scanCooldownTicks * 2);
             goal.edgeMobState = EdgeMobState.GOING_TO_SOUND;
             goal.foundPlayerOrHit = false;
             goal.relayedToLeader = false;
             goal.edgeArrivalTicks = 0;
-            goal.mob.getNavigation().stop();
 
-            MobEntity leader = MobGroupManager.getLeader(edge);
-            if (leader != null && leader != edge && goal.targetSoundPos != null) {
-                if (pendingDelayedRelays.containsKey(edge)) {
-                    pendingDelayedRelays.get(edge).cancelled = true;
-                }
-                long triggerTime = edge.getWorld().getTime() + SoundAttractMod.CONFIG.delayedRelayTicks;
-                DelayedRelay relay = new DelayedRelay(leader, goal.targetSoundPos, triggerTime);
-                pendingDelayedRelays.put(edge, relay);
-                if (SoundAttractMod.CONFIG.debugLogging) {
-                    SoundAttractMod.LOGGER.info("[AttractionGoal] Smart Edge {} commanded to investigate {}, scheduling delayed relay.", edge.getName().getString(), sound.pos);
-                }
+
+
+
+            if (goal.mob.getNavigation().isIdle()
+                    || (goal.mob.getNavigation().getTargetPos() != null && !goal.mob.getNavigation().getTargetPos().equals(sound.pos))) {
+                goal.mob.getNavigation().startMovingTo(sound.pos.getX() + 0.5, sound.pos.getY() + 0.5, sound.pos.getZ() + 0.5, goal.moveSpeed);
             }
+
             if (SoundAttractMod.CONFIG.debugLogging) {
-                SoundAttractMod.LOGGER.info("[AttractionGoal] Edge mob {} instructed to investigate sound at {}", edge.getName().getString(), sound.soundId);
+                SoundAttractMod.LOGGER.info("[AttractionGoal] Edge {} instructed to investigate sound {} at {}", edge.getName().getString(), String.valueOf(sound.soundId), sound.pos);
+            }
+        }
+    }
+
+
+    public static void handleLeaderObjective(MobEntity leader, SoundTracker.SoundRecord sound) {
+        AttractionGoal goal = getAttractionGoal(leader);
+        if (goal != null && sound != null) {
+            boolean takeNew = goal.cachedSound == null
+                    || sound.weight > goal.cachedSound.weight * SoundAttractMod.CONFIG.soundSwitchRatio;
+
+            if (!takeNew && goal.cachedSound != null && Math.abs(sound.weight - goal.cachedSound.weight) < 0.001) {
+
+                double newDistSq = sound.pos.getSquaredDistance(leader.getBlockPos());
+                double curDistSq = goal.targetSoundPos != null ? goal.targetSoundPos.getSquaredDistance(leader.getBlockPos()) : Double.MAX_VALUE;
+                takeNew = newDistSq < curDistSq;
+            }
+
+            if (takeNew) {
+                goal.cachedSound = sound;
+                goal.targetSoundPos = sound.pos;
+                goal.currentTargetWeight = sound.weight;
+                goal.isPursuingSound = true;
+                goal.pursuingSoundTicksRemaining = sound.ticksRemaining;
+                goal.edgeMobState = null;
+
+                if (goal.mob.getNavigation().isIdle()
+                        || (goal.mob.getNavigation().getTargetPos() != null && !goal.mob.getNavigation().getTargetPos().equals(sound.pos))) {
+                    goal.mob.getNavigation().startMovingTo(sound.pos.getX() + 0.5, sound.pos.getY() + 0.5, sound.pos.getZ() + 0.5, goal.moveSpeed);
+                }
+
+                if (SoundAttractMod.CONFIG.debugLogging) {
+                    SoundAttractMod.LOGGER.info("[AttractionGoal] Leader {} objective set to sound {} at {} (weight={})",
+                            leader.getName().getString(), String.valueOf(sound.soundId), sound.pos, String.format("%.2f", sound.weight));
+                }
             }
         }
     }

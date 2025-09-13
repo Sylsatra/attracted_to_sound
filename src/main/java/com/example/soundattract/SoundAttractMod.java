@@ -141,6 +141,7 @@ public class SoundAttractMod implements ModInitializer {
                 SoundAttractionEvents.onServerTick(level);
             }
 
+            SoundTracker.tick();
 
             long applyBudgetMs = 2L;
             if (CONFIG != null) {

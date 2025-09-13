@@ -5,6 +5,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.util.Identifier;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,12 +50,16 @@ public class SoundAttractConfigData {
      */
 
     private List<MobProfile> cachedMobProfiles = null;
+    private List<PlayerProfile> cachedPlayerProfiles = null;
     private transient Map<String, Double> pointBlankGunShootRangesMap;
     private transient Map<String, Double> pointBlankAttachmentSoundReductionsMap;
     private transient Map<String, Double> pointBlankMuzzleFlashReductionsMap = null;
 
     public void buildCaches() {
+
+        migrateLegacyPlayerProfiles();
         this.cachedMobProfiles = parseMobProfiles();
+        this.cachedPlayerProfiles = parsePlayerProfiles();
 
         this.pointBlankGunShootRangesMap = parseConfigList(this.pointblankGunShootRanges);
         this.pointBlankAttachmentSoundReductionsMap = parseConfigList(this.pointblankAttachmentSoundReductions);
@@ -71,11 +76,58 @@ public class SoundAttractConfigData {
      */
     public void invalidateCaches() {
         this.cachedMobProfiles = null;
+        this.cachedPlayerProfiles = null;
         this.pointBlankGunShootRangesMap = null;
         this.pointBlankAttachmentSoundReductionsMap = null;
         this.pointBlankMuzzleFlashReductionsMap = null;
         if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
             SoundAttractMod.LOGGER.info("[Config] All caches have been invalidated.");
+        }
+    }
+
+    /**
+     * Convert any legacy 6-part player profile entries to the new Forge 3-part format.
+     * Old format: profileName;playerName;playerUuid;heldAnyOfCSV;armorAnyOfCSV;detectionOverrides
+     * New format: profileName;nbtMatcher;detectionOverrides
+     * Note: name/UUID/held/armor matchers are no longer supported. We retain only detectionOverrides
+     * and set nbtMatcher blank (match-all). A warning is logged to notify users.
+     */
+    private void migrateLegacyPlayerProfiles() {
+        if (this.specialPlayerProfilesRaw == null) return;
+
+        boolean changed = false;
+        List<String> migrated = new ArrayList<>(this.specialPlayerProfilesRaw.size());
+        for (String raw : this.specialPlayerProfilesRaw) {
+            if (raw == null) { migrated.add(null); continue; }
+            String trimmed = raw.trim();
+            if (trimmed.isEmpty()) { migrated.add(trimmed); continue; }
+
+            String[] parts = trimmed.split(";", -1);
+            if (parts.length == 6) {
+                String profileName = parts[0].trim();
+                String detectionOverrides = parts[5].trim();
+                String newEntry = profileName + ";" + "" + ";" + detectionOverrides;
+                migrated.add(newEntry);
+                changed = true;
+                SoundAttractMod.LOGGER.warn(
+                        "[Config] Migrated legacy 6-part player profile '{}' to 3-part format. " +
+                        "Name/UUID/held/armor matchers are no longer supported; only detectionOverrides were kept.",
+                        profileName
+                );
+            } else {
+                migrated.add(trimmed);
+            }
+        }
+
+        if (changed) {
+            this.specialPlayerProfilesRaw = migrated;
+
+            if (this.configSchemaVersion < CURRENT_SCHEMA_VERSION) {
+                this.configSchemaVersion = CURRENT_SCHEMA_VERSION;
+            }
+        } else if (this.configSchemaVersion < CURRENT_SCHEMA_VERSION) {
+
+            this.configSchemaVersion = CURRENT_SCHEMA_VERSION;
         }
     }
 
@@ -227,12 +279,100 @@ public class SoundAttractConfigData {
         return cachedMobProfiles;
     }
 
+    /**
+     * Player profile format (semicolon-separated, 3 parts — Forge parity):
+     * 1) profileName
+     * 2) nbtMatcher (SNBT compound; empty = match all players)
+     * 3) detectionOverrides (comma-separated stance:value pairs)
+     *
+     * Example:
+     * "FelineOrigin;{\"ForgeCaps\":{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}};standing:24.0,sneaking:10.0,crawling:3.0"
+     */
+    public List<PlayerProfile> parsePlayerProfiles() {
+        List<PlayerProfile> list = new ArrayList<>();
+        if (specialPlayerProfilesRaw == null) {
+            cachedPlayerProfiles = Collections.unmodifiableList(list);
+            return cachedPlayerProfiles;
+        }
+        for (String raw : specialPlayerProfilesRaw) {
+            if (raw == null || raw.trim().isEmpty()) continue;
+            String[] parts = raw.trim().split(";", -1);
+            if (parts.length != 3) {
+                SoundAttractMod.LOGGER.warn("Skipping malformed player profile: '{}' (expected 3 parts)", raw);
+                continue;
+            }
+
+            String profileName = parts[0].trim();
+            String nbtMatcherString = parts[1].trim();
+            String detectionStr = parts[2].trim();
+
+            NbtCompound parsedNbt = null;
+            if (!nbtMatcherString.isEmpty()) {
+                try {
+                    parsedNbt = StringNbtReader.parse(nbtMatcherString);
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn(
+                            "Failed to parse NBT matcher for player profile '{}': {}. Error: {}",
+                            profileName, nbtMatcherString, e.getMessage()
+                    );
+                    parsedNbt = null;
+                }
+            }
+
+            Map<PlayerStance, Double> detectionOverrides = new HashMap<>();
+            if (!detectionStr.isEmpty()) {
+                String[] pairs = detectionStr.split(",");
+                for (String pair : pairs) {
+                    String tp = pair.trim();
+                    if (tp.isEmpty()) continue;
+                    String[] kv = tp.split(":", 2);
+                    if (kv.length != 2) {
+                        SoundAttractMod.LOGGER.warn("Malformed stance override '{}' in player profile '{}'", tp, profileName);
+                        continue;
+                    }
+                    Optional<PlayerStance> stanceOpt = PlayerStance.fromString(kv[0].trim());
+                    if (stanceOpt.isEmpty()) {
+                        SoundAttractMod.LOGGER.warn("Unknown stance '{}' in player profile '{}'", kv[0], profileName);
+                        continue;
+                    }
+                    try {
+                        double val = Double.parseDouble(kv[1].trim());
+                        detectionOverrides.put(stanceOpt.get(), val);
+                    } catch (NumberFormatException nfe) {
+                        SoundAttractMod.LOGGER.warn("Invalid value '{}' for stance '{}' in player profile '{}'", kv[1], kv[0], profileName);
+                    }
+                }
+            }
+
+            try {
+                PlayerProfile pp = new PlayerProfile(
+                    profileName,
+                    parsedNbt,
+                    detectionOverrides
+                );
+                list.add(pp);
+            } catch (Throwable t) {
+                SoundAttractMod.LOGGER.warn("Failed to construct PlayerProfile for entry '{}': {}", raw, t.getMessage());
+            }
+        }
+        cachedPlayerProfiles = Collections.unmodifiableList(list);
+        return cachedPlayerProfiles;
+    }
+
     public MobProfile getMatchingProfile(MobEntity mob) {
 
         for (MobProfile profile : getMobProfiles()) {
             if (profile.matches(mob)) {
                 return profile;
             }
+        }
+        return null;
+    }
+
+    /** Return the first matching player profile for this player, or null if none. */
+    public PlayerProfile getMatchingPlayerProfile(PlayerEntity player) {
+        for (PlayerProfile pp : getPlayerProfiles()) {
+            if (pp.matches(player)) return pp;
         }
         return null;
     }
@@ -262,6 +402,14 @@ public class SoundAttractConfigData {
             buildCaches();
         }
         return cachedMobProfiles;
+    }
+
+    /** Get parsed player profiles (build if needed). */
+    public List<PlayerProfile> getPlayerProfiles() {
+        if (cachedPlayerProfiles == null) {
+            buildCaches();
+        }
+        return cachedPlayerProfiles;
     }
 
     public SoundConfig getSoundConfigForId(String id) {
@@ -320,7 +468,8 @@ public class SoundAttractConfigData {
     /**
      * Internal schema version for config migrations. Increment when structure changes.
      */
-    public int configSchemaVersion = 1;
+    private static final int CURRENT_SCHEMA_VERSION = 3;
+    public int configSchemaVersion = 3;
 
 
     /** Number of worker threads for off-thread computations. <= 0 uses (CPUs-1). */
@@ -482,7 +631,11 @@ public class SoundAttractConfigData {
      */
     public boolean edgeMobSmartBehavior = false;
 
-    public int delayedRelayTicks = 2000;
+    /**
+     * How long an edge mob waits at the sound location before deciding to return
+     * to the leader if no player is detected. Default: 15 ticks.
+     */
+    public int edgeInvestigateWaitTicks = 15;
 
     /**
      * The size (in blocks) of each spatial partition (cell/chunk) used for both
@@ -508,6 +661,48 @@ public class SoundAttractConfigData {
      * Recommended: 16–256. Minimum: 1. Maximum: 1024.
      */
     public int maxGroupSize = 128;
+
+    /**
+     * Maximum number of leaders allowed (Forge parity). If <= 0, unlimited leaders are allowed
+     */
+    public int maxLeaders = 16;
+
+    /**
+     * Leader spacing multiplier (Forge parity). When > 0, prevents new leaders from being created within
+     * (groupDistance * leaderSpacingMultiplier) of existing leaders. 
+     * If 0, spacing is disabled (matches current Fabric default).
+     */
+    public double leaderSpacingMultiplier = 1.0;
+
+    /**
+     * Number of edge mobs to select per angular sector (Forge parity). Default 4 to preserve current Fabric behavior.
+     */
+    public int edgeMobsPerSector = 4;
+
+    /**
+     * Sprint speed multiplier used by followers during RAID rally/advance phases.
+     * Default: 1.1  Minimum: 1.0  Recommended: 1.05–1.5
+     */
+    public double groupSprintMultiplier = 1.1;
+
+    /**
+     * Distance (in blocks) within which an edge mob considers itself 'returned' to its leader (Forge parity).
+     * Default: 2.0  Minimum: 0.5  Recommended: 1.0–4.0
+     */
+    public double leaderReturnArrivalDistance = 2.0;
+
+    /**
+     * Interval (in ticks) between group manager updates (Forge parity).
+     * If > 0, this overrides the dynamic interval computed by DynamicScanCooldownManager.
+     * 20 ticks = 1 second. Default: 200
+     */
+    public int groupUpdateInterval = 200;
+
+    /**
+     * Countdown duration (in ticks) before a RAID advances to its target.
+     * 20 ticks = 1 second. Default: 200 (10 seconds)
+     */
+    public int raidCountdownTicks = 200;
 
     /**
      * Number of angular sectors used for edge mob selection logic. Affects how
@@ -1327,6 +1522,19 @@ public class SoundAttractConfigData {
     public List<String> specialMobProfilesRaw = new ArrayList<>(List.of(
             "GreedyGoblin;minecraft:piglin;;minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0",
             "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
+    ));
+
+    /**
+     * Player profiles (Forge parity): semicolon-separated 3 parts
+     * profileName;nbtMatcher;detectionOverrides
+     * - nbtMatcher: SNBT compound to match on full player NBT (blank = match all players)
+     * - detectionOverrides: comma-separated "stance:value" pairs (standing/sneaking/crawling)
+     * Examples:
+     * "MatchAll;;standing:24.0,sneaking:12.0,crawling:6.0"
+     * "FelineOrigin;{cardinal_components:{\"origins:origin\":{OriginLayers:[{Layer:\"origins:origin\",Origin:\"origins:feline\"}]}}};standing:24.0,sneaking:10.0,crawling:3.0"
+     */
+    public List<String> specialPlayerProfilesRaw = new ArrayList<>(List.of(
+            "FelineOrigin;{cardinal_components:{\"origins:origin\":{OriginLayers:[{Layer:\"origins:origin\",Origin:\"origins:feline\"}]}}};standing:24.0,sneaking:10.0,crawling:3.0"
     ));
 
 
