@@ -70,7 +70,9 @@ public class FovEvents {
         SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} user-defined exclusions.", USER_EXCLUSION_CACHE.size());
 
         CONFIG_FOV_CACHE = new HashMap<>();
-        List<? extends String> overrideList = SoundAttractMod.CONFIG.fovOverrides;
+        List<? extends String> overrideList = SoundAttractMod.CONFIG.fovOverrides != null
+                ? SoundAttractMod.CONFIG.fovOverrides
+                : java.util.Collections.emptyList();
         for (String entry : overrideList) {
             try {
                 String[] parts = entry.split(",");
@@ -91,11 +93,13 @@ public class FovEvents {
                 SoundAttractMod.LOGGER.error("[FOV Config] Failed to parse FOV override entry: " + entry, e);
             }
         }
-        SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} custom FOV overrides.", CONFIG_FOV_CACHE.size());
-
-
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.debugLogging) {
+            SoundAttractMod.LOGGER.info("[FOV Config] Loaded {} custom FOV overrides.", CONFIG_FOV_CACHE.size());
+        }
         NON_BLOCKING_VISION_ALLOW = new HashSet<>();
-        List<? extends String> allowList = SoundAttractMod.CONFIG.nonBlockingVisionAllowList;
+        List<? extends String> allowList = SoundAttractMod.CONFIG.nonBlockingVisionAllowList != null
+                ? SoundAttractMod.CONFIG.nonBlockingVisionAllowList
+                : java.util.Collections.emptyList();
         for (String s : allowList) {
             try {
                 Identifier id = Identifier.tryParse(s.trim());
@@ -204,7 +208,7 @@ public class FovEvents {
             RaycastContext ctx = new RaycastContext(
                     currStart,
                     end,
-                    RaycastContext.ShapeType.COLLIDER,
+                    RaycastContext.ShapeType.VISUAL,
                     RaycastContext.FluidHandling.NONE,
                     looker
             );
@@ -245,7 +249,9 @@ public class FovEvents {
     }
 
     private static boolean isNonBlockingVision(BlockState state, World world, BlockPos pos) {
-
+        if (state == null || world == null || pos == null) {
+            return false;
+        }
         if (state.isAir()) return true;
 
 
@@ -257,18 +263,12 @@ public class FovEvents {
             Boolean open = state.get(TrapdoorBlock.OPEN);
             if (open != null && open) return true;
         }
-
-
-        if (NON_BLOCKING_VISION_ALLOW != null) {
             try {
                 Identifier bid = Registries.BLOCK.getId(state.getBlock());
                 if (bid != null && NON_BLOCKING_VISION_ALLOW.contains(bid)) {
                     return true;
                 }
             } catch (Throwable ignored) {}
-        }
-
-
 
         try {
             var id = net.minecraft.registry.Registries.BLOCK.getId(state.getBlock());

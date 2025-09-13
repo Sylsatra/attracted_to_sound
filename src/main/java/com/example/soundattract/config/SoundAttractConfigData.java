@@ -5,6 +5,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.util.Identifier;
 import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,9 +24,6 @@ import java.util.stream.Collectors;
  * "GreedyGoblin;minecraft:piglin;{IsAlpha:1b};minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0"
  */
 public class SoundAttractConfigData {
-
-
-
 
     /**
      * Each entry here must be in the format:
@@ -49,12 +47,15 @@ public class SoundAttractConfigData {
      */
 
     private List<MobProfile> cachedMobProfiles = null;
+    private List<PlayerProfile> cachedPlayerProfiles = null;
     private transient Map<String, Double> pointBlankGunShootRangesMap;
     private transient Map<String, Double> pointBlankAttachmentSoundReductionsMap;
     private transient Map<String, Double> pointBlankMuzzleFlashReductionsMap = null;
 
     public void buildCaches() {
+        migrateLegacyPlayerProfiles();
         this.cachedMobProfiles = parseMobProfiles();
+        this.cachedPlayerProfiles = parsePlayerProfiles();
 
         this.pointBlankGunShootRangesMap = parseConfigList(this.pointblankGunShootRanges);
         this.pointBlankAttachmentSoundReductionsMap = parseConfigList(this.pointblankAttachmentSoundReductions);
@@ -70,12 +71,57 @@ public class SoundAttractConfigData {
      */
     public void invalidateCaches() {
         this.cachedMobProfiles = null;
+        this.cachedPlayerProfiles = null;
         this.pointBlankGunShootRangesMap = null;
         this.pointBlankAttachmentSoundReductionsMap = null;
         this.pointBlankMuzzleFlashReductionsMap = null;
         SoundAttractMod.LOGGER.info("[Config] All caches have been invalidated.");
     }
+    /**
+     * Convert any legacy 6-part player profile entries to the new Forge 3-part format.
+     * Old format: profileName;playerName;playerUuid;heldAnyOfCSV;armorAnyOfCSV;detectionOverrides
+     * New format: profileName;nbtMatcher;detectionOverrides
+     * Note: name/UUID/held/armor matchers are no longer supported. We retain only detectionOverrides
+     * and set nbtMatcher blank (match-all). A warning is logged to notify users.
+     */
+    private void migrateLegacyPlayerProfiles() {
+        if (this.specialPlayerProfilesRaw == null) return;
 
+        boolean changed = false;
+        List<String> migrated = new ArrayList<>(this.specialPlayerProfilesRaw.size());
+        for (String raw : this.specialPlayerProfilesRaw) {
+            if (raw == null) { migrated.add(null); continue; }
+            String trimmed = raw.trim();
+            if (trimmed.isEmpty()) { migrated.add(trimmed); continue; }
+
+            String[] parts = trimmed.split(";", -1);
+            if (parts.length == 6) {
+                String profileName = parts[0].trim();
+                String detectionOverrides = parts[5].trim();
+                String newEntry = profileName + ";" + "" + ";" + detectionOverrides;
+                migrated.add(newEntry);
+                changed = true;
+                SoundAttractMod.LOGGER.warn(
+                        "[Config] Migrated legacy 6-part player profile '{}' to 3-part format. " +
+                        "Name/UUID/held/armor matchers are no longer supported; only detectionOverrides were kept.",
+                        profileName
+                );
+            } else {
+                migrated.add(trimmed);
+            }
+        }
+
+        if (changed) {
+            this.specialPlayerProfilesRaw = migrated;
+            // Bump schema so we don't spam logs across sessions once config is saved
+            if (this.configSchemaVersion < CURRENT_SCHEMA_VERSION) {
+                this.configSchemaVersion = CURRENT_SCHEMA_VERSION;
+            }
+        } else if (this.configSchemaVersion < CURRENT_SCHEMA_VERSION) {
+            // No legacy entries found, but ensure version is current
+            this.configSchemaVersion = CURRENT_SCHEMA_VERSION;
+        }
+    }
     public Map<String, Double> getPointBlankGunShootRanges() {
         if (pointBlankGunShootRangesMap == null) {
             buildCaches();
@@ -223,7 +269,85 @@ public class SoundAttractConfigData {
         cachedMobProfiles = Collections.unmodifiableList(list);
         return cachedMobProfiles;
     }
+    /**
+     * Player profile format (semicolon-separated, 3 parts — Forge parity):
+     * 1) profileName
+     * 2) nbtMatcher (SNBT compound; empty = match all players)
+     * 3) detectionOverrides (comma-separated stance:value pairs)
+     *
+     * Example:
+     * "FelineOrigin;{\"ForgeCaps\":{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}};standing:24.0,sneaking:10.0,crawling:3.0"
+     */
+    public List<PlayerProfile> parsePlayerProfiles() {
+        List<PlayerProfile> list = new ArrayList<>();
+        if (specialPlayerProfilesRaw == null) {
+            cachedPlayerProfiles = Collections.unmodifiableList(list);
+            return cachedPlayerProfiles;
+        }
+        for (String raw : specialPlayerProfilesRaw) {
+            if (raw == null || raw.trim().isEmpty()) continue;
+            String[] parts = raw.trim().split(";", -1);
+            if (parts.length != 3) {
+                SoundAttractMod.LOGGER.warn("Skipping malformed player profile: '{}' (expected 3 parts)", raw);
+                continue;
+            }
 
+            String profileName = parts[0].trim();
+            String nbtMatcherString = parts[1].trim();
+            String detectionStr = parts[2].trim();
+
+            NbtCompound parsedNbt = null;
+            if (!nbtMatcherString.isEmpty()) {
+                try {
+                    parsedNbt = StringNbtReader.parse(nbtMatcherString);
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn(
+                            "Failed to parse NBT matcher for player profile '{}': {}. Error: {}",
+                            profileName, nbtMatcherString, e.getMessage()
+                    );
+                    parsedNbt = null;
+                }
+            }
+
+            Map<PlayerStance, Double> detectionOverrides = new HashMap<>();
+            if (!detectionStr.isEmpty()) {
+                String[] pairs = detectionStr.split(",");
+                for (String pair : pairs) {
+                    String tp = pair.trim();
+                    if (tp.isEmpty()) continue;
+                    String[] kv = tp.split(":", 2);
+                    if (kv.length != 2) {
+                        SoundAttractMod.LOGGER.warn("Malformed stance override '{}' in player profile '{}'", tp, profileName);
+                        continue;
+                    }
+                    Optional<PlayerStance> stanceOpt = PlayerStance.fromString(kv[0].trim());
+                    if (stanceOpt.isEmpty()) {
+                        SoundAttractMod.LOGGER.warn("Unknown stance '{}' in player profile '{}'", kv[0], profileName);
+                        continue;
+                    }
+                    try {
+                        double val = Double.parseDouble(kv[1].trim());
+                        detectionOverrides.put(stanceOpt.get(), val);
+                    } catch (NumberFormatException nfe) {
+                        SoundAttractMod.LOGGER.warn("Invalid value '{}' for stance '{}' in player profile '{}'", kv[1], kv[0], profileName);
+                    }
+                }
+            }
+
+            try {
+                PlayerProfile pp = new PlayerProfile(
+                    profileName,
+                    parsedNbt,
+                    detectionOverrides
+                );
+                list.add(pp);
+            } catch (Throwable t) {
+                SoundAttractMod.LOGGER.warn("Failed to construct PlayerProfile for entry '{}': {}", raw, t.getMessage());
+            }
+        }
+        cachedPlayerProfiles = Collections.unmodifiableList(list);
+        return cachedPlayerProfiles;
+    }
     public MobProfile getMatchingProfile(MobEntity mob) {
 
         for (MobProfile profile : getMobProfiles()) {
@@ -233,9 +357,13 @@ public class SoundAttractConfigData {
         }
         return null;
     }
-
-
-
+    /** Return the first matching player profile for this player, or null if none. */
+    public PlayerProfile getMatchingPlayerProfile(PlayerEntity player) {
+        for (PlayerProfile pp : getPlayerProfiles()) {
+            if (pp.matches(player)) return pp;
+        }
+        return null;
+    }
 
     public static class SoundConfig {
 
@@ -260,7 +388,13 @@ public class SoundAttractConfigData {
         }
         return cachedMobProfiles;
     }
-
+    /** Get parsed player profiles (build if needed). */
+    public List<PlayerProfile> getPlayerProfiles() {
+        if (cachedPlayerProfiles == null) {
+            buildCaches();
+        }
+        return cachedPlayerProfiles;
+    }
     public SoundConfig getSoundConfigForId(String id) {
         if (id == null || nonPlayerSoundIdList == null) {
             return null;
@@ -313,6 +447,8 @@ public class SoundAttractConfigData {
      * debug logs in your console.
      */
     public boolean debugLogging = false;
+    private static final int CURRENT_SCHEMA_VERSION = 2;
+
 
     /**
      * The lifetime of a sound event in ticks (20 ticks = 1 second). Higher
@@ -435,7 +571,7 @@ public class SoundAttractConfigData {
      */
     public double mobMoveSpeed = 1.15;
 
-    public int configSchemaVersion = 1;
+    public int configSchemaVersion = 2;
 
 
     public int workerThreads = 2;
@@ -1332,6 +1468,19 @@ public class SoundAttractConfigData {
     public List<String> specialMobProfilesRaw = new ArrayList<>(List.of(
             "GreedyGoblin;minecraft:piglin;;minecraft:block.chest.open:30.0:2.5,minecraft:entity.player.death:50.0:3.0;standing:40.0,sneaking:20.0,crawling:10.0",
             "FastZombie;minecraft:zombie;{IsAlpha:1b};minecraft:entity.player.hurt:25.0:2.0;standing:60.0,sneaking:30.0,crawling:10.0"
+    ));
+
+    /**
+     * Player profiles (Forge parity): semicolon-separated 3 parts
+     * profileName;nbtMatcher;detectionOverrides
+     * - nbtMatcher: SNBT compound to match on full player NBT (blank = match all players)
+     * - detectionOverrides: comma-separated "stance:value" pairs (standing/sneaking/crawling)
+     * Examples:
+     * "MatchAll;;standing:24.0,sneaking:12.0,crawling:6.0"
+     * "FelineOrigin;{cardinal_components:{\"origins:origin\":{OriginLayers:[{Layer:\"origins:origin\",Origin:\"origins:feline\"}]}}};standing:24.0,sneaking:10.0,crawling:3.0"
+     */
+    public List<String> specialPlayerProfilesRaw = new ArrayList<>(List.of(
+            "FelineOrigin;{cardinal_components:{\"origins:origin\":{OriginLayers:[{Layer:\"origins:origin\",Origin:\"origins:feline\"}]}}};standing:24.0,sneaking:10.0,crawling:3.0"
     ));
 
 
