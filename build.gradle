@@ -106,6 +106,7 @@ dependencies {
     runtimeOnly fg.deobf("maven.modrinth:simple-voice-chat:forge-1.20.1-2.5.27")
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
     compileOnly "curse.maven:timeless-and-classics-zero-1028108:6654541"
+    compileOnly "curse.maven:vics-point-blank-961053:6012485"
     compileOnly files('libs/enhancedai-2.7.0.jar')
     compileOnly files('libs/insanelib-1.21.14.jar')
     compileOnly "su.plo.voice.api:server:2.1.5"

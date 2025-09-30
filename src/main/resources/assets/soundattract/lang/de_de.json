@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Verstecken"
+  "enchantment.soundattract.conceal.desc": "Entfernt den Verzauberungsglanz, damit sich die Reichweite der Erkennung nicht vergrößert",
+  "enchantment.soundattract.conceal": "Verbergen"
 }

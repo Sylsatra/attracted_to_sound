@@ -6,7 +6,7 @@ license="GPLv3"
   config = "soundattract.mixins.json"
 [[mods]]
 modId="soundattract" 
-version="4.1.1" 
+version="4.1.2" 
 logoFile="attract-to-sound-mod-logo.jpg"
 displayName="Sound Attract Mod" 
 authors="Sylsatra" 
@@ -20,6 +20,7 @@ Also camouflage is a thing.
     versionRange="[47,)" 
     ordering="NONE"
     side="BOTH"
+
 [[dependencies.soundattract]]
     modId="minecraft"
     mandatory=true
@@ -45,5 +46,26 @@ Also camouflage is a thing.
     modId="plasmovoice"
     mandatory=false
     versionRange="[2.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="pointblank"
+    mandatory=false
+    versionRange="[1.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="superbwarfare"
+    mandatory=false
+    versionRange="[0.7.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="origins"
+    mandatory=false
+    versionRange="[1.10.0.0,)"
     ordering="NONE"
     side="BOTH"

@@ -1,6 +1,7 @@
 package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -22,10 +23,11 @@ public class SoundMessage {
     private final double weight;
     private final String animatorClass;
     private final String taczType;
+    private final String pointBlankType;
 
     public static final ResourceLocation VOICE_CHAT_SOUND_ID = ResourceLocation.fromNamespaceAndPath(SoundAttractMod.MOD_ID, "voice_chat");
 
-    public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass, String taczType) {
+    public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass, String taczType, String pointBlankType) {
         this.soundId = soundId;
         this.x = x;
         this.y = y;
@@ -36,22 +38,23 @@ public class SoundMessage {
         this.weight = weight;
         this.animatorClass = animatorClass;
         this.taczType = taczType;
+        this.pointBlankType = pointBlankType;
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, null, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, -1, 1.0, null, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, -1, 1.0, null, null, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, 1.0, null, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, 1.0, null, null, null);
     }
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight) {
-        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, null, null);
+        this(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, null, null, null);
     }
 
     public static void encode(SoundMessage msg, FriendlyByteBuf buf) {
@@ -68,6 +71,8 @@ public class SoundMessage {
         if (msg.animatorClass != null) buf.writeUtf(msg.animatorClass);
         buf.writeBoolean(msg.taczType != null);
         if (msg.taczType != null) buf.writeUtf(msg.taczType);
+        buf.writeBoolean(msg.pointBlankType != null);
+        if (msg.pointBlankType != null) buf.writeUtf(msg.pointBlankType);
     }
 
     public static SoundMessage decode(FriendlyByteBuf buf) {
@@ -81,7 +86,8 @@ public class SoundMessage {
         double weight = buf.readDouble();
         String animatorClass = buf.readBoolean() ? buf.readUtf() : null;
         String taczType = buf.readBoolean() ? buf.readUtf() : null;
-        return new SoundMessage(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, taczType);
+        String pointBlankType = buf.readBoolean() ? buf.readUtf() : null;
+        return new SoundMessage(soundId, x, y, z, dimension, sourcePlayerUUID, range, weight, animatorClass, taczType, pointBlankType);
     }
 
     public static void handle(SoundMessage msg, Supplier<NetworkEvent.Context> ctx) {
@@ -162,7 +168,14 @@ public class SoundMessage {
                         }
                     }
 
-                    SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
+                    if (se != null) {
+                        SoundTracker.addSound(se, pos, dimString, range, weight, lifetime);
+                    } else {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info("[SoundMessage] No SoundEvent for {} on server; using explicit id.", msg.soundId);
+                        }
+                        SoundTracker.addSound(null, pos, dimString, range, weight, lifetime, msg.soundId.toString());
+                    }
                 }
             }; 
 
@@ -176,5 +189,24 @@ public class SoundMessage {
             SoundAttractMod.LOGGER.error("[SoundMessage] Exception for soundId={}", msg.soundId, e);
             if (ctx != null && ctx.get() != null) ctx.get().setPacketHandled(true);
         }
+    }
+
+    public String getPointBlankType() {
+        return pointBlankType;
+    }
+
+    private static String buildPointBlankIntegrationMetadata(String type, String gunId) {
+        String trimmedType = (type == null || type.isBlank()) ? null : type.trim();
+        String trimmedGun = (gunId == null || gunId.isBlank()) ? null : gunId.trim();
+        if (trimmedType == null && trimmedGun == null) {
+            return null;
+        }
+        if (trimmedType == null) {
+            return trimmedGun;
+        }
+        if (trimmedGun == null) {
+            return trimmedType;
+        }
+        return trimmedType + ";" + trimmedGun;
     }
 }

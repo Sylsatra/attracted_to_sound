@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "隠匿"
+  "enchantment.soundattract.conceal.desc": "エンチャントの輝きを消して探知範囲を拡大しないようにする",
+  "enchantment.soundattract.conceal": "隠す"
 }

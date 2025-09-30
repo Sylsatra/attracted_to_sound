@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "附魔隐藏"
+  "enchantment.soundattract.conceal.desc": "移除附魔光效以避免扩大探测范围",
+  "enchantment.soundattract.conceal": "隐藏"
 }

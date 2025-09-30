@@ -64,7 +64,8 @@ public class TaczIntegration {
                 (int) range,
                 weight,
                 null,
-                soundType
+                soundType,
+                null
         );
 
         SoundMessage.handle(msg, () -> null);
@@ -95,7 +96,8 @@ public class TaczIntegration {
                 (int) range,
                 weight,
                 null,
-                soundType
+                soundType,
+                null
         );
 
         SoundMessage.handle(msg, () -> null);

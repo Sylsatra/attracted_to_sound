@@ -56,6 +56,16 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static boolean POINT_BLANK_ENABLED_CACHE = false;
+    public static double POINT_BLANK_RELOAD_RANGE_CACHE = 9.0;
+    public static double POINT_BLANK_RELOAD_WEIGHT_CACHE = 1.0;
+    public static double POINT_BLANK_SHOOT_RANGE_CACHE = 140.0;
+    public static double POINT_BLANK_SHOOT_WEIGHT_CACHE = 15.0;
+    public static final Map<ResourceLocation, Double> POINT_BLANK_GUN_RANGE_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Double> POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<String, Double> POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static double POINT_BLANK_ATTACHMENT_REDUCTION_DEFAULT_CACHE = 20.0;
+
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static List<com.example.soundattract.config.PlayerProfile> SPECIAL_PLAYER_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
@@ -134,7 +144,9 @@ public class SoundAttractConfig {
         }
 
         for (String entry : cfg) {
-            if (entry == null || entry.trim().isEmpty()) continue;
+            if (entry == null || entry.trim().isEmpty()) {
+                continue;
+            }
             try {
                 ResourceLocation loc = ResourceLocation.tryParse(entry.trim());
                 if (loc != null) {
@@ -154,7 +166,6 @@ public class SoundAttractConfig {
 
     public static class Common {
 
-
         public final ForgeConfigSpec.BooleanValue debugLogging;
         public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
@@ -165,7 +176,6 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue soundNoveltyBonusWeight;
         public final ForgeConfigSpec.IntValue soundNoveltyTimeTicks;
 
-
         public final ForgeConfigSpec.BooleanValue enableRaycastCache;
         public final ForgeConfigSpec.IntValue raycastCacheTtlTicks;
         public final ForgeConfigSpec.IntValue raycastCacheMaxEntries;
@@ -175,7 +185,6 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue maxTpsForScanCooldown;
         public final ForgeConfigSpec.IntValue soundScoringSubmitCooldownTicks;
         public final ForgeConfigSpec.IntValue asyncResultTtlTicks;
-
 
         public final ForgeConfigSpec.IntValue maxGroupSize;
         public final ForgeConfigSpec.DoubleValue leaderGroupRadius;
@@ -193,18 +202,15 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue workerThreads;
         public final ForgeConfigSpec.IntValue workerTaskBudgetMs;
 
-
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialPlayerProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> mobBlacklist;
 
-
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> soundIdWhitelist;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> rawSoundDefaults;
         public final ForgeConfigSpec.DoubleValue minSoundLevelForPlayer;
         public final ForgeConfigSpec.DoubleValue minSoundLevelForMob;
-
 
         public final ForgeConfigSpec.BooleanValue enableBlockMuffling;
         public final ForgeConfigSpec.IntValue maxMufflingBlocksToCheck;
@@ -221,18 +227,15 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> customLiquidBlocks;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> customAirBlocks;
 
-
         public final ForgeConfigSpec.BooleanValue enableStealthMechanics;
         public final ForgeConfigSpec.IntValue stealthCheckInterval;
         public final ForgeConfigSpec.IntValue stealthGracePeriodTicks;
         public final ForgeConfigSpec.DoubleValue minStealthDetectionRange;
         public final ForgeConfigSpec.DoubleValue maxStealthDetectionRange;
 
-
         public final ForgeConfigSpec.DoubleValue standingDetectionRangePlayer;
         public final ForgeConfigSpec.DoubleValue sneakingDetectionRangePlayer;
         public final ForgeConfigSpec.DoubleValue crawlingDetectionRangePlayer;
-
 
         public final ForgeConfigSpec.IntValue neutralLightLevel;
         public final ForgeConfigSpec.DoubleValue lightLevelSensitivity;
@@ -243,12 +246,10 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue rainStealthFactor;
         public final ForgeConfigSpec.DoubleValue thunderStealthFactor;
 
-
         public final ForgeConfigSpec.DoubleValue movementStealthPenalty;
         public final ForgeConfigSpec.DoubleValue stationaryStealthBonusFactor;
         public final ForgeConfigSpec.DoubleValue movementThreshold;
         public final ForgeConfigSpec.DoubleValue invisibilityStealthFactor;
-
 
         public final ForgeConfigSpec.BooleanValue enableCamouflage;
         public final ForgeConfigSpec.BooleanValue enableHeldItemPenalty;
@@ -279,7 +280,6 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue environmentalMismatchPenaltyFactor;
         public final ForgeConfigSpec.IntValue environmentalMismatchThreshold;
 
-
         public final ForgeConfigSpec.BooleanValue enableTaczIntegration;
         public final ForgeConfigSpec.DoubleValue taczReloadRange;
         public final ForgeConfigSpec.DoubleValue taczReloadWeight;
@@ -291,6 +291,15 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue gunshotBaseDetectionRange;
         public final ForgeConfigSpec.IntValue gunshotDetectionDurationTicks;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;
+        public final ForgeConfigSpec.BooleanValue enablePointBlankIntegration;
+        public final ForgeConfigSpec.DoubleValue pointBlankReloadRange;
+        public final ForgeConfigSpec.DoubleValue pointBlankReloadWeight;
+        public final ForgeConfigSpec.DoubleValue pointBlankShootRange;
+        public final ForgeConfigSpec.DoubleValue pointBlankShootWeight;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> pointBlankGunShootRanges;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> pointBlankAttachmentSoundReductions;
+        public final ForgeConfigSpec.DoubleValue pointBlankAttachmentReductionDefault;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> pointBlankMuzzleFlashReductions;
 
         public final ForgeConfigSpec.BooleanValue enableVoiceChatIntegration;
         public final ForgeConfigSpec.IntValue voiceChatWhisperRange;
@@ -298,13 +307,11 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue voiceChatWeight;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> voiceChatDbThresholdMap;
 
-
         public final ForgeConfigSpec.DoubleValue defaultHorizontalFov;
         public final ForgeConfigSpec.DoubleValue defaultVerticalFov;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fovExclusionList;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> nonBlockingVisionAllowList;
-
 
         public final ForgeConfigSpec.BooleanValue enableBlockBreaking;
         public final ForgeConfigSpec.DoubleValue blockBreakingTimeMultiplier;
@@ -324,9 +331,9 @@ public class SoundAttractConfig {
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                     .defineInRange("maxSoundsTracked", 20, 1, 1000000);
             soundSwitchRatio = builder.comment(
-                            "Switching threshold factor (0.0–1.0]. A mob will switch if newWeight > currentWeight × soundSwitchRatio.",
-                            "Example: 0.5 means a new sound beating 70% of the current weight will trigger a switch (more eager switching).",
-                            "Set closer to 1.0 for conservative switching; closer to 0.0 for very eager switching.")
+                    "Switching threshold factor (0.0–1.0]. A mob will switch if newWeight > currentWeight × soundSwitchRatio.",
+                    "Example: 0.5 means a new sound beating 70% of the current weight will trigger a switch (more eager switching).",
+                    "Set closer to 1.0 for conservative switching; closer to 0.0 for very eager switching.")
                     .defineInRange("soundSwitchRatio", 0.5, 0.0, 1.0);
             soundNoveltyBonusWeight = builder.comment("A small weight bonus given to very new sounds to make mobs more likely to switch to them.",
                     "This helps break ties and makes mobs seem more 'alert' to new threats.",
@@ -337,7 +344,6 @@ public class SoundAttractConfig {
                     .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
 
             builder.pop();
-
 
             builder.comment("Mob grouping and squad behavior").push("groups");
             edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
@@ -381,14 +387,14 @@ public class SoundAttractConfig {
             ).defineInRange("initialGroupComputationDelay", 50, 0, 72000);
 
             workerThreads = builder.comment(
-                            "Number of background worker threads used for off-thread computations (e.g., group building).",
-                            "Increase for large servers; decrease if you observe contention."
-                    )
+                    "Number of background worker threads used for off-thread computations (e.g., group building).",
+                    "Increase for large servers; decrease if you observe contention."
+            )
                     .defineInRange("workerThreads", 2, 1, 64);
             workerTaskBudgetMs = builder.comment(
-                            "Soft per-task time budget in milliseconds for worker computations before yielding.",
-                            "Higher values allow more work per batch but can increase latency to apply results."
-                    )
+                    "Soft per-task time budget in milliseconds for worker computations before yielding.",
+                    "Higher values allow more work per batch but can increase latency to apply results."
+            )
                     .defineInRange("workerTaskBudgetMs", 10, 1, 1000);
 
             scanCooldownTicks = builder.comment("Minimum time in ticks between mob scans for new sounds. Higher values can improve performance but reduce responsiveness.")
@@ -404,19 +410,19 @@ public class SoundAttractConfig {
                     .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
 
             soundScoringSubmitCooldownTicks = builder.comment(
-                            "Cooldown (in ticks) per mob between async sound scoring submissions when candidates/target are unchanged.")
+                    "Cooldown (in ticks) per mob between async sound scoring submissions when candidates/target are unchanged.")
                     .defineInRange("soundScoringSubmitCooldownTicks", 1, 0, 10000);
             asyncResultTtlTicks = builder.comment(
-                            "Time-to-live (in ticks) for cached async sound scoring results before considered stale.")
+                    "Time-to-live (in ticks) for cached async sound scoring results before considered stale.")
                     .defineInRange("asyncResultTtlTicks", 10, 1, 10000);
 
             enableRaycastCache = builder.comment("Enable caching for raycast results to improve performance. Disable if experiencing issues with sound obstruction detection.")
                     .define("enableRaycastCache", true);
             raycastCacheTtlTicks = builder.comment(
-                            "Time-to-live (in ticks) for raycast cache entries before they are considered expired.")
+                    "Time-to-live (in ticks) for raycast cache entries before they are considered expired.")
                     .defineInRange("raycastCacheTtlTicks", 200, 1, 1000000);
             raycastCacheMaxEntries = builder.comment(
-                            "Maximum number of entries stored in the raycast cache. Oldest entries are evicted when exceeded.")
+                    "Maximum number of entries stored in the raycast cache. Oldest entries are evicted when exceeded.")
                     .defineInRange("raycastCacheMaxEntries", 5000, 100, 1000000);
 
             builder.pop();
@@ -1106,7 +1112,8 @@ public class SoundAttractConfig {
                             "superbwarfare:smoke_grenade_release",
                             "superbwarfare:hand_wheel_rot",
                             "superbwarfare:medium_rocket_fire",
-                            "superbwarfare:ty63_reload"
+                            "superbwarfare:ty63_reload",
+                            "pointblank:gun_action"
                     ),
                             obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
             minSoundLevelForPlayer = builder.comment("Minimum sound level (0.0-1.0) for player-emitted sounds to be considered. Higher values mean only louder sounds are tracked.")
@@ -1678,7 +1685,8 @@ public class SoundAttractConfig {
                                     "superbwarfare:smoke_grenade_release;30;10",
                                     "superbwarfare:hand_wheel_rot;30;10",
                                     "superbwarfare:medium_rocket_fire;150;65",
-                                    "superbwarfare:ty63_reload;30;25"
+                                    "superbwarfare:ty63_reload;30;25",
+                                    "pointblank:gun_action;15;5"
                             ),
                             obj -> obj instanceof String && ((String) obj).split(";").length == 3);
             builder.pop();
@@ -1707,10 +1715,8 @@ public class SoundAttractConfig {
             )
                     .defineList("customFovOverrides",
                             List.of(
-
                                     "minecraft:spider, 360.0, 360.0",
                                     "minecraft:cave_spider, 360.0, 360.0",
-
                                     "minecraft:phantom, 200.0, 280.0",
                                     "minecraft:vex, 200.0, 280.0",
                                     "minecraft:allay, 200.0, 280.0",
@@ -1718,7 +1724,6 @@ public class SoundAttractConfig {
                                     "minecraft:parrot, 200.0, 280.0",
                                     "minecraft:ghast, 200.0, 280.0",
                                     "minecraft:blaze, 200.0, 280.0",
-
                                     "minecraft:axolotl, 270.0, 90.0",
                                     "minecraft:camel, 270.0, 90.0",
                                     "minecraft:chicken, 270.0, 90.0",
@@ -1739,7 +1744,6 @@ public class SoundAttractConfig {
                                     "minecraft:wandering_trader, 270.0, 90.0",
                                     "minecraft:slime, 270.0, 120.0",
                                     "minecraft:magma_cube, 270.0, 120.0",
-
                                     "minecraft:cod, 300.0, 100.0",
                                     "minecraft:pufferfish, 300.0, 100.0",
                                     "minecraft:salmon, 300.0, 100.0",
@@ -1747,14 +1751,12 @@ public class SoundAttractConfig {
                                     "minecraft:glow_squid, 300.0, 100.0",
                                     "minecraft:tadpole, 300.0, 100.0",
                                     "minecraft:tropical_fish, 300.0, 100.0",
-
                                     "minecraft:cat, 140.0, 140.0",
                                     "minecraft:ocelot, 140.0, 140.0",
                                     "minecraft:wolf, 140.0, 140.0",
                                     "minecraft:polar_bear, 140.0, 140.0",
                                     "minecraft:fox, 140.0, 140.0",
                                     "minecraft:frog, 140.0, 140.0",
-
                                     "minecraft:zombie, 200.0, 135.0",
                                     "minecraft:husk, 200.0, 135.0",
                                     "minecraft:drowned, 200.0, 135.0",
@@ -1767,7 +1769,6 @@ public class SoundAttractConfig {
                                     "minecraft:piglin, 200.0, 135.0",
                                     "minecraft:piglin_brute, 200.0, 135.0",
                                     "minecraft:iron_golem, 200.0, 135.0",
-
                                     "minecraft:creeper, 90.0, 90.0",
                                     "minecraft:enderman, 180.0, 240.0",
                                     "minecraft:guardian, 320.0, 180.0",
@@ -1792,9 +1793,9 @@ public class SoundAttractConfig {
                             obj -> obj instanceof String);
 
             nonBlockingVisionAllowList = builder.comment(
-                            "Blocks in this allowlist are treated as see-through for line-of-sight checks (e.g., modded glass).",
-                            "Format: ['modid:block_id']"
-                    )
+                    "Blocks in this allowlist are treated as see-through for line-of-sight checks (e.g., modded glass).",
+                    "Format: ['modid:block_id']"
+            )
                     .defineList("nonBlockingVisionAllowList", Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
 
             builder.pop();
@@ -2062,6 +2063,144 @@ public class SoundAttractConfig {
 
             builder.pop();
 
+            builder.comment("Point Blank Integration Configuration").push("pointblank");
+            enablePointBlankIntegration = builder.comment("Enable Point Blank gun integration").define("enablePointBlankIntegration", true);
+            pointBlankReloadRange = builder.comment("Point Blank reload sound range fallback (used when specific gun data is not provided)").defineInRange("pointBlankReloadRange", 9, 1.0, 128.0);
+            pointBlankReloadWeight = builder.comment("Point Blank reload sound weight fallback (used when specific gun data is not provided)").defineInRange("pointBlankReloadWeight", 1.0, 0.0, 10.0);
+            pointBlankShootRange = builder.comment("Point Blank shoot sound range fallback (used when specific gun data is not provided)").defineInRange("pointBlankShootRange", 140.0, 1.0, 256.0);
+            pointBlankShootWeight = builder.comment("Point Blank shoot sound weight fallback (used when specific gun data is not provided)").defineInRange("pointBlankShootWeight", 15.0, 0.0, 10.0);
+            pointBlankGunShootRanges = builder.comment("Point Blank gun shoot ranges (when provided, override fallback). Format: 'modid:item;range' (range in blocks)")
+                    .defineList("pointBlankGunShootRanges", Arrays.asList(
+                            "pointblank:glock17;128.0",
+                            "pointblank:glock18;128.0",
+                            "pointblank:m9;128.0",
+                            "pointblank:m1911a1;128.0",
+                            "pointblank:tti_viper;128.0",
+                            "pointblank:p30l;128.0",
+                            "pointblank:mk23;128.0",
+                            "pointblank:deserteagle;140.0",
+                            "pointblank:rhino;138.0",
+                            "pointblank:m4a1;118.0",
+                            "pointblank:m4a1mod1;118.0",
+                            "pointblank:star15;90.0",
+                            "pointblank:m4sopmodii;118.0",
+                            "pointblank:m16a1;90.0",
+                            "pointblank:hk416;118.0",
+                            "pointblank:scarl;72.0",
+                            "pointblank:xm7;118.0",
+                            "pointblank:g36c;132.0",
+                            "pointblank:g36k;132.0",
+                            "pointblank:aug;118.0",
+                            "pointblank:g41;118.0",
+                            "pointblank:ak74;128.0",
+                            "pointblank:ak12;128.0",
+                            "pointblank:an94;128.0",
+                            "pointblank:ar57;128.0",
+                            "pointblank:xm29;128.0",
+                            "pointblank:mp5;128.0",
+                            "pointblank:mp7;128.0",
+                            "pointblank:ro635;119.0",
+                            "pointblank:ump45;128.0",
+                            "pointblank:vector;90.0",
+                            "pointblank:p90;128.0",
+                            "pointblank:m950;128.0",
+                            "pointblank:tmp;128.0",
+                            "pointblank:sl8;128.0",
+                            "pointblank:mk14ebr;128.0",
+                            "pointblank:uar10;156.0",
+                            "pointblank:g3;128.0",
+                            "pointblank:wa2000;128.0",
+                            "pointblank:xm3;128.0",
+                            "pointblank:c14;128.0",
+                            "pointblank:l96a1;128.0",
+                            "pointblank:ballista;128.0",
+                            "pointblank:gm6lynx;128.0",
+                            "pointblank:m590;128.0",
+                            "pointblank:m870;128.0",
+                            "pointblank:spas12;128.0",
+                            "pointblank:m1014;128.0",
+                            "pointblank:citoricxs;128.0",
+                            "pointblank:hs12;128.0",
+                            "pointblank:lamg;128.0",
+                            "pointblank:mk48;128.0",
+                            "pointblank:m249;128.0",
+                            "pointblank:m32mgl;128.0",
+                            "pointblank:smaw;128.0",
+                            "pointblank:at4;128.0",
+                            "pointblank:javelin;200.0",
+                            "pointblank:m134minigun;156.0",
+                            "pointblank:aughbar;128.0",
+                            "pointblank:aa12;128.0",
+                            "pointblank:ak47;128.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) {
+                            return false;
+                        }
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) {
+                            return false;
+                        }
+                        try {
+                            Double.parseDouble(parts[1]);
+                            return true;
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
+                    });
+            pointBlankAttachmentSoundReductions = builder.comment("Point Blank attachment sound reduction. Format: 'modid:item;reduction'. Positive reduces range, negative increases.")
+                    .defineList("pointBlankAttachmentSoundReductions", Arrays.asList(
+                            "pointblank:ar_suppressor;40.0",
+                            "pointblank:ar_suppressor_tan;40.0",
+                            "pointblank:xm7_suppressor;40.0",
+                            "pointblank:ak_suppressor;40.0",
+                            "pointblank:smg_suppressor;40.0",
+                            "pointblank:rf_suppressor;40.0",
+                            "pointblank:hp_suppressor;40.0",
+                            "pointblank:sg_suppressor;40.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) {
+                            return false;
+                        }
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) {
+                            return false;
+                        }
+                        try {
+                            Double.parseDouble(parts[1]);
+                            return true;
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
+                    });
+            pointBlankAttachmentReductionDefault = builder.comment("Default sound reduction for Point Blank attachments not listed above.")
+                    .defineInRange("pointBlankAttachmentReductionDefault", 20.0, -300.0, 300.0);
+            pointBlankMuzzleFlashReductions = builder.comment("Point Blank attachment VISUAL FLASH reduction. Positive reduces flash range, negative increases. Format: 'modid:item;reduction_amount'")
+                    .defineList("pointBlankMuzzleFlashReductions", Arrays.asList(
+                            "pointblank:ar_suppressor;90.0",
+                            "pointblank:ar_suppressor_tan;90.0",
+                            "pointblank:xm7_suppressor;90.0",
+                            "pointblank:ak_suppressor;90.0",
+                            "pointblank:smg_suppressor;90.0",
+                            "pointblank:rf_suppressor;90.0",
+                            "pointblank:hp_suppressor;90.0",
+                            "pointblank:sg_suppressor;90.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) {
+                            return false;
+                        }
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) {
+                            return false;
+                        }
+                        try {
+                            Double.parseDouble(parts[1]);
+                            return true;
+                        } catch (NumberFormatException e) {
+                            return false;
+                        }
+                    });
+            builder.pop();
+
             builder.push("Simple VC");
             enableVoiceChatIntegration = builder.comment(
                     "Enable Simple Voice Chat (SVC) integration.",
@@ -2085,9 +2224,13 @@ public class SoundAttractConfig {
                     .defineList("voiceChatDbThresholdMap",
                             Arrays.asList("110:2.0", "90:1.8", "75:1.5", "50:1.0", "30:0.7", "10:0.3", "0:0.05"),
                             obj -> {
-                                if (!(obj instanceof String s)) return false;
+                                if (!(obj instanceof String s)) {
+                                    return false;
+                                }
                                 String[] parts = s.split(":");
-                                if (parts.length != 2) return false;
+                                if (parts.length != 2) {
+                                    return false;
+                                }
                                 try {
                                     Double.parseDouble(parts[0]);
                                     Double.parseDouble(parts[1]);
@@ -2189,11 +2332,9 @@ public class SoundAttractConfig {
             SoundAttractMod.LOGGER.info("Migrating config from version 1 to 2.");
             com.electronwill.nightconfig.core.UnmodifiableConfig config = COMMON_SPEC.getValues();
 
-
             moveConfigValue(config, "maxSoundSources", COMMON.maxSoundsTracked);
             moveConfigValue(config, "soundProcessingInterval", COMMON.scanCooldownTicks);
             moveConfigValue(config, "maxMuffledBlocks", COMMON.maxMufflingBlocksToCheck);
-
 
             COMMON.configSchemaVersion.set(2);
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 2. Saving config...");
@@ -2233,7 +2374,6 @@ public class SoundAttractConfig {
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 4. Saving config...");
             COMMON_SPEC.save();
         }
-
 
         if (COMMON.configSchemaVersion.get() < 5) {
             SoundAttractMod.LOGGER.info("Migrating config from version 4 to 5.");
@@ -2359,7 +2499,59 @@ public class SoundAttractConfig {
 
         parseAndCacheCustomArmorColors();
 
-        SPECIAL_MOB_PROFILES_CACHE = new ArrayList<>();
+        POINT_BLANK_ENABLED_CACHE = net.minecraftforge.fml.ModList.get().isLoaded("pointblank") && COMMON.enablePointBlankIntegration.get();
+        POINT_BLANK_RELOAD_RANGE_CACHE = COMMON.pointBlankReloadRange.get();
+        POINT_BLANK_RELOAD_WEIGHT_CACHE = COMMON.pointBlankReloadWeight.get();
+        POINT_BLANK_SHOOT_RANGE_CACHE = COMMON.pointBlankShootRange.get();
+        POINT_BLANK_SHOOT_WEIGHT_CACHE = COMMON.pointBlankShootWeight.get();
+
+        POINT_BLANK_GUN_RANGE_CACHE.clear();
+        java.util.List<? extends String> pbGunRanges = COMMON.pointBlankGunShootRanges.get();
+        for (String raw : pbGunRanges) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double range = Double.parseDouble(parts[1]);
+                if (rl != null) {
+                    POINT_BLANK_GUN_RANGE_CACHE.put(rl, range);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Failed to parse Point Blank gun range entry: {}", raw, e);
+            }
+        }
+
+        POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.clear();
+        java.util.List<? extends String> pbAttachRed = COMMON.pointBlankAttachmentSoundReductions.get();
+        for (String raw : pbAttachRed) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double reduction = Double.parseDouble(parts[1]);
+                if (rl != null) {
+                    POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.put(rl, reduction);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Failed to parse Point Blank attachment reduction entry: {}", raw, e);
+            }
+        }
+        POINT_BLANK_ATTACHMENT_REDUCTION_DEFAULT_CACHE = COMMON.pointBlankAttachmentReductionDefault.get();
+
+        POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+        java.util.List<? extends String> pbFlashRed = COMMON.pointBlankMuzzleFlashReductions.get();
+        for (String raw : pbFlashRed) {
+            try {
+                String[] parts = raw.split(";", 2);
+                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                double reduction = Double.parseDouble(parts[1]);
+                if (rl != null) {
+                    POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reduction);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Failed to parse Point Blank muzzle flash reduction entry: {}", raw, e);
+            }
+        }
+
+        List<MobProfile> tmpMobProfiles = new ArrayList<>();
         if (COMMON.specialMobProfilesRaw != null) {
             List<String> rawProfiles = new ArrayList<>(COMMON.specialMobProfilesRaw.get());
             for (String profileString : rawProfiles) {
@@ -2439,14 +2631,15 @@ public class SoundAttractConfig {
                         soundOverrides.values().stream().map(so -> new com.example.soundattract.config.SoundOverride(so.getSoundId(), so.getRange(), so.getWeight())).toList(),
                         detectionOverrides
                 );
-                SPECIAL_MOB_PROFILES_CACHE.add(profile);
+                tmpMobProfiles.add(profile);
                 if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info("Successfully parsed and cached mob profile: {}", profileName);
                 }
             }
         }
+        SPECIAL_MOB_PROFILES_CACHE = tmpMobProfiles;
 
-        SPECIAL_PLAYER_PROFILES_CACHE = new ArrayList<>();
+        List<PlayerProfile> tmpPlayerProfiles = new ArrayList<>();
         if (COMMON.specialPlayerProfilesRaw != null) {
             List<String> rawPlayerProfiles = new ArrayList<>(COMMON.specialPlayerProfilesRaw.get());
             for (String profileString : rawPlayerProfiles) {
@@ -2485,12 +2678,13 @@ public class SoundAttractConfig {
                 }
 
                 com.example.soundattract.config.PlayerProfile profile = new com.example.soundattract.config.PlayerProfile(profileName, nbtMatcherString.isEmpty() ? null : nbtMatcherString, detectionOverrides);
-                SPECIAL_PLAYER_PROFILES_CACHE.add(profile);
+                tmpPlayerProfiles.add(profile);
                 if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info("Successfully parsed and cached player profile: {}", profileName);
                 }
             }
         }
+        SPECIAL_PLAYER_PROFILES_CACHE = tmpPlayerProfiles;
 
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
@@ -2502,7 +2696,6 @@ public class SoundAttractConfig {
             );
         }
     }
-
 
     public static MobProfile getMatchingProfile(Mob mob) {
         if (SPECIAL_MOB_PROFILES_CACHE == null || SPECIAL_MOB_PROFILES_CACHE.isEmpty()) {

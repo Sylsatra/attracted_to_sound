@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Ocultação"
+  "enchantment.soundattract.conceal.desc": "Remover o brilho do encantamento para não ampliar o alcance de detecção",
+  "enchantment.soundattract.conceal": "Ocultar"
 }

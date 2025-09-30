@@ -14,7 +14,7 @@ import java.nio.file.Path;
 public class ConfigHelper {
 
 
-    private static final int CURRENT_SCHEMA_VERSION = 5;
+    private static final int CURRENT_SCHEMA_VERSION = 6;
 
     public static void register() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
@@ -64,18 +64,49 @@ public class ConfigHelper {
 
 
             }
-
             if (configVersion < 3) {
                 renameKey(config, "muffling.specialMobProfilesRaw", "profiles.specialMobProfilesRaw");
                 renameKey(config, "muffling.specialPlayerProfilesRaw", "profiles.specialPlayerProfilesRaw");
             }
 
+            if (configVersion < 6) {
+                try {
+                    final String wlPath = "Sounds White List.soundIdWhitelist";
+                    java.util.List<Object> wl = config.get(wlPath);
+                    if (wl == null) {
+                        wl = new java.util.ArrayList<>();
+                        config.set(wlPath, wl);
+                    }
+                    String gunAction = "pointblank:gun_action";
+                    if (!wl.contains(gunAction)) {
+                        wl.add(gunAction);
+                        SoundAttractMod.LOGGER.info("Migration v6: appended '{}' to {}.", gunAction, wlPath);
+                    }
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn("Migration v6: failed updating soundIdWhitelist", e);
+                }
+
+                try {
+                    final String defPath = "sound_defaults.soundDefaults";
+                    java.util.List<Object> defs = config.get(defPath);
+                    if (defs == null) {
+                        defs = new java.util.ArrayList<>();
+                        config.set(defPath, defs);
+                    }
+                    String defEntry = "pointblank:gun_action;15;5";
+                    if (!defs.contains(defEntry)) {
+                        defs.add(defEntry);
+                        SoundAttractMod.LOGGER.info("Migration v6: appended '{}' to {}.", defEntry, defPath);
+                    }
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn("Migration v6: failed updating soundDefaults", e);
+                }
+            }
 
             config.set("internal.configSchemaVersion", CURRENT_SCHEMA_VERSION);
             SoundAttractMod.LOGGER.info("Config migration complete.");
         }
     }
-
     private static void renameKey(CommentedConfig config, String oldPath, String newPath) {
         if (config.contains(oldPath)) {
             Object value = config.get(oldPath);

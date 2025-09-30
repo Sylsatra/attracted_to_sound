@@ -65,6 +65,52 @@ public class SoundTracker {
         }
     }
 
+    public static String buildIntegrationSoundId(ResourceLocation baseId, @Nullable String metadata) {
+        if (baseId == null) {
+            return metadata == null ? null : metadata.trim();
+        }
+        if (metadata == null || metadata.isBlank()) {
+            return baseId.toString();
+        }
+        String trimmed = metadata.trim();
+        StringBuilder sanitized = new StringBuilder(trimmed.length());
+        for (int i = 0; i < trimmed.length(); i++) {
+            char ch = trimmed.charAt(i);
+            if (Character.isWhitespace(ch)) {
+                sanitized.append('_');
+                continue;
+            }
+            if (ch == ';' || ch == '|' || ch == ',' || ch == '#') {
+                sanitized.append('/');
+                continue;
+            }
+            sanitized.append(Character.toLowerCase(ch));
+        }
+        return baseId + "#" + sanitized;
+    }
+
+    @Nullable
+    public static ResourceLocation extractBaseSoundLocation(@Nullable String soundId) {
+        if (soundId == null || soundId.isBlank()) {
+            return null;
+        }
+        int idx = soundId.indexOf('#');
+        String base = idx >= 0 ? soundId.substring(0, idx) : soundId;
+        return ResourceLocation.tryParse(base);
+    }
+
+    @Nullable
+    public static String extractIntegrationMetadata(@Nullable String soundId) {
+        if (soundId == null) {
+            return null;
+        }
+        int idx = soundId.indexOf('#');
+        if (idx < 0 || idx + 1 >= soundId.length()) {
+            return null;
+        }
+        return soundId.substring(idx + 1);
+    }
+
     public static class VirtualSoundRecord extends SoundRecord {
 
         public final UUID sourcePlayer;
@@ -171,8 +217,7 @@ public class SoundTracker {
             soundIdToUse = se.getLocation().toString();
         }
 
-        ResourceLocation loc = soundIdToUse != null
-                ? ResourceLocation.tryParse(soundIdToUse) : null;
+        ResourceLocation loc = extractBaseSoundLocation(soundIdToUse);
 
         if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                 && (loc == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc))) {
@@ -623,12 +668,13 @@ public class SoundTracker {
                     continue;
                 }
                 String soundIdStr = r.soundId;
-                ResourceLocation rl = soundIdStr != null ? ResourceLocation.tryParse(soundIdStr) : null;
+                ResourceLocation rl = extractBaseSoundLocation(soundIdStr);
+                String integrationMeta = extractIntegrationMetadata(soundIdStr);
                 if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && (rl == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl))) {
                     continue;
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[findNearest] considering {}", rl);
+                    SoundAttractMod.LOGGER.info("[findNearest] considering {} (meta={})", rl, integrationMeta);
                 }
                 double effectiveInitialRange = r.range;
                 double effectiveInitialWeight = r.weight;

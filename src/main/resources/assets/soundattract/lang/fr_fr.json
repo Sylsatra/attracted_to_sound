@@ -1,3 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Dissimulation"
+  "enchantment.soundattract.conceal.desc": "Supprime la lueur de l’enchantement afin de ne pas amplifier la portée de détection",
+  "enchantment.soundattract.conceal": "Cacher"
 }
