@@ -1,4 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Ocultar",
-  "enchantment.soundattract.conceal.desc": "Reduce el rango de detección de los monstruos."
+  "enchantment.soundattract.conceal.desc": "Elimina el brillo del encantamiento para no ampliar el rango de detección",
+  "enchantment.soundattract.conceal": "Ocultar"
 }

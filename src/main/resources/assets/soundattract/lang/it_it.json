@@ -1,4 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Occultamento",
-  "enchantment.soundattract.conceal.desc": "Riduce il raggio di rilevamento dei mostri."
+  "enchantment.soundattract.conceal.desc": "Rimuove il bagliore dell’incantamento per non ampliare il raggio di rilevamento",
+  "enchantment.soundattract.conceal": "Nascondere"
 }

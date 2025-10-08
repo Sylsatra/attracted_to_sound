@@ -180,6 +180,8 @@ public class SoundAttractionEvents {
         if (!event.getLevel().isClientSide()) {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
                 tryUpdateGroupsWithDelay(serverLevel);
+                // Tick RAID countdown/advancing state machine each server tick per dimension
+                com.example.soundattract.ai.RaidManager.tick(serverLevel);
             }
         }
     }
@@ -201,8 +203,17 @@ public class SoundAttractionEvents {
 
         scheduleAddGoal(mob, 2, new CombatBlockBreakAssistGoal(mob));
 
+        // Leader-specific behavior and relayed/RAID handling
+        scheduleAddGoal(mob, 3, new com.example.soundattract.ai.LeaderAttractionGoal(mob, moveSpeed));
+
+        // General sound pursuit
         scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
-        scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));
+
+        // Edge follower smart relay behavior
+        scheduleAddGoal(mob, 4, new com.example.soundattract.ai.FollowerEdgeRelayGoal(mob, moveSpeed));
+
+        // Maintain group cohesion
+        scheduleAddGoal(mob, 5, new FollowLeaderGoal(mob, moveSpeed));
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Scheduled goals for mob {} of type {}", mob.getName().getString(), EntityType.getKey(mob.getType()));

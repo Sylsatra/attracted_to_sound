@@ -1,4 +1,4 @@
 {
-  "enchantment.soundattract.conceal": "Скрытие",
-  "enchantment.soundattract.conceal.desc": "Уменьшает дальность обнаружения мобами."
+  "enchantment.soundattract.conceal.desc": "Убирает свечение зачарования, чтобы не увеличивать радиус обнаружения",
+  "enchantment.soundattract.conceal": "Скрыть"
 }

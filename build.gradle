@@ -66,7 +66,8 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             
             // Add Mixin debug properties
-            systemProperty "mixin.config", "soundattract.mixins.json"
+            // Load both configs early to avoid 'loaded too early' for PB target classes
+            systemProperty "mixin.config", "soundattract.mixins.json,soundattract.pointblank.mixins.json"
             systemProperty "mixin.env.remapRefMap", "true"
             systemProperty "mixin.debug.verbose", "true"
             systemProperty "mixin.debug.export", "true"
@@ -82,7 +83,7 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             
             // Add Mixin debug properties
-            systemProperty "mixin.config", "soundattract.mixins.json"
+            systemProperty "mixin.config", "soundattract.mixins.json,soundattract.pointblank.mixins.json"
             systemProperty "mixin.env.remapRefMap", "true"
             systemProperty "mixin.debug.verbose", "true"
             systemProperty "mixin.debug.export", "true"
@@ -139,6 +140,9 @@ dependencies {
     compileOnly "su.plo.voice.api:server:2.1.5"
     compileOnly "su.plo.voice.api:client:2.1.5"
     localRuntime "curse.maven:simple-voice-chat-416089:6439546"
+    // Vic's Point Blank (optional)
+    compileOnly "curse.maven:vics-point-blank-961053:6028992"
+    localRuntime "curse.maven:vics-point-blank-961053:6028992"
     
     // The mixin annotation processor is no longer needed; it's handled by NeoGradle.
 }

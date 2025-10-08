@@ -195,6 +195,19 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
+        // When smart edge behavior is enabled, only deserters should directly pursue sounds via AttractionGoal.
+        // Leaders should use LeaderAttractionGoal; followers/edge mobs should use FollowerEdgeRelayGoal.
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            Mob leader = MobGroupManager.getLeader(mob);
+            boolean isDeserter = MobGroupManager.isDeserter(mob);
+            if (leader == mob && !isDeserter) {
+                return false; // exclude leaders
+            }
+            if (leader != mob) {
+                return false; // exclude followers (edge and non-edge)
+            }
+        }
+
         if (scanCooldownCounter > 0) {
             scanCooldownCounter--;
             return false;
@@ -219,6 +232,16 @@ public class AttractionGoal extends Goal {
     public boolean canContinueToUse() {
         if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
             return false;
+        }
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            Mob leader = MobGroupManager.getLeader(mob);
+            boolean isDeserter = MobGroupManager.isDeserter(mob);
+            if (leader == mob && !isDeserter) {
+                return false;
+            }
+            if (leader != mob) {
+                return false;
+            }
         }
         if (targetSoundPos == null || this.mob.getNavigation().isDone()) {
             return false;
@@ -442,7 +465,7 @@ public class AttractionGoal extends Goal {
             }
         }
 
-        if (leader != null && smartEdge) {
+        if (leader != null && smartEdge && !hasFollowerEdgeRelayGoal()) {
             if (edgeMobState == null) {
                 edgeMobState = EdgeMobState.GOING_TO_SOUND;
                 mob.getNavigation().moveTo(
@@ -639,5 +662,11 @@ public class AttractionGoal extends Goal {
             this.cachedNearestSoundForTick = findInterestingSoundRecord();
         }
         return this.cachedNearestSoundForTick;
+    }
+
+    private boolean hasFollowerEdgeRelayGoal() {
+        // Avoid duplicating edge-relay behavior if a dedicated follower goal is present
+        return this.mob.goalSelector.getAvailableGoals().stream()
+            .anyMatch(w -> w.getGoal() instanceof com.example.soundattract.ai.FollowerEdgeRelayGoal);
     }
 }

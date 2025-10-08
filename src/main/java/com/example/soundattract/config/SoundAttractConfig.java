@@ -26,7 +26,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class SoundAttractConfig {
 
-    private static final int CURRENT_CONFIG_VERSION = 2;
+    private static final int CURRENT_CONFIG_VERSION = 5;
 
     public record SoundDefaultEntry(double range, double weight) {
 
@@ -57,6 +57,14 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static boolean POINT_BLANK_ENABLED_CACHE = false;
+    public static double POINT_BLANK_RELOAD_RANGE_CACHE = 10.0;
+    public static double POINT_BLANK_RELOAD_WEIGHT_CACHE = 1.0;
+    public static double POINT_BLANK_SHOOT_RANGE_CACHE = 140.0;
+    public static double POINT_BLANK_SHOOT_WEIGHT_CACHE = 15.0;
+    public static final Map<ResourceLocation, Double> POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Double> POINT_BLANK_GUN_RANGE_CACHE = new HashMap<>();
+    public static final Map<String, Double> POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static List<com.example.soundattract.config.PlayerProfile> SPECIAL_PLAYER_PROFILES_CACHE = Collections.emptyList();
 
@@ -94,6 +102,174 @@ public class SoundAttractConfig {
             moveConfigValue(config, "muffling.specialMobProfilesRaw", COMMON.specialMobProfilesRaw);
             moveConfigValue(config, "muffling.specialPlayerProfilesRaw", COMMON.specialPlayerProfilesRaw);
 
+        }
+
+        if (oldVersion < 3) {
+            SoundAttractMod.LOGGER.info("Performing migration for config version 2 -> 3");
+            try {
+                Object edgeSectorsObj = config.get("general.numEdgeSectors");
+                if (edgeSectorsObj instanceof Number && ((Number) edgeSectorsObj).intValue() == 8) {
+                    COMMON.numEdgeSectors.set(4);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v3: Could not read/write general.numEdgeSectors: {}", e.toString());
+            }
+            try {
+                Object edgePerSectorObj = config.get("general.edgeMobsPerSector");
+                if (edgePerSectorObj instanceof Number && ((Number) edgePerSectorObj).intValue() == 4) {
+                    COMMON.edgeMobsPerSector.set(1);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v3: Could not read/write general.edgeMobsPerSector: {}", e.toString());
+            }
+        }
+
+        if (oldVersion < 4) {
+            SoundAttractMod.LOGGER.info("Performing migration for config version 3 -> 4 (append Point Blank defaults if missing)");
+            try {
+                List<String> wl = new java.util.ArrayList<>(COMMON.soundIdWhitelist.get().stream().map(String::valueOf).toList());
+                boolean wlChanged = false;
+                String pbSoundId = "pointblank:gun_action";
+                if (!wl.isEmpty() && wl.stream().noneMatch(pbSoundId::equals)) {
+                    wl.add(pbSoundId);
+                    wlChanged = true;
+                }
+                if (wlChanged) {
+                    COMMON.soundIdWhitelist.set(wl);
+                    SoundAttractMod.LOGGER.info("Migration v4: Added '{}' to soundIdWhitelist.", pbSoundId);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v4: Could not update soundIdWhitelist: {}", e.toString());
+            }
+
+            try {
+                List<String> defs = new java.util.ArrayList<>(COMMON.rawSoundDefaults.get().stream().map(String::valueOf).toList());
+                String pbDefault = "pointblank:gun_action;15;5";
+                boolean hasPb = defs.stream().anyMatch(s -> s.startsWith("pointblank:gun_action;"));
+                if (!hasPb) {
+                    defs.add(pbDefault);
+                    COMMON.rawSoundDefaults.set(defs);
+                    SoundAttractMod.LOGGER.info("Migration v4: Appended '{}' to soundDefaults.", pbDefault);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v4: Could not update soundDefaults: {}", e.toString());
+            }
+        }
+
+        if (oldVersion < 5) {
+            SoundAttractMod.LOGGER.info("Performing migration for config version 4 -> 5 (populate Point Blank lists if empty)");
+            try {
+                List<String> v = new java.util.ArrayList<>(COMMON.pointBlankAttachmentReductions.get().stream().map(String::valueOf).toList());
+                if (v.isEmpty()) {
+                    v = new java.util.ArrayList<>(Arrays.asList(
+                            "pointblank:ar_suppressor;40.0",
+                            "pointblank:ar_suppressor_tan;40.0",
+                            "pointblank:xm7_suppressor;40.0",
+                            "pointblank:ak_suppressor;40.0",
+                            "pointblank:smg_suppressor;40.0",
+                            "pointblank:rf_suppressor;40.0",
+                            "pointblank:hp_suppressor;40.0",
+                            "pointblank:sg_suppressor;40.0"
+                    ));
+                    COMMON.pointBlankAttachmentReductions.set(v);
+                    SoundAttractMod.LOGGER.info("Migration v5: Populated pointBlankAttachmentReductions with {} defaults.", v.size());
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v5: Could not update pointBlankAttachmentReductions: {}", e.toString());
+            }
+
+            try {
+                List<String> v = new java.util.ArrayList<>(COMMON.pointBlankGunRanges.get().stream().map(String::valueOf).toList());
+                if (v.isEmpty()) {
+                    v = new java.util.ArrayList<>(Arrays.asList(
+                            "pointblank:glock17;128.0",
+                            "pointblank:glock18;128.0",
+                            "pointblank:m9;128.0",
+                            "pointblank:m1911a1;128.0",
+                            "pointblank:tti_viper;128.0",
+                            "pointblank:p30l;128.0",
+                            "pointblank:mk23;128.0",
+                            "pointblank:deserteagle;140.0",
+                            "pointblank:rhino;138.0",
+                            "pointblank:m4a1;118.0",
+                            "pointblank:m4a1mod1;118.0",
+                            "pointblank:star15;90.0",
+                            "pointblank:m4sopmodii;118.0",
+                            "pointblank:m16a1;90.0",
+                            "pointblank:hk416;118.0",
+                            "pointblank:scarl;72.0",
+                            "pointblank:xm7;118.0",
+                            "pointblank:g36c;132.0",
+                            "pointblank:g36k;132.0",
+                            "pointblank:aug;118.0",
+                            "pointblank:g41;118.0",
+                            "pointblank:ak74;128.0",
+                            "pointblank:ak12;128.0",
+                            "pointblank:an94;128.0",
+                            "pointblank:ar57;128.0",
+                            "pointblank:xm29;128.0",
+                            "pointblank:mp5;128.0",
+                            "pointblank:mp7;128.0",
+                            "pointblank:ro635;119.0",
+                            "pointblank:ump45;128.0",
+                            "pointblank:vector;90.0",
+                            "pointblank:p90;128.0",
+                            "pointblank:m950;128.0",
+                            "pointblank:tmp;128.0",
+                            "pointblank:sl8;128.0",
+                            "pointblank:mk14ebr;128.0",
+                            "pointblank:uar10;156.0",
+                            "pointblank:g3;128.0",
+                            "pointblank:wa2000;128.0",
+                            "pointblank:xm3;128.0",
+                            "pointblank:c14;128.0",
+                            "pointblank:l96a1;128.0",
+                            "pointblank:ballista;128.0",
+                            "pointblank:gm6lynx;128.0",
+                            "pointblank:m590;128.0",
+                            "pointblank:m870;128.0",
+                            "pointblank:spas12;128.0",
+                            "pointblank:m1014;128.0",
+                            "pointblank:citoricxs;128.0",
+                            "pointblank:hs12;128.0",
+                            "pointblank:lamg;128.0",
+                            "pointblank:mk48;128.0",
+                            "pointblank:m249;128.0",
+                            "pointblank:m32mgl;128.0",
+                            "pointblank:smaw;128.0",
+                            "pointblank:at4;128.0",
+                            "pointblank:javelin;200.0",
+                            "pointblank:m134minigun;156.0",
+                            "pointblank:aughbar;128.0",
+                            "pointblank:aa12;128.0",
+                            "pointblank:ak47;128.0"
+                    ));
+                    COMMON.pointBlankGunRanges.set(v);
+                    SoundAttractMod.LOGGER.info("Migration v5: Populated pointBlankGunRanges with {} defaults.", v.size());
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v5: Could not update pointBlankGunRanges: {}", e.toString());
+            }
+
+            try {
+                List<String> v = new java.util.ArrayList<>(COMMON.pointBlankMuzzleFlashReductions.get().stream().map(String::valueOf).toList());
+                if (v.isEmpty()) {
+                    v = new java.util.ArrayList<>(Arrays.asList(
+                            "pointblank:ar_suppressor;90.0",
+                            "pointblank:ar_suppressor_tan;90.0",
+                            "pointblank:xm7_suppressor;90.0",
+                            "pointblank:ak_suppressor;90.0",
+                            "pointblank:smg_suppressor;90.0",
+                            "pointblank:rf_suppressor;90.0",
+                            "pointblank:hp_suppressor;90.0",
+                            "pointblank:sg_suppressor;90.0"
+                    ));
+                    COMMON.pointBlankMuzzleFlashReductions.set(v);
+                    SoundAttractMod.LOGGER.info("Migration v5: Populated pointBlankMuzzleFlashReductions with {} defaults.", v.size());
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v5: Could not update pointBlankMuzzleFlashReductions: {}", e.toString());
+            }
         }
 
         COMMON.configVersion.set(CURRENT_CONFIG_VERSION);
@@ -235,6 +411,10 @@ public class SoundAttractConfig {
         public final ModConfigSpec.DoubleValue groupDistance;
         public final ModConfigSpec.DoubleValue leaderSpacingMultiplier;
         public final ModConfigSpec.IntValue numEdgeSectors;
+        public final ModConfigSpec.IntValue edgeMobsPerSector;
+        public final ModConfigSpec.DoubleValue groupSprintMultiplier;
+        public final ModConfigSpec.DoubleValue leaderReturnArrivalDistance;
+        public final ModConfigSpec.IntValue raidCountdownTicks;
         public final ModConfigSpec.IntValue maxLeaders;
 
         public final ModConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
@@ -334,6 +514,15 @@ public class SoundAttractConfig {
         public final ModConfigSpec.DoubleValue voiceChatWeight;
         public final ModConfigSpec.ConfigValue<List<? extends String>> voiceChatDbThresholdMap;
 
+        public final ModConfigSpec.BooleanValue enablePointBlankIntegration;
+        public final ModConfigSpec.DoubleValue pointBlankReloadRange;
+        public final ModConfigSpec.DoubleValue pointBlankReloadWeight;
+        public final ModConfigSpec.DoubleValue pointBlankShootRange;
+        public final ModConfigSpec.DoubleValue pointBlankShootWeight;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> pointBlankAttachmentReductions;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> pointBlankGunRanges;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> pointBlankMuzzleFlashReductions;
+
         public final ModConfigSpec.ConfigValue<List<? extends String>> fovOverrides;
         public final ModConfigSpec.ConfigValue<List<? extends String>> fovExclusionList;
 
@@ -395,8 +584,16 @@ public class SoundAttractConfig {
                     .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
             leaderSpacingMultiplier = builder.comment("Multiplier for spacing between mob leaders in a group. Default: 1.0")
                     .defineInRange("leaderSpacingMultiplier", 1.0, 0.1, 10.0);
-            numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 8")
-                    .defineInRange("numEdgeSectors", 8, 1, 64);
+            numEdgeSectors = builder.comment("Number of edge sectors for group detection (AI). Default: 4")
+                    .defineInRange("numEdgeSectors", 4, 1, 64);
+            edgeMobsPerSector = builder.comment("Maximum number of edge mobs to select per sector. Default: 1")
+                    .defineInRange("edgeMobsPerSector", 1, 1, 64);
+            groupSprintMultiplier = builder.comment("Sprint speed multiplier used when followers rally/advance during RAID and when edge mobs return to the leader.")
+                    .defineInRange("groupSprintMultiplier", 1.1, 1.0, 5.0);
+            leaderReturnArrivalDistance = builder.comment("Distance (in blocks) within which an edge mob considers itself 'returned' to its leader.")
+                    .defineInRange("leaderReturnArrivalDistance", 2.0, 0.5, 16.0);
+            raidCountdownTicks = builder.comment("Countdown duration (in ticks) before a RAID advances to the target. 20 ticks = 1 second.")
+                    .defineInRange("raidCountdownTicks", 100, 20, 72000);
             builder.comment("Performance-tuning options. Adjust these to balance responsiveness and server load.").push("performance");
 
             initialGroupComputationDelay = builder.comment(
@@ -472,6 +669,7 @@ public class SoundAttractConfig {
                     .defineList("soundIdWhitelist", Arrays.asList(
                             "tacz:gun_shoot",
                             "tacz:gun_reload",
+                            "pointblank:gun_action",
                             "gcaa:item.g19.fire",
                             "minecraft:item.crossbow.shoot",
                             "minecraft:item.crossbow.loading_start",
@@ -663,6 +861,7 @@ public class SoundAttractConfig {
                     .defineList("soundDefaults",
                             Arrays.asList(
                                     "gcaa:item.g19.fire;160;10",
+                                    "pointblank:gun_action;15;5",
                                     "minecraft:item.crossbow.shoot;16;4",
                                     "minecraft:item.crossbow.loading_start;6;2",
                                     "minecraft:item.crossbow.loading_middle;6;2",
@@ -1218,6 +1417,115 @@ public class SoundAttractConfig {
                             });
             builder.pop();
 
+            builder.comment("Point Blank Integration Configuration").push("pointblank");
+            enablePointBlankIntegration = builder.comment("Enable Vic's Point Blank gun integration").define("enablePointBlankIntegration", true);
+            pointBlankReloadRange = builder.comment("Point Blank reload sound range (fallback)").defineInRange("pointBlankReloadRange", 10.0, 1.0, 128.0);
+            pointBlankReloadWeight = builder.comment("Point Blank reload sound weight (fallback)").defineInRange("pointBlankReloadWeight", 1.0, 0.0, 10.0);
+            pointBlankShootRange = builder.comment("Point Blank shoot sound range (fallback)").defineInRange("pointBlankShootRange", 140.0, 1.0, 256.0);
+            pointBlankShootWeight = builder.comment("Point Blank shoot sound weight (fallback)").defineInRange("pointBlankShootWeight", 15.0, 0.0, 10.0);
+            pointBlankAttachmentReductions = builder.comment("Point Blank attachment sound reduction. Format: 'modid:item;reduction'. Example: 'pointblank:suppressor;15.0'")
+                    .defineList("pointBlankAttachmentReductions", Arrays.asList(
+                            "pointblank:ar_suppressor;40.0",
+                            "pointblank:ar_suppressor_tan;40.0",
+                            "pointblank:xm7_suppressor;40.0",
+                            "pointblank:ak_suppressor;40.0",
+                            "pointblank:smg_suppressor;40.0",
+                            "pointblank:rf_suppressor;40.0",
+                            "pointblank:hp_suppressor;40.0",
+                            "pointblank:sg_suppressor;40.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) return false;
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) return false;
+                        try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                    });
+            pointBlankGunRanges = builder.comment("Point Blank gun sound ranges. Format: 'modid:item;range'. Example: 'pointblank:akm;157.0'")
+                    .defineList("pointBlankGunRanges", Arrays.asList(
+                            "pointblank:glock17;128.0",
+                            "pointblank:glock18;128.0",
+                            "pointblank:m9;128.0",
+                            "pointblank:m1911a1;128.0",
+                            "pointblank:tti_viper;128.0",
+                            "pointblank:p30l;128.0",
+                            "pointblank:mk23;128.0",
+                            "pointblank:deserteagle;140.0",
+                            "pointblank:rhino;138.0",
+                            "pointblank:m4a1;118.0",
+                            "pointblank:m4a1mod1;118.0",
+                            "pointblank:star15;90.0",
+                            "pointblank:m4sopmodii;118.0",
+                            "pointblank:m16a1;90.0",
+                            "pointblank:hk416;118.0",
+                            "pointblank:scarl;72.0",
+                            "pointblank:xm7;118.0",
+                            "pointblank:g36c;132.0",
+                            "pointblank:g36k;132.0",
+                            "pointblank:aug;118.0",
+                            "pointblank:g41;118.0",
+                            "pointblank:ak74;128.0",
+                            "pointblank:ak12;128.0",
+                            "pointblank:an94;128.0",
+                            "pointblank:ar57;128.0",
+                            "pointblank:xm29;128.0",
+                            "pointblank:mp5;128.0",
+                            "pointblank:mp7;128.0",
+                            "pointblank:ro635;119.0",
+                            "pointblank:ump45;128.0",
+                            "pointblank:vector;90.0",
+                            "pointblank:p90;128.0",
+                            "pointblank:m950;128.0",
+                            "pointblank:tmp;128.0",
+                            "pointblank:sl8;128.0",
+                            "pointblank:mk14ebr;128.0",
+                            "pointblank:uar10;156.0",
+                            "pointblank:g3;128.0",
+                            "pointblank:wa2000;128.0",
+                            "pointblank:xm3;128.0",
+                            "pointblank:c14;128.0",
+                            "pointblank:l96a1;128.0",
+                            "pointblank:ballista;128.0",
+                            "pointblank:gm6lynx;128.0",
+                            "pointblank:m590;128.0",
+                            "pointblank:m870;128.0",
+                            "pointblank:spas12;128.0",
+                            "pointblank:m1014;128.0",
+                            "pointblank:citoricxs;128.0",
+                            "pointblank:hs12;128.0",
+                            "pointblank:lamg;128.0",
+                            "pointblank:mk48;128.0",
+                            "pointblank:m249;128.0",
+                            "pointblank:m32mgl;128.0",
+                            "pointblank:smaw;128.0",
+                            "pointblank:at4;128.0",
+                            "pointblank:javelin;200.0",
+                            "pointblank:m134minigun;156.0",
+                            "pointblank:aughbar;128.0",
+                            "pointblank:aa12;128.0",
+                            "pointblank:ak47;128.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) return false;
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) return false;
+                        try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                    });
+            pointBlankMuzzleFlashReductions = builder.comment("Point Blank attachment VISUAL FLASH reduction. Positive reduces flash range, negative increases it. Format: 'modid:item;reduction_amount'")
+                    .defineList("pointBlankMuzzleFlashReductions", Arrays.asList(
+                            "pointblank:ar_suppressor;90.0",
+                            "pointblank:ar_suppressor_tan;90.0",
+                            "pointblank:xm7_suppressor;90.0",
+                            "pointblank:ak_suppressor;90.0",
+                            "pointblank:smg_suppressor;90.0",
+                            "pointblank:rf_suppressor;90.0",
+                            "pointblank:hp_suppressor;90.0",
+                            "pointblank:sg_suppressor;90.0"
+                    ), obj -> {
+                        if (!(obj instanceof String str)) return false;
+                        String[] parts = str.split(";", 2);
+                        if (parts.length != 2) return false;
+                        try { Double.parseDouble(parts[1]); return true; } catch (NumberFormatException e) { return false; }
+                    });
+            builder.pop();
+
             builder.comment("Muffling settings for different block types.").push("muffling");
             enableBlockMuffling = builder.comment("Enable/disable block muffling effects on sound range/weight.")
                     .define("enableBlockMuffling", true);
@@ -1430,6 +1738,51 @@ public class SoundAttractConfig {
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("Failed to parse muzzle flash reduction entry: {}", raw, e);
+            }
+        }
+
+        POINT_BLANK_ENABLED_CACHE = ModList.get().isLoaded("pointblank") && COMMON.enablePointBlankIntegration.get();
+        POINT_BLANK_RELOAD_RANGE_CACHE = COMMON.pointBlankReloadRange.get();
+        POINT_BLANK_RELOAD_WEIGHT_CACHE = COMMON.pointBlankReloadWeight.get();
+        POINT_BLANK_SHOOT_RANGE_CACHE = COMMON.pointBlankShootRange.get();
+        POINT_BLANK_SHOOT_WEIGHT_CACHE = COMMON.pointBlankShootWeight.get();
+        POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.clear();
+        if (COMMON.pointBlankAttachmentReductions != null) {
+            for (String raw : COMMON.pointBlankAttachmentReductions.get()) {
+                try {
+                    String[] parts = raw.split(";", 2);
+                    ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                    double reduction = Double.parseDouble(parts[1]);
+                    if (rl != null) {
+                        POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.put(rl, reduction);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        POINT_BLANK_GUN_RANGE_CACHE.clear();
+        if (COMMON.pointBlankGunRanges != null) {
+            for (String raw : COMMON.pointBlankGunRanges.get()) {
+                try {
+                    String[] parts = raw.split(";", 2);
+                    ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                    double range = Double.parseDouble(parts[1]);
+                    if (rl != null) {
+                        POINT_BLANK_GUN_RANGE_CACHE.put(rl, range);
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+        POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+        if (COMMON.pointBlankMuzzleFlashReductions != null) {
+            for (String raw : COMMON.pointBlankMuzzleFlashReductions.get()) {
+                try {
+                    String[] parts = raw.split(";", 2);
+                    ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
+                    double reduction = Double.parseDouble(parts[1]);
+                    if (rl != null) {
+                        POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reduction);
+                    }
+                } catch (Exception ignored) {}
             }
         }
 

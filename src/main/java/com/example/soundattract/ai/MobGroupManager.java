@@ -231,7 +231,7 @@ public class MobGroupManager {
             if (group == null) continue;
 
             int sectors = SoundAttractConfig.COMMON.numEdgeSectors.get();
-            int edgePerSector = 4;
+            int edgePerSector = SoundAttractConfig.COMMON.edgeMobsPerSector.get();
             Map<Integer, List<Mob>> sectorToFarthestList = new HashMap<>();
             double leaderX = leader.getX(), leaderZ = leader.getZ();
             for (Mob m : group) {
