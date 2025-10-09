@@ -1810,10 +1810,10 @@ public class SoundAttractConfig {
             builder.pop();
 
             builder.comment("Base detection ranges for players based on their stance.", "These are modified by all other factors (light, camo, etc.).").push("player_stance_detection_ranges");
-            standingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is standing.").defineInRange("standingDetectionRangePlayer", 32.0, 0.0, 128.0);
-            sneakingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is sneaking (crouching).").defineInRange("sneakingDetectionRangePlayer", 12.0, 0.0, 128.0);
+            standingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is standing.").defineInRange("standingDetectionRangePlayer", 32.0, 0.0, 512.0);
+            sneakingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is sneaking (crouching).").defineInRange("sneakingDetectionRangePlayer", 12.0, 0.0, 512.0);
             crawlingDetectionRangePlayer = builder.comment("Base detection range (in blocks) when a player is crawling (e.g., in a 1-block high gap).")
-                    .defineInRange("crawlingDetectionRangePlayer", 4.0, 0.0, 128.0);
+                    .defineInRange("crawlingDetectionRangePlayer", 4.0, 0.0, 512.0);
             builder.pop();
 
             builder.comment("How environmental conditions affect stealth.").push("environmental_factors");
@@ -1947,7 +1947,7 @@ public class SoundAttractConfig {
             minStealthDetectionRange = builder.comment("The absolute minimum detection range (in blocks). Player cannot be harder to detect than this, regardless of modifiers.", "Set > 0 to prevent mobs from being completely blind unless intended by other mechanics.")
                     .defineInRange("minStealthDetectionRange", 0.5, 0.0, 64.0);
             maxStealthDetectionRange = builder.comment("The absolute maximum detection range (in blocks). Player cannot be easier to detect than this.", "Also used as default range if 'enableStealthMechanics' is false.")
-                    .defineInRange("maxStealthDetectionRange", 64.0, 1.0, 256.0);
+                    .defineInRange("maxStealthDetectionRange", 64.0, 1.0, 1024.0);
             builder.pop();
 
             builder.pop();

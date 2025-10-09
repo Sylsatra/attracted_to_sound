@@ -259,13 +259,13 @@ public class SoundAttractionEvents {
 
 
 
-            scheduleAddGoal(mob, 0, new LeaderAttractionGoal(mob, moveSpeed));
-            scheduleAddGoal(mob, 0, new FollowerEdgeRelayGoal(mob, moveSpeed));
+            scheduleAddGoal(mob, 3, new LeaderAttractionGoal(mob, moveSpeed));
+            scheduleAddGoal(mob, 1, new FollowerEdgeRelayGoal(mob, moveSpeed));
         } else {
 
-            scheduleAddGoal(mob, 1, new AttractionGoal(mob, moveSpeed));
+            scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
         }
-        scheduleAddGoal(mob, 1, new FollowLeaderGoal(mob, moveSpeed));
+        scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Scheduled goals for mob {} of type {}", mob.getName().getString(), EntityType.getKey(mob.getType()));
