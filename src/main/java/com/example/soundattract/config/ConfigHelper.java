@@ -25,6 +25,73 @@ public class ConfigHelper {
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, SoundAttractMod.MOD_ID + "-common.toml");
     }
+    private static void repairTruncatedListsAndEnsurePointBlank(CommentedFileConfig config) {
+        boolean truncated = false;
+        try {
+            final String wlPath = "Sounds White List.soundIdWhitelist";
+            java.util.List<Object> wl = config.get(wlPath);
+            if (wl != null && wl.size() == 1 && "pointblank:gun_action".equals(String.valueOf(wl.get(0)))) {
+                config.remove(wlPath);
+                truncated = true;
+                SoundAttractMod.LOGGER.info("Repair: detected truncated soundIdWhitelist; restoring defaults.");
+            }
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.warn("Repair: failed checking soundIdWhitelist for truncation", e);
+        }
+
+        try {
+            final String defPath = "sound_defaults.soundDefaults";
+            java.util.List<Object> defs = config.get(defPath);
+            if (defs != null && defs.size() == 1 && "pointblank:gun_action;15;5".equals(String.valueOf(defs.get(0)))) {
+                config.remove(defPath);
+                truncated = true;
+                SoundAttractMod.LOGGER.info("Repair: detected truncated soundDefaults; restoring defaults.");
+            }
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.warn("Repair: failed checking soundDefaults for truncation", e);
+        }
+
+        if (truncated) {
+            try {
+                SoundAttractConfig.COMMON_SPEC.correct(config);
+                SoundAttractMod.LOGGER.info("Repair: defaults restored for truncated lists.");
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Repair: failed restoring defaults after truncation fix", e);
+            }
+        }
+
+        try {
+            final String wlPath = "Sounds White List.soundIdWhitelist";
+            java.util.List<Object> wl = config.get(wlPath);
+            if (wl == null) {
+                wl = new java.util.ArrayList<>();
+                config.set(wlPath, wl);
+            }
+            String pbWl = "pointblank:gun_action";
+            if (!wl.contains(pbWl)) {
+                wl.add(pbWl);
+                SoundAttractMod.LOGGER.info("Repair: appended '{}' to {}.", pbWl, wlPath);
+            }
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.warn("Repair: failed ensuring pointblank in soundIdWhitelist", e);
+        }
+
+        try {
+            final String defPath = "sound_defaults.soundDefaults";
+            java.util.List<Object> defs = config.get(defPath);
+            if (defs == null) {
+                defs = new java.util.ArrayList<>();
+                config.set(defPath, defs);
+            }
+            String pbDef = "pointblank:gun_action;15;5";
+            if (!defs.contains(pbDef)) {
+                defs.add(pbDef);
+                SoundAttractMod.LOGGER.info("Repair: appended '{}' to {}.", pbDef, defPath);
+            }
+        } catch (Exception e) {
+            SoundAttractMod.LOGGER.warn("Repair: failed ensuring pointblank in soundDefaults", e);
+        }
+    }
 
     private static void updateAndMigrateConfig(Path path) {
         SoundAttractMod.LOGGER.debug("Checking config file at {} for corrections and migrations.", path);
@@ -36,11 +103,7 @@ public class ConfigHelper {
 
         configData.load();
 
-
-        migrateConfig(configData);
-
-
-
+        int originalVersion = configData.getOptionalInt("internal.configSchemaVersion").orElse(0);
         if (!SoundAttractConfig.COMMON_SPEC.isCorrect(configData)) {
             SoundAttractMod.LOGGER.info("Configuration file is missing values. Correcting and saving...");
             SoundAttractConfig.COMMON_SPEC.correct(configData);
@@ -49,27 +112,58 @@ public class ConfigHelper {
         } else {
             SoundAttractMod.LOGGER.debug("Configuration file is up to date.");
         }
+        repairTruncatedListsAndEnsurePointBlank(configData);
+        migrateConfig(configData, originalVersion);
+
         configData.close();
     }
 
-    private static void migrateConfig(CommentedFileConfig config) {
+    private static void migrateConfig(CommentedFileConfig config, int originalVersion) {
+        if (originalVersion < CURRENT_SCHEMA_VERSION) {
+            SoundAttractMod.LOGGER.info("Old config version ({}) detected. Migrating to version {}...", originalVersion, CURRENT_SCHEMA_VERSION);
 
-        int configVersion = config.getOptionalInt("internal.configSchemaVersion").orElse(0);
-
-        if (configVersion < CURRENT_SCHEMA_VERSION) {
-            SoundAttractMod.LOGGER.info("Old config version ({}) detected. Migrating to version {}...", configVersion, CURRENT_SCHEMA_VERSION);
-
-
-            if (configVersion < 1) {
-
-
+            if (originalVersion < 1) {
             }
-            if (configVersion < 3) {
+            if (originalVersion < 3) {
                 renameKey(config, "muffling.specialMobProfilesRaw", "profiles.specialMobProfilesRaw");
                 renameKey(config, "muffling.specialPlayerProfilesRaw", "profiles.specialPlayerProfilesRaw");
             }
 
-            if (configVersion < 6) {
+            if (originalVersion < 6) {
+                boolean correctedTruncatedLists = false;
+                try {
+                    final String wlPath = "Sounds White List.soundIdWhitelist";
+                    java.util.List<Object> wl = config.get(wlPath);
+                    if (wl != null && wl.size() == 1 && "pointblank:gun_action".equals(String.valueOf(wl.get(0)))) {
+                        config.remove(wlPath);
+                        correctedTruncatedLists = true;
+                        SoundAttractMod.LOGGER.info("Migration v6: detected truncated soundIdWhitelist from v4.1.3; restoring defaults.");
+                    }
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn("Migration v6: failed checking soundIdWhitelist for truncation", e);
+                }
+
+                try {
+                    final String defPath = "sound_defaults.soundDefaults";
+                    java.util.List<Object> defs = config.get(defPath);
+                    if (defs != null && defs.size() == 1 && "pointblank:gun_action;15;5".equals(String.valueOf(defs.get(0)))) {
+                        config.remove(defPath);
+                        correctedTruncatedLists = true;
+                        SoundAttractMod.LOGGER.info("Migration v6: detected truncated soundDefaults from v4.1.3; restoring defaults.");
+                    }
+                } catch (Exception e) {
+                    SoundAttractMod.LOGGER.warn("Migration v6: failed checking soundDefaults for truncation", e);
+                }
+
+                if (correctedTruncatedLists) {
+                    try {
+                        SoundAttractConfig.COMMON_SPEC.correct(config);
+                        SoundAttractMod.LOGGER.info("Migration v6: defaults restored for truncated lists.");
+                    } catch (Exception e) {
+                        SoundAttractMod.LOGGER.warn("Migration v6: failed restoring defaults after truncation fix", e);
+                    }
+                }
+
                 try {
                     final String wlPath = "Sounds White List.soundIdWhitelist";
                     java.util.List<Object> wl = config.get(wlPath);

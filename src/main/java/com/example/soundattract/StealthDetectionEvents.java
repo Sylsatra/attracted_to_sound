@@ -16,7 +16,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.TagKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.EntityType;
+import com.example.soundattract.integration.EnhancedAICompat;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -48,6 +52,9 @@ public class StealthDetectionEvents {
     private static final Map<java.util.UUID, net.minecraft.world.phys.Vec3> lastMobPositions = new HashMap<>();
     private static long lastStealthCheckTick = -1;
     private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
+
+    // XRAY fallback cache when Enhanced AI is not present
+    private static final Map<UUID, Double> XRAY_RANGE_CACHE = new HashMap<>();
 
     private static final Set<UUID> suppressedEdgeDetections = new HashSet<>();
 
@@ -290,6 +297,60 @@ public class StealthDetectionEvents {
         return moved;
     }
 
+    private static double getEffectiveXrayRange(Mob mob) {
+        if (mob == null) return 0d;
+        if (!SoundAttractConfig.COMMON.enableXrayTargeting.get()) return 0d;
+
+        try {
+            // Check apply_xray tag
+            String applyTagStr = SoundAttractConfig.COMMON.xrayApplyTag.get();
+            if (applyTagStr == null || applyTagStr.isBlank()) return 0d;
+            TagKey<EntityType<?>> applyTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(applyTagStr));
+            if (!mob.getType().is(applyTag)) return 0d;
+
+            // Optionally require better_nearby tag
+            if (SoundAttractConfig.COMMON.xrayRequireBetterNearby.get()) {
+                String betterTagStr = SoundAttractConfig.COMMON.xrayBetterNearbyTag.get();
+                if (betterTagStr == null || betterTagStr.isBlank()) return 0d;
+                TagKey<EntityType<?>> betterTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(betterTagStr));
+                if (!mob.getType().is(betterTag)) return 0d;
+            }
+        } catch (Exception e) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.warn("[XRAY] Tag check failed for mob {}: {}", mob.getName().getString(), e.getMessage());
+            }
+            return 0d;
+        }
+
+        // If Enhanced AI is loaded, use its attribute value only
+        if (EnhancedAICompat.isEnhancedAiLoaded()) {
+            double v = EnhancedAICompat.getXrayAttributeValue(mob);
+            return Math.max(0d, v);
+        }
+
+        // Fallback: compute once per mob and cache
+        Double cached = XRAY_RANGE_CACHE.get(mob.getUUID());
+        if (cached != null) return cached;
+
+        int max = SoundAttractConfig.COMMON.xrayMaxRange.get();
+        if (max <= 0) {
+            XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
+            return 0d;
+        }
+        int min = SoundAttractConfig.COMMON.xrayMinRange.get();
+        min = Math.max(0, Math.min(min, max));
+        double chance = SoundAttractConfig.COMMON.xrayChance.get();
+        if (mob.getRandom().nextDouble() >= chance) {
+            XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
+            return 0d;
+        }
+        int spread = max - min;
+        int chosen = spread <= 0 ? max : (min + mob.getRandom().nextInt(spread + 1));
+        double result = (double) chosen;
+        XRAY_RANGE_CACHE.put(mob.getUUID(), result);
+        return result;
+    }
+
     private static java.util.Optional<Integer> getEffectiveArmorColorEntity(LivingEntity entity) {
         java.util.List<Integer> colors = new java.util.ArrayList<>();
         boolean onlyDyedLeather = SoundAttractConfig.COMMON.environmentalCamouflageOnlyDyedLeather.get();
@@ -483,6 +544,21 @@ public class StealthDetectionEvents {
         }
 
         Level level = mob.level();
+
+        // XRAY detection (Enhanced AI compat): allow detection through walls within XRAY range
+        double xrayRange = getEffectiveXrayRange(mob);
+        if (xrayRange > 0) {
+            double distSqXray = mob.distanceToSqr(player);
+            if (distSqXray <= xrayRange * xrayRange) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[XRAY] Mob {} detects Player {} within XRAY range {} (distSq {}).",
+                        mob.getName().getString(), player.getName().getString(), String.format("%.2f", xrayRange), String.format("%.2f", distSqXray)
+                    );
+                }
+                return true;
+            }
+        }
         double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
         double distSq = mob.distanceToSqr(player);
 

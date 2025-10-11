@@ -15,12 +15,15 @@ import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.FollowerEdgeRelayGoal;
 import com.example.soundattract.ai.LeaderAttractionGoal;
+import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
+import com.example.soundattract.ai.TeleportToSoundGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.tags.TagKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
@@ -254,6 +257,35 @@ public class SoundAttractionEvents {
         }
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
+
+        // Enhanced AI-inspired special actions
+        // Teleport to sound
+        if (SoundAttractConfig.COMMON.enableTeleportToSound.get()) {
+            try {
+                TagKey<EntityType<?>> canTeleportTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(SoundAttractConfig.COMMON.teleportCanTeleportTag.get()));
+                if (mob.getType().is(canTeleportTag)) {
+                    scheduleAddGoal(mob, 2, new TeleportToSoundGoal(mob));
+                }
+            } catch (Exception e) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Failed to apply TeleportToSoundGoal tag check for mob {}: {}", EntityType.getKey(mob.getType()), e.getMessage());
+                }
+            }
+        }
+
+        // Pick up and throw to sound
+        if (SoundAttractConfig.COMMON.enablePickUpAndThrowToSound.get()) {
+            try {
+                TagKey<EntityType<?>> canPickUpTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(SoundAttractConfig.COMMON.pickUpCanPickUpTag.get()));
+                if (mob.getType().is(canPickUpTag)) {
+                    scheduleAddGoal(mob, 2, new PickUpAndThrowToSoundGoal(mob));
+                }
+            } catch (Exception e) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Failed to apply PickUpAndThrowToSoundGoal tag check for mob {}: {}", EntityType.getKey(mob.getType()), e.getMessage());
+                }
+            }
+        }
 
         if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
 

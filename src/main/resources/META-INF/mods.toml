@@ -6,7 +6,7 @@ license="GPLv3"
   config = "soundattract.mixins.json"
 [[mods]]
 modId="soundattract" 
-version="4.1.3" 
+version="4.1.4" 
 logoFile="attract-to-sound-mod-logo.jpg"
 displayName="Sound Attract Mod" 
 authors="Sylsatra" 
@@ -67,5 +67,12 @@ Also camouflage is a thing.
     modId="origins"
     mandatory=false
     versionRange="[1.10.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="teammanagement"
+    mandatory=false
+    versionRange="[1.0.2,)"
     ordering="NONE"
     side="BOTH"

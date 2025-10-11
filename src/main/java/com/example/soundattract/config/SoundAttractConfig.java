@@ -318,11 +318,36 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue blockBreakingToolOnly;
         public final ForgeConfigSpec.BooleanValue blockBreakingProperToolOnly;
 
+        // Enhanced AI-inspired special actions
+        public final ForgeConfigSpec.BooleanValue enableTeleportToSound;
+        public final ForgeConfigSpec.DoubleValue teleportChance;
+        public final ForgeConfigSpec.IntValue teleportCooldownTicks;
+        public final ForgeConfigSpec.ConfigValue<String> teleportCanTeleportTag;
+        public final ForgeConfigSpec.ConfigValue<String> teleportCanBeTeleportedTag;
+
+        public final ForgeConfigSpec.BooleanValue enablePickUpAndThrowToSound;
+        public final ForgeConfigSpec.DoubleValue pickUpChance;
+        public final ForgeConfigSpec.IntValue pickUpCooldownTicks;
+        public final ForgeConfigSpec.IntValue pickUpMinDistanceToPickUp;
+        public final ForgeConfigSpec.IntValue pickUpMaxDistanceToThrow;
+        public final ForgeConfigSpec.DoubleValue pickUpSpeedModifier;
+        public final ForgeConfigSpec.ConfigValue<String> pickUpCanPickUpTag;
+        public final ForgeConfigSpec.ConfigValue<String> pickUpCanBePickedUpTag;
+
+        // XRAY targeting (Enhanced AI Targeting compat)
+        public final ForgeConfigSpec.BooleanValue enableXrayTargeting;
+        public final ForgeConfigSpec.ConfigValue<String> xrayApplyTag;
+        public final ForgeConfigSpec.BooleanValue xrayRequireBetterNearby;
+        public final ForgeConfigSpec.ConfigValue<String> xrayBetterNearbyTag;
+        public final ForgeConfigSpec.IntValue xrayMinRange;
+        public final ForgeConfigSpec.IntValue xrayMaxRange;
+        public final ForgeConfigSpec.DoubleValue xrayChance;
+
         public final ForgeConfigSpec.IntValue configSchemaVersion;
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 5, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 6, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
@@ -444,6 +469,72 @@ public class SoundAttractConfig {
             blockBreakingProperToolOnly = builder
                     .comment("If true, mobs will only break blocks if their tool is the 'proper' tool for that block (e.g., pickaxe for stone).")
                     .define("blockBreakingProperToolOnly", false);
+
+            // Teleport a nearby target to the current sound location (inspired by EnhancedAI TeleportToTarget)
+            enableTeleportToSound = builder
+                    .comment("Enable special AI: mobs with the specified tag can teleport another mob to the sound location.")
+                    .define("enableTeleportToSound", true);
+            teleportChance = builder
+                    .comment("Chance [0..1] for a teleporter mob to attempt the teleport behavior when evaluating goals. If EnhancedAI is installed, its difficulty-based chance is used instead.")
+                    .defineInRange("teleportChance", 0.35, 0.0, 1.0);
+            teleportCooldownTicks = builder
+                    .comment("Cooldown (in ticks) after a teleport action. If EnhancedAI is installed, its value is used instead.")
+                    .defineInRange("teleportCooldownTicks", 300, 0, 72000);
+            teleportCanTeleportTag = builder
+                    .comment("EntityType tag used to decide which mobs can perform teleport-to-sound. Defaults to EnhancedAI's tag.")
+                    .define("teleportCanTeleportTag", "enhancedai:mobs/teleport_to_target/can_teleport");
+            teleportCanBeTeleportedTag = builder
+                    .comment("EntityType tag used to decide which mobs can be teleported. Defaults to EnhancedAI's tag.")
+                    .define("teleportCanBeTeleportedTag", "enhancedai:mobs/teleport_to_target/can_be_teleported");
+
+            // Pick up a mob and throw it towards the current sound location (inspired by EnhancedAI PickUpAndThrow)
+            enablePickUpAndThrowToSound = builder
+                    .comment("Enable special AI: mobs with the specified tag can pick up another mob and throw it toward the sound location.")
+                    .define("enablePickUpAndThrowToSound", true);
+            pickUpChance = builder
+                    .comment("Chance [0..1] for a thrower mob to attempt the pick-up-and-throw behavior. If EnhancedAI is installed, its difficulty-based chance is used instead.")
+                    .defineInRange("pickUpChance", 0.05, 0.0, 1.0);
+            pickUpCooldownTicks = builder
+                    .comment("Cooldown (in ticks) after a throw action. If EnhancedAI is installed, its value is used instead.")
+                    .defineInRange("pickUpCooldownTicks", 600, 0, 72000);
+            pickUpMinDistanceToPickUp = builder
+                    .comment("Minimum distance from the sound for the mob to consider picking up a target.")
+                    .defineInRange("pickUpMinDistanceToPickUp", 5, 0, 1024);
+            pickUpMaxDistanceToThrow = builder
+                    .comment("Max distance to the sound within which the mob will release/throw the picked-up mob.")
+                    .defineInRange("pickUpMaxDistanceToThrow", 24, 0, 1024);
+            pickUpSpeedModifier = builder
+                    .comment("Speed modifier applied to the mob while approaching the pick-up target.")
+                    .defineInRange("pickUpSpeedModifier", 1.25, 0.0, 10.0);
+            pickUpCanPickUpTag = builder
+                    .comment("EntityType tag used to decide which mobs can perform pick-up-and-throw. Defaults to EnhancedAI's tag.")
+                    .define("pickUpCanPickUpTag", "enhancedai:mobs/pick_up_and_throw/can_pick_up");
+            pickUpCanBePickedUpTag = builder
+                    .comment("EntityType tag used to decide which mobs can be picked up. Defaults to EnhancedAI's tag.")
+                    .define("pickUpCanBePickedUpTag", "enhancedai:mobs/pick_up_and_throw/can_be_picked_up");
+
+            // XRAY follow range compat (see Enhanced AI Targeting)
+            enableXrayTargeting = builder
+                    .comment("Enable XRAY targeting compat: mobs in the apply_xray tag can detect players through walls up to a configured range.")
+                    .define("enableXrayTargeting", true);
+            xrayApplyTag = builder
+                    .comment("EntityType tag used to decide which mobs can have XRAY detection. Defaults to EnhancedAI's tag.")
+                    .define("xrayApplyTag", "enhancedai:mobs/targeting/apply_xray");
+            xrayRequireBetterNearby = builder
+                    .comment("Require the mob to also be in the Better Nearby Targeting tag to apply XRAY (mirrors EnhancedAI behavior).")
+                    .define("xrayRequireBetterNearby", true);
+            xrayBetterNearbyTag = builder
+                    .comment("EntityType tag for Better Nearby Targeting. Used only if xrayRequireBetterNearby is true.")
+                    .define("xrayBetterNearbyTag", "enhancedai:mobs/targeting/better_nearby_targeting");
+            xrayMinRange = builder
+                    .comment("Minimum XRAY follow range (blocks) for fallback when EnhancedAI is not present. 0..128")
+                    .defineInRange("xrayMinRange", 16, 0, 128);
+            xrayMaxRange = builder
+                    .comment("Maximum XRAY follow range (blocks). 0 disables XRAY fallback.")
+                    .defineInRange("xrayMaxRange", 24, 0, 128);
+            xrayChance = builder
+                    .comment("Chance [0..1] for a mob in the XRAY tag to get the XRAY range (fallback when EnhancedAI is not present).")
+                    .defineInRange("xrayChance", 0.5, 0.0, 1.0);
 
             builder.pop();
 
@@ -2380,6 +2471,14 @@ public class SoundAttractConfig {
 
             COMMON.configSchemaVersion.set(5);
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 5. Saving config...");
+            COMMON_SPEC.save();
+        }
+
+        if (COMMON.configSchemaVersion.get() < 6) {
+            SoundAttractMod.LOGGER.info("Migrating config from version 5 to 6 (adding Enhanced AI integration keys).");
+            // No values to move; new keys will be created with defaults on save.
+            COMMON.configSchemaVersion.set(6);
+            SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 6. Saving config...");
             COMMON_SPEC.save();
         }
 
