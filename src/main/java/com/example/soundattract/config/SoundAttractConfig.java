@@ -168,6 +168,7 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.BooleanValue debugLogging;
         public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior;
+        public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
         public final ForgeConfigSpec.DoubleValue arrivalDistance;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed;
@@ -347,12 +348,15 @@ public class SoundAttractConfig {
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 6, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 7, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
                     .define("debugLogging", false);
+            enableFleeFromUnseenAttackerGoal = builder
+                    .comment("Enable the FleeFromUnseenAttackerGoal that makes mobs flee after being hurt by an attacker they cannot see.")
+                    .define("enableFleeFromUnseenAttackerGoal", true);
             maxSoundsTracked = builder.comment("Maximum number of sounds any single mob can track simultaneously.")
                     .defineInRange("maxSoundsTracked", 20, 1, 1000000);
             soundSwitchRatio = builder.comment(

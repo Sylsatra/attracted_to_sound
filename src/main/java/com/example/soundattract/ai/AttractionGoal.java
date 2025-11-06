@@ -39,6 +39,9 @@ public class AttractionGoal extends Goal {
     private BlockBreakerPosGoal blockBreakerGoal = null;
     private SoundTracker.SoundRecord soundResultCache = null;
     private long cacheTick = -1L;
+    private long lastMoveToTick = -1L;
+    private BlockPos lastMoveToTarget = null;
+    private static final int MOVE_TO_COOLDOWN_TICKS = 20;
 
     public AttractionGoal(Mob mob, double moveSpeed) {
         this.mob = mob;
@@ -277,6 +280,8 @@ public class AttractionGoal extends Goal {
         this.cachedSound = null;
         this.isPursuingSound = false;
         this.pursuingSoundTicksRemaining = 0;
+        this.lastMoveToTick = -1L;
+        this.lastMoveToTarget = null;
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("AttractionGoal stop: " + mob.getName().getString());
         }
@@ -457,12 +462,21 @@ public class AttractionGoal extends Goal {
             return;
         }
 
-        mob.getNavigation().moveTo(
-                targetSoundPos.getX(),
-                targetSoundPos.getY(),
-                targetSoundPos.getZ(),
-                this.moveSpeed
-        );
+        boolean targetChanged = this.lastMoveToTarget == null || !this.lastMoveToTarget.equals(this.targetSoundPos);
+        long nowTick = this.mob.level().getGameTime();
+        boolean cooldownElapsed = (this.lastMoveToTick < 0) || (nowTick - this.lastMoveToTick >= MOVE_TO_COOLDOWN_TICKS);
+        boolean navDone = this.mob.getNavigation().isDone();
+        boolean shouldRecalc = targetChanged || navDone || cooldownElapsed || this.mob.getNavigation().isStuck();
+        if (shouldRecalc && this.targetSoundPos != null) {
+            this.mob.getNavigation().moveTo(
+                    targetSoundPos.getX(),
+                    targetSoundPos.getY(),
+                    targetSoundPos.getZ(),
+                    this.moveSpeed
+            );
+            this.lastMoveToTick = nowTick;
+            this.lastMoveToTarget = this.targetSoundPos;
+        }
 
         if (isPursuingSound && this.cachedSound != null) {
             if (pursuingSoundTicksRemaining > 0) {

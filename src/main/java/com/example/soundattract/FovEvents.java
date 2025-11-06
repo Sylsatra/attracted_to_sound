@@ -10,6 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
+import net.minecraft.world.level.block.GlassPaneBlock;
 import net.minecraft.world.level.block.IceBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
@@ -239,6 +241,12 @@ public class FovEvents {
         }
 
         try {
+            if (state.is(BlockTags.WALLS) || state.getBlock() instanceof IronBarsBlock) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+
+        try {
             ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
             if (id != null) {
                 if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.isEmpty()) {
@@ -267,9 +275,11 @@ public class FovEvents {
             return true;
         }
 
-        if (state.getBlock() instanceof FenceBlock
-                || state.getBlock() instanceof WallBlock
-                || state.getBlock() instanceof IronBarsBlock) {
+        if (state.getBlock() instanceof FenceBlock || state.is(BlockTags.FENCES)) {
+            return true;
+        }
+
+        if (state.getBlock() instanceof GlassPaneBlock) {
             return true;
         }
 

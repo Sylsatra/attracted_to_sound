@@ -2,6 +2,7 @@ package com.example.soundattract.event;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.ai.FleeFromUnseenAttackerGoal;
+import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -14,6 +15,10 @@ public class AIModificationEvents {
     @SubscribeEvent
     public static void onEntityJoinWorld(EntityJoinLevelEvent event) {
         if (!(event.getEntity() instanceof Mob mob)) {
+            return;
+        }
+
+        if (!SoundAttractConfig.COMMON.enableFleeFromUnseenAttackerGoal.get()) {
             return;
         }
 

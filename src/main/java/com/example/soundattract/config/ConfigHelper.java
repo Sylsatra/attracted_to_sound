@@ -14,7 +14,7 @@ import java.nio.file.Path;
 public class ConfigHelper {
 
 
-    private static final int CURRENT_SCHEMA_VERSION = 6;
+    private static final int CURRENT_SCHEMA_VERSION = 7;
 
     public static void register() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
