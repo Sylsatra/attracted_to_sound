@@ -21,6 +21,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
@@ -243,6 +244,18 @@ public class FovEvents {
         }
 
         try {
+            if (state.is(BlockTags.WALLS)) {
+                return false;
+            }
+        } catch (Throwable ignored) {
+        }
+
+        if (state.getBlock() instanceof WallBlock) {
+            return false;
+        }
+
+
+        try {
             ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
             if (id != null) {
                 if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.isEmpty()) {
@@ -269,12 +282,6 @@ public class FovEvents {
         }
 
         if (state.getBlock() instanceof IceBlock || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE)) {
-            return true;
-        }
-
-        if (state.getBlock() instanceof FenceBlock
-                || state.getBlock() instanceof WallBlock
-                || state.getBlock() instanceof IronBarsBlock) {
             return true;
         }
 

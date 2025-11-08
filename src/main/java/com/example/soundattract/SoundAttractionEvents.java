@@ -15,9 +15,12 @@ import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.CombatBlockBreakAssistGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.MobGroupManager;
+import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
+import com.example.soundattract.ai.TeleportToSoundGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.resources.ResourceLocation;
@@ -27,6 +30,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.tags.TagKey;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
@@ -180,7 +184,6 @@ public class SoundAttractionEvents {
         if (!event.getLevel().isClientSide()) {
             if (event.getLevel() instanceof ServerLevel serverLevel) {
                 tryUpdateGroupsWithDelay(serverLevel);
-                // Tick RAID countdown/advancing state machine each server tick per dimension
                 com.example.soundattract.ai.RaidManager.tick(serverLevel);
             }
         }
@@ -200,19 +203,49 @@ public class SoundAttractionEvents {
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
 
+        if (SoundAttractConfig.COMMON.enableTeleportToSound.get()) {
+            String tagId = SoundAttractConfig.COMMON.teleportCanTeleportTag.get();
+            String targetTagId = SoundAttractConfig.COMMON.teleportCanBeTeleportedTag.get();
+            if (tagId != null && !tagId.isBlank() && targetTagId != null && !targetTagId.isBlank()) {
+                ResourceLocation canTeleportRl = ResourceLocation.tryParse(tagId);
+                ResourceLocation canBeTeleportedRl = ResourceLocation.tryParse(targetTagId);
+                if (canTeleportRl != null && canBeTeleportedRl != null) {
+                    TagKey<EntityType<?>> canTeleportTag = TagKey.create(Registries.ENTITY_TYPE, canTeleportRl);
+                    TagKey<EntityType<?>> canBeTeleportedTag = TagKey.create(Registries.ENTITY_TYPE, canBeTeleportedRl);
+                    if (mob.getType().is(canTeleportTag)) {
+                        scheduleAddGoal(mob, 2, new TeleportToSoundGoal(mob));
+                    }
+                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid teleport tags configured: canTeleport='{}', canBeTeleported='{}'", tagId, targetTagId);
+                }
+            }
+        }
+
+        if (SoundAttractConfig.COMMON.enablePickUpAndThrowToSound.get()) {
+            String pickUpPerformerTagId = SoundAttractConfig.COMMON.pickUpCanPickUpTag.get();
+            String pickUpTargetTagId = SoundAttractConfig.COMMON.pickUpCanBePickedUpTag.get();
+            if (pickUpPerformerTagId != null && !pickUpPerformerTagId.isBlank() && pickUpTargetTagId != null && !pickUpTargetTagId.isBlank()) {
+                ResourceLocation performerRl = ResourceLocation.tryParse(pickUpPerformerTagId);
+                ResourceLocation targetRl = ResourceLocation.tryParse(pickUpTargetTagId);
+                if (performerRl != null && targetRl != null) {
+                    TagKey<EntityType<?>> pickUpPerformerTag = TagKey.create(Registries.ENTITY_TYPE, performerRl);
+                    if (mob.getType().is(pickUpPerformerTag)) {
+                        scheduleAddGoal(mob, 2, new PickUpAndThrowToSoundGoal(mob));
+                    }
+                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid pick-up tags configured: canPickUp='{}', canBePicked='{}'", pickUpPerformerTagId, pickUpTargetTagId);
+                }
+            }
+        }
 
         scheduleAddGoal(mob, 2, new CombatBlockBreakAssistGoal(mob));
 
-        // Leader-specific behavior and relayed/RAID handling
         scheduleAddGoal(mob, 3, new com.example.soundattract.ai.LeaderAttractionGoal(mob, moveSpeed));
 
-        // General sound pursuit
         scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
 
-        // Edge follower smart relay behavior
         scheduleAddGoal(mob, 4, new com.example.soundattract.ai.FollowerEdgeRelayGoal(mob, moveSpeed));
 
-        // Maintain group cohesion
         scheduleAddGoal(mob, 5, new FollowLeaderGoal(mob, moveSpeed));
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {

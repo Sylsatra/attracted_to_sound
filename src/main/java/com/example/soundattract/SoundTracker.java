@@ -65,6 +65,11 @@ public class SoundTracker {
     private static final ConcurrentHashMap<String, ConcurrentHashMap<GridKey3D, ConcurrentHashMap<UUID, SoundRecord>>> SPATIAL_SOUNDS = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<UUID, SoundRecord> LARGE_RANGE_SOUNDS = new ConcurrentHashMap<>();
 
+    private static final ConcurrentHashMap<String, Long> RECENT_DUPLICATE_SUPPRESSION = new ConcurrentHashMap<>();
+    private static final long DEDUPLICATE_WINDOW_TICKS = 2L;
+    private static final int PREFILTER_LIMIT = 24;
+    private static final double WEIGHT_EPSILON = 1.0e-4;
+
     private record GridKey3D(int x, int y, int z) {}
 
 
@@ -110,6 +115,9 @@ public class SoundTracker {
 
     public static void addSound(SoundEvent se, BlockPos pos, String dimensionKey, double range, double weight, int lifetime, String explicitSoundId) {
         String soundIdToUse = (explicitSoundId != null) ? explicitSoundId : (se != null && se.getLocation() != null ? se.getLocation().toString() : "unknown");
+        if (soundIdToUse == null) {
+            soundIdToUse = "unknown";
+        }
 
         ResourceLocation loc = ResourceLocation.tryParse(soundIdToUse);
         if (loc != null && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc)) {
@@ -118,6 +126,14 @@ public class SoundTracker {
             }
             return;
         }
+
+        String dedupKey = dimensionKey + "|" + soundIdToUse + "|" + pos.asLong();
+        long nowTick = currentTickCounter;
+        Long lastTick = RECENT_DUPLICATE_SUPPRESSION.get(dedupKey);
+        if (lastTick != null && nowTick - lastTick <= DEDUPLICATE_WINDOW_TICKS) {
+            return;
+        }
+        RECENT_DUPLICATE_SUPPRESSION.put(dedupKey, nowTick);
 
 
         SoundRecord record = new SoundRecord(se, soundIdToUse, pos, lifetime, dimensionKey, range, weight);
@@ -200,18 +216,33 @@ public class SoundTracker {
     }
 
 
-    private static final class CandidateEval {
+    private static final class ApproxCandidate {
         final SoundRecord rec;
-        final double muffledRange;
-        final double muffledWeight;
-        final double finalWeight;
+        final double effRange;
+        final double effWeight;
+        final double novelty;
+        final double approxWeight;
         final double distSqr;
-        CandidateEval(SoundRecord rec, double muffledRange, double muffledWeight, double finalWeight, double distSqr) {
+        final String soundKey;
+        final ResourceLocation baseSoundId;
+        double muffledRange;
+        double muffledWeight;
+
+        ApproxCandidate(SoundRecord rec, double effRange, double effWeight, double novelty, double approxWeight, double distSqr, String soundKey, ResourceLocation baseSoundId) {
             this.rec = rec;
-            this.muffledRange = muffledRange;
-            this.muffledWeight = muffledWeight;
-            this.finalWeight = finalWeight;
+            this.effRange = effRange;
+            this.effWeight = effWeight;
+            this.novelty = novelty;
+            this.approxWeight = approxWeight;
             this.distSqr = distSqr;
+            this.soundKey = soundKey;
+            this.baseSoundId = baseSoundId;
+            this.muffledRange = effRange;
+            this.muffledWeight = effWeight;
+        }
+
+        double finalWeight() {
+            return this.muffledWeight + this.novelty;
         }
     }
 
@@ -286,13 +317,12 @@ public class SoundTracker {
             RAYCAST_CACHE.clear();
         }
 
-
+        RECENT_DUPLICATE_SUPPRESSION.entrySet().removeIf(entry -> currentTickCounter - entry.getValue() > DEDUPLICATE_WINDOW_TICKS);
 
         AsyncSoundResult result;
         while ((result = ASYNC_RESULTS.poll()) != null) {
             EVAL_CACHE.put(result.mobId(), new CachedEval(result.result(), result.completionTick()));
         }
-
 
         if (currentTickCounter % 200 == 0) {
             long now = currentTickCounter;
@@ -301,7 +331,6 @@ public class SoundTracker {
         }
     }
 
-
     private static SoundRecord findNearestSoundInternal(Level level, BlockPos mobPos, Vec3 mobEyePos, com.example.soundattract.config.MobProfile mobProfile) {
         String dimensionKey = level.dimension().location().toString();
         List<SoundRecord> nearbyCandidates = getNearbySounds(dimensionKey, mobPos);
@@ -309,54 +338,97 @@ public class SoundTracker {
             return null;
         }
 
+        Map<String, ApproxCandidate> approxBySound = new HashMap<>();
 
-            Map<String, CandidateEval> bestById = new HashMap<>();
+        double noveltyBonusValue = SoundAttractConfig.COMMON.soundNoveltyBonusWeight.get();
+        int noveltyTicks = SoundAttractConfig.COMMON.soundNoveltyTimeTicks.get();
+        int maxLifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
 
-            double noveltyBonusValue = SoundAttractConfig.COMMON.soundNoveltyBonusWeight.get();
-            int noveltyTicks = SoundAttractConfig.COMMON.soundNoveltyTimeTicks.get();
-            int maxLifetime = SoundAttractConfig.COMMON.soundLifetimeTicks.get();
+        for (SoundRecord r : nearbyCandidates) {
+            if (r == null || r.pos == null) {
+                continue;
+            }
 
-            for (SoundRecord r : nearbyCandidates) {
-                if (r == null || r.pos == null) continue;
-                ResourceLocation rl = r.soundId != null ? ResourceLocation.tryParse(r.soundId) : null;
-                if (rl != null && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl)) {
-                    continue;
-                }
-                double effRange = r.range;
-                double effWeight = r.weight;
+            String soundKey = (r.soundId != null) ? r.soundId : "unknown";
+            ResourceLocation rl = ResourceLocation.tryParse(soundKey);
+            if (rl != null && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl)) {
+                continue;
+            }
 
-                if (mobProfile != null && rl != null) {
-                    java.util.Optional<com.example.soundattract.config.MobProfile.SoundOverride> ov = mobProfile.getSoundOverride(rl);
-                    if (ov.isPresent()) {
-                        com.example.soundattract.config.MobProfile.SoundOverride so = ov.get();
-                        effRange = so.range();
-                        effWeight = so.weight();
-                    }
-                }
-                double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effRange, effWeight, r.soundId != null ? r.soundId : "unknown");
-                double muffledRange = muffled[0];
-                double muffledWeight = muffled[1];
-                double distSqr = mobPos.distSqr(r.pos);
-                if (distSqr > (muffledRange * muffledRange)) continue;
-                double novelty = (r.ticksRemaining > (maxLifetime - noveltyTicks)) ? noveltyBonusValue : 0.0;
-                double finalW = muffledWeight + novelty;
-                String key = (r.soundId != null) ? r.soundId : "unknown";
-                CandidateEval prev = bestById.get(key);
-                if (prev == null || finalW > prev.finalWeight || (Math.abs(finalW - prev.finalWeight) < 0.001 && distSqr < prev.distSqr)) {
-                    bestById.put(key, new CandidateEval(r, muffledRange, muffledWeight, finalW, distSqr));
+            double effRange = r.range;
+            double effWeight = r.weight;
+
+            if (mobProfile != null && rl != null) {
+                java.util.Optional<com.example.soundattract.config.MobProfile.SoundOverride> ov = mobProfile.getSoundOverride(rl);
+                if (ov.isPresent()) {
+                    com.example.soundattract.config.MobProfile.SoundOverride so = ov.get();
+                    effRange = so.range();
+                    effWeight = so.weight();
                 }
             }
 
-            CandidateEval best = null;
-            for (CandidateEval ce : bestById.values()) {
-                if (best == null || ce.finalWeight > best.finalWeight || (Math.abs(ce.finalWeight - best.finalWeight) < 0.001 && ce.distSqr < best.distSqr)) {
-                    best = ce;
-                }
+            double distSqr = mobPos.distSqr(r.pos);
+            if (distSqr > (effRange * effRange)) {
+                continue;
             }
-            if (best != null) {
-                return new SoundRecord(best.rec.sound, best.rec.soundId, best.rec.pos, best.rec.ticksRemaining, best.rec.dimensionKey, best.muffledRange, best.muffledWeight);
+
+            double novelty = (r.ticksRemaining > (maxLifetime - noveltyTicks)) ? noveltyBonusValue : 0.0;
+            double approxWeight = effWeight + novelty;
+            if (approxWeight <= 0.0) {
+                continue;
             }
+
+            ApproxCandidate existing = approxBySound.get(soundKey);
+            if (existing == null || approxWeight > existing.approxWeight || (Math.abs(approxWeight - existing.approxWeight) < 0.001 && distSqr < existing.distSqr)) {
+                approxBySound.put(soundKey, new ApproxCandidate(r, effRange, effWeight, novelty, approxWeight, distSqr, soundKey, rl));
+            }
+        }
+
+        if (approxBySound.isEmpty()) {
             return null;
+        }
+
+        List<ApproxCandidate> shortlist = new ArrayList<>(approxBySound.values());
+        shortlist.sort((a, b) -> {
+            int cmp = Double.compare(b.approxWeight, a.approxWeight);
+            if (cmp != 0) {
+                return cmp;
+            }
+            return Double.compare(a.distSqr, b.distSqr);
+        });
+        if (shortlist.size() > PREFILTER_LIMIT) {
+            shortlist = new ArrayList<>(shortlist.subList(0, PREFILTER_LIMIT));
+        }
+
+        ApproxCandidate bestCandidate = null;
+        double bestFinalWeight = -1.0;
+        double bestFinalDist = Double.MAX_VALUE;
+
+        for (ApproxCandidate candidate : shortlist) {
+            if (bestCandidate != null && candidate.approxWeight < bestFinalWeight - WEIGHT_EPSILON) {
+                continue;
+            }
+
+            double[] muffled = applyBlockMuffling(level, candidate.rec.pos, mobPos, candidate.effRange, candidate.effWeight, candidate.soundKey);
+            candidate.muffledRange = muffled[0];
+            candidate.muffledWeight = muffled[1];
+
+            if (candidate.distSqr > (candidate.muffledRange * candidate.muffledRange)) {
+                continue;
+            }
+
+            double finalWeight = candidate.finalWeight();
+            if (finalWeight > bestFinalWeight || (Math.abs(finalWeight - bestFinalWeight) < 0.001 && candidate.distSqr < bestFinalDist)) {
+                bestCandidate = candidate;
+                bestFinalWeight = finalWeight;
+                bestFinalDist = candidate.distSqr;
+            }
+        }
+
+        if (bestCandidate != null) {
+            return new SoundRecord(bestCandidate.rec.sound, bestCandidate.rec.soundId, bestCandidate.rec.pos, bestCandidate.rec.ticksRemaining, bestCandidate.rec.dimensionKey, bestCandidate.muffledRange, bestCandidate.muffledWeight);
+        }
+        return null;
     }
 
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos) {

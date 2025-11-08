@@ -26,7 +26,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class SoundAttractConfig {
 
-    private static final int CURRENT_CONFIG_VERSION = 5;
+    private static final int CURRENT_CONFIG_VERSION = 7;
 
     public record SoundDefaultEntry(double range, double weight) {
 
@@ -272,6 +272,16 @@ public class SoundAttractConfig {
             }
         }
 
+        if (oldVersion < 7) {
+            SoundAttractMod.LOGGER.info("Performing migration for config version 6 -> 7 (ensure flee-from-unseen-attacker toggle exists).");
+            try {
+                boolean current = COMMON.enableFleeFromUnseenAttackerGoal.get();
+                COMMON.enableFleeFromUnseenAttackerGoal.set(current);
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("Migration v7: Unable to access enableFleeFromUnseenAttackerGoal; using default.", e);
+            }
+        }
+
         COMMON.configVersion.set(CURRENT_CONFIG_VERSION);
         SoundAttractMod.LOGGER.info("Config migration complete. New schema version: {}. Saving config...", CURRENT_CONFIG_VERSION);
         COMMON_SPEC.save();
@@ -377,6 +387,7 @@ public class SoundAttractConfig {
 
         public final ModConfigSpec.IntValue configVersion;
         public final ModConfigSpec.BooleanValue debugLogging;
+        public final ModConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
         public final ModConfigSpec.BooleanValue enableRaycastCache;
         public final ModConfigSpec.BooleanValue edgeMobSmartBehavior;
         public final ModConfigSpec.IntValue soundLifetimeTicks;
@@ -536,6 +547,29 @@ public class SoundAttractConfig {
         public final ModConfigSpec.BooleanValue blockBreakListAsWhitelist;
         public final ModConfigSpec.ConfigValue<List<? extends String>> blockBreakBlockList;
 
+        public final ModConfigSpec.BooleanValue enableTeleportToSound;
+        public final ModConfigSpec.DoubleValue teleportChance;
+        public final ModConfigSpec.IntValue teleportCooldownTicks;
+        public final ModConfigSpec.ConfigValue<String> teleportCanTeleportTag;
+        public final ModConfigSpec.ConfigValue<String> teleportCanBeTeleportedTag;
+
+        public final ModConfigSpec.BooleanValue enablePickUpAndThrowToSound;
+        public final ModConfigSpec.DoubleValue pickUpChance;
+        public final ModConfigSpec.IntValue pickUpCooldownTicks;
+        public final ModConfigSpec.IntValue pickUpMinDistanceToPickUp;
+        public final ModConfigSpec.IntValue pickUpMaxDistanceToThrow;
+        public final ModConfigSpec.DoubleValue pickUpSpeedModifier;
+        public final ModConfigSpec.ConfigValue<String> pickUpCanPickUpTag;
+        public final ModConfigSpec.ConfigValue<String> pickUpCanBePickedUpTag;
+
+        public final ModConfigSpec.BooleanValue enableXrayTargeting;
+        public final ModConfigSpec.ConfigValue<String> xrayApplyTag;
+        public final ModConfigSpec.BooleanValue xrayRequireBetterNearby;
+        public final ModConfigSpec.ConfigValue<String> xrayBetterNearbyTag;
+        public final ModConfigSpec.IntValue xrayMinRange;
+        public final ModConfigSpec.IntValue xrayMaxRange;
+        public final ModConfigSpec.DoubleValue xrayChance;
+
         public Common(ModConfigSpec.Builder builder) {
             builder.comment("Internal config version. Do not change.").push("version");
             configVersion = builder.defineInRange("configVersion", 0, 0, CURRENT_CONFIG_VERSION);
@@ -544,6 +578,8 @@ public class SoundAttractConfig {
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
                     .define("debugLogging", false);
+            enableFleeFromUnseenAttackerGoal = builder.comment("Enable the FleeFromUnseenAttackerGoal that makes mobs flee after being hurt by an attacker they cannot see.")
+                    .define("enableFleeFromUnseenAttackerGoal", true);
             enableRaycastCache = builder.comment("Enable caching for raycast results to improve performance. Disable if experiencing issues with sound obstruction detection.")
                     .define("enableRaycastCache", true);
             edgeMobSmartBehavior = builder.comment("Enables smarter behavior for mobs at the edge of their hearing range (e.g. pathing closer to investigate further)")
@@ -1597,11 +1633,11 @@ public class SoundAttractConfig {
 
             builder.pop();
 
-            builder.push("block_breaking");
+            builder.push("enhanced_ai_integration");
             enableBlockBreaking = builder.comment("Enable mobs to break blocks that obstruct pathing when stuck.")
                     .define("enableBlockBreaking", false);
-            blockBreakTimeMultiplier = builder.comment("Global multiplier for block breaking time. Higher means slower breaking.")
-                    .defineInRange("blockBreakTimeMultiplier", 1.0, 0.01, 100.0);
+            blockBreakTimeMultiplier = builder.comment("Global multiplier for block breaking time. Higher means slower breaking. Set to -1 to mirror EnhancedAI when available.")
+                    .defineInRange("blockBreakTimeMultiplier", 1.5, -1.0, 100.0);
             blockBreakToolOnly = builder.comment("Only allow breaking if the mob is holding any tool in main hand.")
                     .define("blockBreakToolOnly", false);
             blockBreakProperToolOnly = builder.comment("Only allow breaking if the mob is holding a proper tool for the block (faster if true).")
@@ -1609,13 +1645,57 @@ public class SoundAttractConfig {
             blockBreakProperToolRequired = builder.comment("Require a proper tool to break the block at all.")
                     .define("blockBreakProperToolRequired", false);
             blockBreakMaxY = builder.comment("Maximum Y level where mobs are allowed to break blocks (safety).")
-                    .defineInRange("blockBreakMaxY", 320, -2032, 4064);
+                    .defineInRange("blockBreakMaxY", 256, -2032, 4064);
             blockBreakBlacklistTileEntities = builder.comment("Prevent breaking blocks that have block entities (e.g., chests) to avoid grief.")
                     .define("blockBreakBlacklistTileEntities", true);
             blockBreakListAsWhitelist = builder.comment("Treat blockBreakBlockList as a whitelist (true) or blacklist (false).")
                     .define("blockBreakListAsWhitelist", false);
-            blockBreakBlockList = builder.comment("Whitelist/Blacklist of blocks for block breaking, depending on blockBreakListAsWhitelist. Format: 'modid:blockid'.")
-                    .defineList("blockBreakBlockList", java.util.Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
+            blockBreakBlockList = builder.comment("List of blocks (or block tags ending with '*') affected by block breaking rules.")
+                    .defineList("blockBreakBlockList", List.of(), obj -> obj instanceof String);
+
+            enableTeleportToSound = builder.comment("Enable special AI: mobs in teleportCanTeleportTag can teleport allies to sound positions.")
+                    .define("enableTeleportToSound", false);
+            teleportChance = builder.comment("Chance [0..1] for a teleporter mob to attempt teleport when evaluating goals. EnhancedAI difficulty is used if present.")
+                    .defineInRange("teleportChance", 0.35, 0.0, 1.0);
+            teleportCooldownTicks = builder.comment("Cooldown (ticks) after teleport completes. EnhancedAI value is used if present.")
+                    .defineInRange("teleportCooldownTicks", 300, 0, 72000);
+            teleportCanTeleportTag = builder.comment("EntityType tag whose entries can perform teleport-to-sound behavior.")
+                    .define("teleportCanTeleportTag", "enhancedai:mobs/teleport_to_target/can_teleport");
+            teleportCanBeTeleportedTag = builder.comment("EntityType tag whose entries can be teleported toward sounds.")
+                    .define("teleportCanBeTeleportedTag", "enhancedai:mobs/teleport_to_target/can_be_teleported");
+
+            enablePickUpAndThrowToSound = builder.comment("Enable special AI: mobs in pickUpCanPickUpTag can throw allies toward sound positions.")
+                    .define("enablePickUpAndThrowToSound", false);
+            pickUpChance = builder.comment("Chance [0..1] a mob attempts pick-up-and-throw. EnhancedAI difficulty is used if present.")
+                    .defineInRange("pickUpChance", 0.05, 0.0, 1.0);
+            pickUpCooldownTicks = builder.comment("Cooldown (ticks) after throwing. EnhancedAI value is used if present.")
+                    .defineInRange("pickUpCooldownTicks", 600, 0, 72000);
+            pickUpMinDistanceToPickUp = builder.comment("Minimum blocks from sound before attempting to pick up a mob.")
+                    .defineInRange("pickUpMinDistanceToPickUp", 5, 0, 1024);
+            pickUpMaxDistanceToThrow = builder.comment("Maximum distance to sound at which the mob will release/throw.")
+                    .defineInRange("pickUpMaxDistanceToThrow", 24, 0, 1024);
+            pickUpSpeedModifier = builder.comment("Speed modifier applied while approaching pick-up target.")
+                    .defineInRange("pickUpSpeedModifier", 1.25, 0.0, 10.0);
+            pickUpCanPickUpTag = builder.comment("EntityType tag whose entries can perform pick-up-and-throw.")
+                    .define("pickUpCanPickUpTag", "enhancedai:mobs/pick_up_and_throw/can_pick_up");
+            pickUpCanBePickedUpTag = builder.comment("EntityType tag whose entries can be picked up and thrown.")
+                    .define("pickUpCanBePickedUpTag", "enhancedai:mobs/pick_up_and_throw/can_be_picked_up");
+
+            enableXrayTargeting = builder.comment("Enable XRAY targeting compat: mobs in xrayApplyTag gain through-wall detection.")
+                    .define("enableXrayTargeting", false);
+            xrayApplyTag = builder.comment("EntityType tag eligible for XRAY detection.")
+                    .define("xrayApplyTag", "enhancedai:mobs/targeting/apply_xray");
+            xrayRequireBetterNearby = builder.comment("Require mobs to also be in better-nearby tag for XRAY.")
+                    .define("xrayRequireBetterNearby", false);
+            xrayBetterNearbyTag = builder.comment("EntityType tag for EnhancedAI better nearby targeting.")
+                    .define("xrayBetterNearbyTag", "enhancedai:mobs/targeting/better_nearby_targeting");
+            xrayMinRange = builder.comment("Minimum XRAY follow range (fallback when EnhancedAI absent).")
+                    .defineInRange("xrayMinRange", 16, 0, 128);
+            xrayMaxRange = builder.comment("Maximum XRAY follow range (fallback when EnhancedAI absent). 0 disables.")
+                    .defineInRange("xrayMaxRange", 24, 0, 128);
+            xrayChance = builder.comment("Chance [0..1] fallback XRAY range is applied when EnhancedAI absent.")
+                    .defineInRange("xrayChance", 0.5, 0.0, 1.0);
+
             builder.pop();
 
         }
@@ -1653,15 +1733,19 @@ public class SoundAttractConfig {
                 String[] parts = entry.split(";");
                 if (parts.length == 3) {
                     ResourceLocation soundId = ResourceLocation.tryParse(parts[0]);
+                    if (soundId == null) {
+                        SoundAttractMod.LOGGER.warn("Invalid sound ID in sound default entry: {}", entry);
+                        return;
+                    }
                     try {
                         double range = Double.parseDouble(parts[1]);
                         double weight = Double.parseDouble(parts[2]);
-                        if (soundId != null) {
-                            SOUND_DEFAULT_ENTRIES_CACHE.put(soundId, new SoundDefaultEntry(range, weight));
-                        }
+                        SOUND_DEFAULT_ENTRIES_CACHE.put(soundId, new SoundDefaultEntry(range, weight));
                     } catch (NumberFormatException e) {
                         SoundAttractMod.LOGGER.warn("Could not parse range/weight for sound default entry: {}", entry, e);
                     }
+                } else {
+                    SoundAttractMod.LOGGER.warn("Malformed sound default entry (expected sound;range;weight): {}", entry);
                 }
             });
         }
@@ -1691,6 +1775,8 @@ public class SoundAttractConfig {
             COMMON.customAirBlocks.get().forEach(id -> CUSTOM_AIR_BLOCKS_CACHE.add(ResourceLocation.parse(id)));
         }
         parseAndCacheNonBlockingVisionAllowList();
+
+        com.example.soundattract.StealthDetectionEvents.resetXrayCache();
 
         TACZ_ENABLED_CACHE = ModList.get().isLoaded("tacz") && COMMON.enableTaczIntegration.get();
         TACZ_RELOAD_RANGE_CACHE = COMMON.taczReloadRange.get();

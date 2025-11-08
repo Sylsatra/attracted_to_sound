@@ -90,6 +90,10 @@ public class AttractionGoal extends Goal {
         return SoundAttractConfig.COMMON.arrivalDistance.get();
     }
 
+    public BlockPos getTargetSoundPos() {
+        return this.targetSoundPos;
+    }
+
     private int getWaitTicks() {
         return SoundAttractConfig.COMMON.scanCooldownTicks.get();
     }
@@ -195,16 +199,15 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        // When smart edge behavior is enabled, only deserters should directly pursue sounds via AttractionGoal.
-        // Leaders should use LeaderAttractionGoal; followers/edge mobs should use FollowerEdgeRelayGoal.
+
         if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
             Mob leader = MobGroupManager.getLeader(mob);
             boolean isDeserter = MobGroupManager.isDeserter(mob);
             if (leader == mob && !isDeserter) {
-                return false; // exclude leaders
+                return false; 
             }
             if (leader != mob) {
-                return false; // exclude followers (edge and non-edge)
+                return false;
             }
         }
 
@@ -243,8 +246,16 @@ public class AttractionGoal extends Goal {
                 return false;
             }
         }
-        if (targetSoundPos == null || this.mob.getNavigation().isDone()) {
+        if (targetSoundPos == null) {
             return false;
+        }
+
+        if (this.mob.getNavigation().isDone()) {
+            double arrivalDistSq = getArrivalDistance() * getArrivalDistance();
+            double stopRangeSq = Math.max(4.0D, arrivalDistSq);
+            if (this.mob.blockPosition().distSqr(this.targetSoundPos) <= stopRangeSq) {
+                return false;
+            }
         }
 
         Mob leader = MobGroupManager.getLeader(mob);
@@ -665,7 +676,6 @@ public class AttractionGoal extends Goal {
     }
 
     private boolean hasFollowerEdgeRelayGoal() {
-        // Avoid duplicating edge-relay behavior if a dedicated follower goal is present
         return this.mob.goalSelector.getAvailableGoals().stream()
             .anyMatch(w -> w.getGoal() instanceof com.example.soundattract.ai.FollowerEdgeRelayGoal);
     }
