@@ -65,6 +65,52 @@ public class SoundTracker {
         }
     }
 
+    public static String buildIntegrationSoundId(ResourceLocation baseId, @Nullable String metadata) {
+        if (baseId == null) {
+            return metadata == null ? null : metadata.trim();
+        }
+        if (metadata == null || metadata.isBlank()) {
+            return baseId.toString();
+        }
+        String trimmed = metadata.trim();
+        StringBuilder sanitized = new StringBuilder(trimmed.length());
+        for (int i = 0; i < trimmed.length(); i++) {
+            char ch = trimmed.charAt(i);
+            if (Character.isWhitespace(ch)) {
+                sanitized.append('_');
+                continue;
+            }
+            if (ch == ';' || ch == '|' || ch == ',' || ch == '#') {
+                sanitized.append('/');
+                continue;
+            }
+            sanitized.append(Character.toLowerCase(ch));
+        }
+        return baseId + "#" + sanitized;
+    }
+
+    @Nullable
+    public static ResourceLocation extractBaseSoundLocation(@Nullable String soundId) {
+        if (soundId == null || soundId.isBlank()) {
+            return null;
+        }
+        int idx = soundId.indexOf('#');
+        String base = idx >= 0 ? soundId.substring(0, idx) : soundId;
+        return ResourceLocation.tryParse(base);
+    }
+
+    @Nullable
+    public static String extractIntegrationMetadata(@Nullable String soundId) {
+        if (soundId == null) {
+            return null;
+        }
+        int idx = soundId.indexOf('#');
+        if (idx < 0 || idx + 1 >= soundId.length()) {
+            return null;
+        }
+        return soundId.substring(idx + 1);
+    }
+
     public static class VirtualSoundRecord extends SoundRecord {
 
         public final UUID sourcePlayer;
@@ -85,6 +131,8 @@ public class SoundTracker {
     private static final Map<String, Map<GridKey3D, Map<String, SoundRecord>>> SPATIAL_SOUNDS = new ConcurrentHashMap<>();
     private static final Map<String, SoundRecord> LARGE_RANGE_SOUNDS = new ConcurrentHashMap<>();
     private static final Map<String, SoundRecord> SOUND_RECORDS_BY_ID = new ConcurrentHashMap<>();
+    private static java.util.Set<String> DEDUP_THIS_TICK = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static java.util.Set<String> DEDUP_LAST_TICK = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static GridKey3D gridKey(BlockPos pos) {
         int x = pos.getX() >> 4;
@@ -97,6 +145,7 @@ public class SoundTracker {
     private static final Lock readLock = lock.readLock();
     private static final Lock writeLock = lock.writeLock();
     private static final double LARGE_SOUND_RANGE_THRESHOLD = 64.0;
+    private static final int MAX_SYNC_CANDIDATES = 24;
 
     private static void addRecordToCollections(SoundRecord r) {
         if (r.range > LARGE_SOUND_RANGE_THRESHOLD) {
@@ -171,8 +220,7 @@ public class SoundTracker {
             soundIdToUse = se.getLocation().toString();
         }
 
-        ResourceLocation loc = soundIdToUse != null
-                ? ResourceLocation.tryParse(soundIdToUse) : null;
+        ResourceLocation loc = extractBaseSoundLocation(soundIdToUse);
 
         if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                 && (loc == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc))) {
@@ -184,6 +232,14 @@ public class SoundTracker {
         }
         writeLock.lock();
         try {
+            String dedupKey = null;
+            if (soundIdToUse != null && pos != null && dimensionKey != null) {
+                dedupKey = dimensionKey + "|" + soundIdToUse + "|" + pos.asLong();
+                if (DEDUP_THIS_TICK.contains(dedupKey) || DEDUP_LAST_TICK.contains(dedupKey)) {
+                    return;
+                }
+                DEDUP_THIS_TICK.add(dedupKey);
+            }
             for (Iterator<SoundRecord> it = RECENT_SOUNDS.iterator(); it.hasNext();) {
                 SoundRecord existing = it.next();
                 if (existing.dimensionKey.equals(dimensionKey)
@@ -240,6 +296,8 @@ public class SoundTracker {
                     removeRecordFromCollections(r);
                 }
             }
+            DEDUP_LAST_TICK = DEDUP_THIS_TICK;
+            DEDUP_THIS_TICK = java.util.concurrent.ConcurrentHashMap.newKeySet();
         } finally {
             writeLock.unlock();
         }
@@ -618,17 +676,25 @@ public class SoundTracker {
             List<SoundCandidate> asyncCandidates = new ArrayList<>();
             Map<String, SoundRecord> candidateRecordById = new HashMap<>();
 
+            java.util.List<SoundRecord> shortlist = new ArrayList<>();
+            java.util.List<Double> shortlistRange = new ArrayList<>();
+            java.util.List<Double> shortlistWeight = new ArrayList<>();
+            java.util.List<Double> shortlistNovelty = new ArrayList<>();
+            java.util.List<Double> shortlistScore = new ArrayList<>();
+            java.util.List<Double> shortlistDistSqr = new ArrayList<>();
+
             for (SoundRecord r : nearbySounds) {
                 if (r == null || r.pos == null) {
                     continue;
                 }
                 String soundIdStr = r.soundId;
-                ResourceLocation rl = soundIdStr != null ? ResourceLocation.tryParse(soundIdStr) : null;
+                ResourceLocation rl = extractBaseSoundLocation(soundIdStr);
+                String integrationMeta = extractIntegrationMetadata(soundIdStr);
                 if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && (rl == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(rl))) {
                     continue;
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[findNearest] considering {}", rl);
+                    SoundAttractMod.LOGGER.info("[findNearest] considering {} (meta={})", rl, integrationMeta);
                 }
                 double effectiveInitialRange = r.range;
                 double effectiveInitialWeight = r.weight;
@@ -645,44 +711,45 @@ public class SoundTracker {
                         rl, effectiveInitialRange, effectiveInitialWeight
                     );
                 }
-                double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effectiveInitialRange, effectiveInitialWeight, soundIdStr != null ? soundIdStr : "unknown");
-                double muffledRange = muffled[0];
-                double muffledWeight = muffled[1];
+
                 double distSqr = mobPos.distSqr(r.pos);
-                double rangeSqr = muffledRange * muffledRange;
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                        "[findNearest] after muffling {}: range {}->{} (rangeSqr={}), weight {}->{}, distSqr={}",
-                        rl,
-                        effectiveInitialRange, muffledRange, rangeSqr,
-                        effectiveInitialWeight, muffledWeight, distSqr
-                    );
-                }
-                if (distSqr > rangeSqr) {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "[findNearest] skipping {}: distSqr={} > rangeSqr={}",
-                            rl, distSqr, rangeSqr
-                        );
-                    }
+                double rangeSqrQuick = effectiveInitialRange * effectiveInitialRange;
+                if (distSqr > rangeSqrQuick) {
                     continue;
                 }
+
                 double noveltyBonus = 0.0;
                 if (r.ticksRemaining > (maxLifetime - noveltyTicks)) {
                     noveltyBonus = noveltyBonusValue;
                 }
-                double finalComparisonWeight = muffledWeight + noveltyBonus;
-                if (finalComparisonWeight > highestWeight || (Math.abs(finalComparisonWeight - highestWeight) < 0.001 && distSqr < closestDistSqr)) {
-                    highestWeight = finalComparisonWeight;
-                    closestDistSqr = distSqr;
-                    bestSound = r;
-                    bestSoundEffectiveRange = muffledRange;
-                    bestSoundEffectiveWeight = finalComparisonWeight;
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info(
-                            "[findNearest] candidate now best {}: effRange={}, effWeight={}, compWeight={}, distSqr={}",
-                            rl, bestSoundEffectiveRange, bestSoundEffectiveWeight, finalComparisonWeight, distSqr
-                        );
+                double approxScore = effectiveInitialWeight + noveltyBonus;
+
+                if (shortlist.size() < MAX_SYNC_CANDIDATES) {
+                    shortlist.add(r);
+                    shortlistRange.add(effectiveInitialRange);
+                    shortlistWeight.add(effectiveInitialWeight);
+                    shortlistNovelty.add(noveltyBonus);
+                    shortlistScore.add(approxScore);
+                    shortlistDistSqr.add(distSqr);
+                } else {
+                    int worstIdx = 0;
+                    double worstScore = shortlistScore.get(0);
+                    double worstDist = shortlistDistSqr.get(0);
+                    for (int i = 1; i < shortlist.size(); i++) {
+                        double sc = shortlistScore.get(i);
+                        if (sc < worstScore || (Math.abs(sc - worstScore) < 0.001 && shortlistDistSqr.get(i) > worstDist)) {
+                            worstIdx = i;
+                            worstScore = sc;
+                            worstDist = shortlistDistSqr.get(i);
+                        }
+                    }
+                    if (approxScore > worstScore || (Math.abs(approxScore - worstScore) < 0.001 && distSqr < worstDist)) {
+                        shortlist.set(worstIdx, r);
+                        shortlistRange.set(worstIdx, effectiveInitialRange);
+                        shortlistWeight.set(worstIdx, effectiveInitialWeight);
+                        shortlistNovelty.set(worstIdx, noveltyBonus);
+                        shortlistScore.set(worstIdx, approxScore);
+                        shortlistDistSqr.set(worstIdx, distSqr);
                     }
                 }
 
@@ -693,12 +760,12 @@ public class SoundTracker {
                         soundIdStr,
                         r.pos.getX() + 0.5, r.pos.getY() + 0.5, r.pos.getZ() + 0.5,
                         occurredAt,
-                        muffledRange,
-                        muffledWeight,
+                        effectiveInitialRange,
+                        effectiveInitialWeight,
                         1.0
                     );
                     asyncCandidates.add(cand);
-                    SoundRecord newRec = new SoundRecord(r.sound, r.soundId, r.pos, r.ticksRemaining, r.dimensionKey, muffledRange, muffledWeight + noveltyBonus);
+                    SoundRecord newRec = new SoundRecord(r.sound, r.soundId, r.pos, r.ticksRemaining, r.dimensionKey, effectiveInitialRange, effectiveInitialWeight);
                     SoundRecord prev = candidateRecordById.get(soundIdStr);
                     if (prev == null) {
                         candidateRecordById.put(soundIdStr, newRec);
@@ -715,8 +782,79 @@ public class SoundTracker {
                     }
                 }
             }
+
+            final int MAX_ASYNC_CANDIDATES = 64;
+            java.util.List<SoundCandidate> asyncFiltered = new java.util.ArrayList<>();
+            if (!candidateRecordById.isEmpty()) {
+                java.util.List<SoundRecord> uniques = new java.util.ArrayList<>(candidateRecordById.values());
+                uniques.sort((a, b) -> {
+                    double aNovelty = (a.ticksRemaining > (maxLifetime - noveltyTicks)) ? noveltyBonusValue : 0.0;
+                    double bNovelty = (b.ticksRemaining > (maxLifetime - noveltyTicks)) ? noveltyBonusValue : 0.0;
+                    double aScore = a.weight + aNovelty;
+                    double bScore = b.weight + bNovelty;
+                    int cmp = Double.compare(bScore, aScore);
+                    if (cmp != 0) return cmp;
+                    double aDist = mobPos.distSqr(a.pos);
+                    double bDist = mobPos.distSqr(b.pos);
+                    return Double.compare(aDist, bDist);
+                });
+                long now = level.getGameTime();
+                int limit = Math.min(MAX_ASYNC_CANDIDATES, uniques.size());
+                for (int i = 0; i < limit; i++) {
+                    SoundRecord rec = uniques.get(i);
+                    long ageTicks = Math.max(0L, maxLifetime - rec.ticksRemaining);
+                    long occurredAt = Math.max(0L, now - ageTicks);
+                    asyncFiltered.add(new SoundCandidate(
+                        rec.soundId,
+                        rec.pos.getX() + 0.5, rec.pos.getY() + 0.5, rec.pos.getZ() + 0.5,
+                        occurredAt,
+                        rec.range,
+                        rec.weight,
+                        1.0
+                    ));
+                }
+            }
+
+            java.util.List<Integer> order = new java.util.ArrayList<>();
+            for (int i = 0; i < shortlist.size(); i++) order.add(i);
+            order.sort((a, b) -> {
+                int c = Double.compare(shortlistScore.get(b), shortlistScore.get(a));
+                if (c != 0) return c;
+                return Double.compare(shortlistDistSqr.get(a), shortlistDistSqr.get(b));
+            });
+
+            for (int idx : order) {
+                SoundRecord r = shortlist.get(idx);
+                double initialRange = shortlistRange.get(idx);
+                double initialWeight = shortlistWeight.get(idx);
+                double noveltyBonus = shortlistNovelty.get(idx);
+
+                if (highestWeight >= 0 && (initialWeight + noveltyBonus) <= (highestWeight - 1e-6)) {
+                    continue;
+                }
+
+                String soundIdStr = r.soundId;
+                double[] muffled = applyBlockMuffling(level, r.pos, mobPos, initialRange, initialWeight, soundIdStr != null ? soundIdStr : "unknown");
+                double muffledRange = muffled[0];
+                double muffledWeight = muffled[1];
+                double distSqr = mobPos.distSqr(r.pos);
+                double rangeSqr = muffledRange * muffledRange;
+                if (distSqr > rangeSqr) {
+                    continue;
+                }
+                double finalComparisonWeight = muffledWeight + noveltyBonus;
+                if (finalComparisonWeight > highestWeight || (Math.abs(finalComparisonWeight - highestWeight) < 0.001 && distSqr < closestDistSqr)) {
+                    highestWeight = finalComparisonWeight;
+                    closestDistSqr = distSqr;
+                    bestSound = r;
+                    bestSoundEffectiveRange = muffledRange;
+                    bestSoundEffectiveWeight = finalComparisonWeight;
+                }
+            }
+
+            java.util.List<SoundCandidate> toSubmit = !asyncFiltered.isEmpty() ? asyncFiltered : asyncCandidates;
             int candidateHash = 1;
-            for (SoundCandidate c : asyncCandidates) {
+            for (SoundCandidate c : toSubmit) {
                 int h = 17;
                 h = 31 * h + (c.soundId == null ? 0 : c.soundId.hashCode());
                 h = 31 * h + (int) Math.round(c.x * 10);
@@ -753,7 +891,7 @@ public class SoundTracker {
                             mobPos.getX() + 0.5, mobPos.getY() + 0.5, mobPos.getZ() + 0.5,
                             level.getGameTime(),
                             currentTargetSoundId,
-                            asyncCandidates,
+                            toSubmit,
                             switchRatio,
                             noveltyBonusValue,
                             noveltyTicks

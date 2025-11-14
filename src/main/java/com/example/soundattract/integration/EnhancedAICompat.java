@@ -4,6 +4,7 @@ import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -157,6 +158,81 @@ public class EnhancedAICompat {
         } catch (Exception e) {
             SoundAttractMod.LOGGER.error("Failed to clear EnhancedAI dig position via NBT", e);
         }
+    }
+
+    public static boolean isEnhancedAiLoaded() {
+        return IS_ENHANCED_AI_LOADED;
+    }
+
+    public static double getTeleportToTargetChance(Level level) {
+        try {
+            double v = SoundAttractConfig.COMMON.teleportChance.get();
+            if (v < 0.0) return 0.0;
+            if (v > 1.0) return 1.0;
+            return v;
+        } catch (Throwable t) {
+            return 0.0;
+        }
+    }
+
+    public static int getTeleportCooldownTicks() {
+        try {
+            int v = SoundAttractConfig.COMMON.teleportCooldownTicks.get();
+            return Math.max(0, v);
+        } catch (Throwable t) {
+            return 200;
+        }
+    }
+
+    public static double getPickUpAndThrowChance(Level level) {
+        try {
+            double v = SoundAttractConfig.COMMON.pickUpChance.get();
+            if (v < 0.0) return 0.0;
+            if (v > 1.0) return 1.0;
+            return v;
+        } catch (Throwable t) {
+            return 0.0;
+        }
+    }
+
+    public static int getPickUpCooldownTicks() {
+        try {
+            int v = SoundAttractConfig.COMMON.pickUpCooldownTicks.get();
+            return Math.max(0, v);
+        } catch (Throwable t) {
+            return 200;
+        }
+    }
+
+    public static int getPickUpMinDistanceToPickUp() {
+        try {
+            int v = SoundAttractConfig.COMMON.pickUpMinDistanceToPickUp.get();
+            return Math.max(0, v);
+        } catch (Throwable t) {
+            return 8;
+        }
+    }
+
+    public static int getPickUpMaxDistanceToThrow() {
+        try {
+            int v = SoundAttractConfig.COMMON.pickUpMaxDistanceToThrow.get();
+            return Math.max(1, v);
+        } catch (Throwable t) {
+            return 32;
+        }
+    }
+
+    public static double getPickUpSpeedModifier() {
+        try {
+            double v = SoundAttractConfig.COMMON.pickUpSpeedModifier.get();
+            return Math.max(0.1, v);
+        } catch (Throwable t) {
+            return 1.2;
+        }
+    }
+
+    public static double getXrayAttributeValue(Mob mob) {
+        return 0d;
     }
 
     /**

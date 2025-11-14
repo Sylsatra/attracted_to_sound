@@ -296,11 +296,36 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue blockBreakingToolOnly;
         public final ForgeConfigSpec.BooleanValue blockBreakingProperToolOnly;
 
+        public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
+
+        public final ForgeConfigSpec.BooleanValue enableTeleportToSound;
+        public final ForgeConfigSpec.DoubleValue teleportChance;
+        public final ForgeConfigSpec.IntValue teleportCooldownTicks;
+        public final ForgeConfigSpec.ConfigValue<String> teleportCanTeleportTag;
+        public final ForgeConfigSpec.ConfigValue<String> teleportCanBeTeleportedTag;
+
+        public final ForgeConfigSpec.BooleanValue enablePickUpAndThrowToSound;
+        public final ForgeConfigSpec.DoubleValue pickUpChance;
+        public final ForgeConfigSpec.IntValue pickUpCooldownTicks;
+        public final ForgeConfigSpec.IntValue pickUpMinDistanceToPickUp;
+        public final ForgeConfigSpec.IntValue pickUpMaxDistanceToThrow;
+        public final ForgeConfigSpec.DoubleValue pickUpSpeedModifier;
+        public final ForgeConfigSpec.ConfigValue<String> pickUpCanPickUpTag;
+        public final ForgeConfigSpec.ConfigValue<String> pickUpCanBePickedUpTag;
+
+        public final ForgeConfigSpec.BooleanValue enableXrayTargeting;
+        public final ForgeConfigSpec.ConfigValue<String> xrayApplyTag;
+        public final ForgeConfigSpec.BooleanValue xrayRequireBetterNearby;
+        public final ForgeConfigSpec.ConfigValue<String> xrayBetterNearbyTag;
+        public final ForgeConfigSpec.IntValue xrayMinRange;
+        public final ForgeConfigSpec.IntValue xrayMaxRange;
+        public final ForgeConfigSpec.DoubleValue xrayChance;
+
         public final ForgeConfigSpec.IntValue configSchemaVersion;
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 2, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 5, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
@@ -411,6 +436,73 @@ public class SoundAttractConfig {
             blockBreakingProperToolOnly = builder
                     .comment("If true, mobs will only break blocks if their tool is the 'proper' tool for that block (e.g., pickaxe for stone).")
                     .define("blockBreakingProperToolOnly", false);
+
+            enableFleeFromUnseenAttackerGoal = builder
+                    .comment("Enable the FleeFromUnseenAttackerGoal behavior on mobs when they are attacked by an unseen attacker.")
+                    .define("enableFleeFromUnseenAttackerGoal", true);
+
+            enableTeleportToSound = builder
+                    .comment("Enable TeleportToSoundGoal that can teleport allies toward interesting sounds. Requires appropriate entity type tags to be configured.")
+                    .define("enableTeleportToSound", false);
+            teleportChance = builder
+                    .comment("Base chance (0.0-1.0) per check that an eligible mob will attempt to use TeleportToSoundGoal when a sound is available.")
+                    .defineInRange("teleportChance", 0.05, 0.0, 1.0);
+            teleportCooldownTicks = builder
+                    .comment("Cooldown in ticks between TeleportToSoundGoal activations for a mob.")
+                    .defineInRange("teleportCooldownTicks", 200, 0, 1000000);
+            teleportCanTeleportTag = builder
+                    .comment("Entity type tag (e.g. 'modid:can_teleport_to_sound') listing mobs that are allowed to act as teleporters.")
+                    .define("teleportCanTeleportTag", "enhancedai:mobs/teleport_to_target/can_teleport");
+            teleportCanBeTeleportedTag = builder
+                    .comment("Entity type tag listing mobs that are allowed to be teleported by TeleportToSoundGoal.")
+                    .define("teleportCanBeTeleportedTag", "enhancedai:mobs/teleport_to_target/can_be_teleported");
+
+            enablePickUpAndThrowToSound = builder
+                    .comment("Enable PickUpAndThrowToSoundGoal that lets certain mobs pick up allies and throw them toward interesting sounds. Requires appropriate entity type tags.")
+                    .define("enablePickUpAndThrowToSound", false);
+            pickUpChance = builder
+                    .comment("Base chance (0.0-1.0) per check that an eligible mob will attempt to use PickUpAndThrowToSoundGoal when a sound is available.")
+                    .defineInRange("pickUpChance", 0.05, 0.0, 1.0);
+            pickUpCooldownTicks = builder
+                    .comment("Cooldown in ticks between PickUpAndThrowToSoundGoal activations for a mob.")
+                    .defineInRange("pickUpCooldownTicks", 200, 0, 1000000);
+            pickUpMinDistanceToPickUp = builder
+                    .comment("Minimum distance (in blocks) from the sound before the thrower will consider picking up an ally.")
+                    .defineInRange("pickUpMinDistanceToPickUp", 8, 0, 256);
+            pickUpMaxDistanceToThrow = builder
+                    .comment("Maximum distance (in blocks) from the sound within which the thrower will attempt to throw the carried ally.")
+                    .defineInRange("pickUpMaxDistanceToThrow", 32, 1, 512);
+            pickUpSpeedModifier = builder
+                    .comment("Speed modifier used when the thrower is moving toward its pickup target.")
+                    .defineInRange("pickUpSpeedModifier", 1.2, 0.1, 10.0);
+            pickUpCanPickUpTag = builder
+                    .comment("Entity type tag listing mobs that are allowed to perform PickUpAndThrowToSoundGoal.")
+                    .define("pickUpCanPickUpTag", "enhancedai:mobs/pick_up_and_throw/can_pick_up");
+            pickUpCanBePickedUpTag = builder
+                    .comment("Entity type tag listing mobs that are allowed to be picked up and thrown.")
+                    .define("pickUpCanBePickedUpTag", "enhancedai:mobs/pick_up_and_throw/can_be_picked_up");
+
+            enableXrayTargeting = builder
+                    .comment("Enable XRAY targeting compat: mobs in xrayApplyTag gain through-wall detection.")
+                    .define("enableXrayTargeting", false);
+            xrayApplyTag = builder
+                    .comment("Entity type tag eligible for XRAY detection.")
+                    .define("xrayApplyTag", "enhancedai:mobs/targeting/apply_xray");
+            xrayRequireBetterNearby = builder
+                    .comment("Require mobs to also be in better-nearby tag for XRAY.")
+                    .define("xrayRequireBetterNearby", false);
+            xrayBetterNearbyTag = builder
+                    .comment("Entity type tag for EnhancedAI better nearby targeting.")
+                    .define("xrayBetterNearbyTag", "enhancedai:mobs/targeting/better_nearby_targeting");
+            xrayMinRange = builder
+                    .comment("Minimum XRAY follow range (fallback when EnhancedAI absent).")
+                    .defineInRange("xrayMinRange", 16, 0, 128);
+            xrayMaxRange = builder
+                    .comment("Maximum XRAY follow range (fallback when EnhancedAI absent). 0 disables.")
+                    .defineInRange("xrayMaxRange", 24, 0, 128);
+            xrayChance = builder
+                    .comment("Chance [0..1] fallback XRAY range is applied when EnhancedAI absent.")
+                    .defineInRange("xrayChance", 0.5, 0.0, 1.0);
 
             builder.pop();
 

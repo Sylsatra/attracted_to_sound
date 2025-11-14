@@ -66,6 +66,9 @@ public class AttractionGoal extends Goal {
     private SoundTracker.SoundRecord soundResultCache = null;
     private long cacheTick = -1L;
 
+    private long lastPathRecalcGameTime = 0L;
+    private BlockPos lastPathTargetPos = null;
+
     private static class DelayedRelay {
 
         public final Mob leader;
@@ -342,6 +345,9 @@ public class AttractionGoal extends Goal {
         this.isPursuingSound = false;
         this.pursuingSoundTicksRemaining = 0;
 
+        this.lastPathTargetPos = null;
+        this.lastPathRecalcGameTime = 0L;
+
 
         if (breakingScheduled) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -373,6 +379,27 @@ public class AttractionGoal extends Goal {
         foundPlayerOrHit = false;
         relayedToLeader = false;
         edgeArrivalTicks = 0;
+    }
+
+    private void moveToIfNeeded(double x, double y, double z, double speed) {
+        Level level = this.mob.level;
+        if (level == null) {
+            return;
+        }
+        long now = level.getGameTime();
+        BlockPos targetPos = new BlockPos((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
+        boolean targetChanged = this.lastPathTargetPos == null || !this.lastPathTargetPos.equals(targetPos);
+
+        PathNavigation navigation = this.mob.getNavigation();
+        boolean navDone = navigation.isDone();
+        long cooldownTicks = 20L;
+        boolean cooldownElapsed = (now - this.lastPathRecalcGameTime) >= cooldownTicks;
+
+        if (targetChanged || navDone || cooldownElapsed) {
+            navigation.moveTo(x, y, z, speed);
+            this.lastPathTargetPos = targetPos;
+            this.lastPathRecalcGameTime = now;
+        }
     }
 
     @Override
@@ -567,9 +594,7 @@ public class AttractionGoal extends Goal {
             if (smartEdge) {
                 handleFollowerSmartEdgeTick(leader);
             } else {
-
-
-                this.mob.getNavigation().moveTo(this.targetSoundPos.getX(), this.targetSoundPos.getY(), this.targetSoundPos.getZ(), this.moveSpeed);
+                moveToIfNeeded(this.targetSoundPos.getX(), this.targetSoundPos.getY(), this.targetSoundPos.getZ(), this.moveSpeed);
             }
         }
     }
@@ -614,7 +639,7 @@ public class AttractionGoal extends Goal {
 
         if (chosenDest != null) {
             if (mob.position().distanceToSqr(chosenDest) > 1.5 * 1.5) {
-                mob.getNavigation().moveTo(chosenDest.x, chosenDest.y, chosenDest.z, moveSpeed);
+                moveToIfNeeded(chosenDest.x, chosenDest.y, chosenDest.z, moveSpeed);
             } else {
 
                 hasPicked = false;
@@ -629,7 +654,7 @@ public class AttractionGoal extends Goal {
         }
 
         if (edgeMobState == EdgeMobState.GOING_TO_SOUND) {
-            mob.getNavigation().moveTo(targetSoundPos.getX(), targetSoundPos.getY(), targetSoundPos.getZ(), this.moveSpeed);
+            moveToIfNeeded(targetSoundPos.getX(), targetSoundPos.getY(), targetSoundPos.getZ(), this.moveSpeed);
 
             if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < getArrivalDistance() * getArrivalDistance()) {
                 edgeArrivalTicks++;
@@ -650,7 +675,7 @@ public class AttractionGoal extends Goal {
             }
         } else if (edgeMobState == EdgeMobState.RETURNING_TO_LEADER) {
             if (leader != null && !leader.isRemoved() && !leader.isDeadOrDying()) {
-                mob.getNavigation().moveTo(leader.getX(), leader.getY(), leader.getZ(), this.moveSpeed * 0.8);
+                moveToIfNeeded(leader.getX(), leader.getY(), leader.getZ(), this.moveSpeed * 0.8);
                 if (mob.distanceToSqr(leader) < (getArrivalDistance() + 2.0) * (getArrivalDistance() + 2.0)) {
                     targetSoundPos = null;
                     edgeMobState = null;

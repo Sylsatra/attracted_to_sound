@@ -232,6 +232,10 @@ public class BlockBreakerPosGoal extends Goal {
             return;
         }
 
+        if (this.blockState == null) {
+            return;
+        }
+
         BlockPos pos = this.targetBlocks.get(0);
         this.breakingTick++;
         this.miner.getLookControl().setLookAt(pos.getX() + 0.5d, pos.getY() + 0.5d, pos.getZ() + 0.5d);

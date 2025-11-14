@@ -35,6 +35,7 @@ import net.minecraft.world.level.block.IceBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.phys.HitResult;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
@@ -264,8 +265,11 @@ public class FovEvents {
             return true;
         }
 
+        if (state.is(BlockTags.WALLS)) {
+            return false;
+        }
+
         if (state.getBlock() instanceof FenceBlock
-                || state.getBlock() instanceof WallBlock
                 || state.getBlock() instanceof IronBarsBlock)
             return true;
 

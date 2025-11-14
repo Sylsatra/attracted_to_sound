@@ -13,6 +13,8 @@ import java.util.stream.Collectors;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.BlockBreakerManager;
+import com.example.soundattract.ai.TeleportToSoundGoal;
+import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
@@ -28,6 +30,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.tags.TagKey;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent; 
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -260,6 +263,36 @@ public class SoundAttractionEvents {
         }
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
+
+        if (SoundAttractConfig.COMMON.enableTeleportToSound.get()) {
+            String tagId = SoundAttractConfig.COMMON.teleportCanTeleportTag.get();
+            String targetTagId = SoundAttractConfig.COMMON.teleportCanBeTeleportedTag.get();
+            if (tagId != null && !tagId.isEmpty() && targetTagId != null && !targetTagId.isEmpty()) {
+                net.minecraft.resources.ResourceLocation canTeleportRl = net.minecraft.resources.ResourceLocation.tryParse(tagId);
+                net.minecraft.resources.ResourceLocation canBeTeleportedRl = net.minecraft.resources.ResourceLocation.tryParse(targetTagId);
+                if (canTeleportRl != null && canBeTeleportedRl != null) {
+                    TagKey<EntityType<?>> canTeleportTag = TagKey.create(Registry.ENTITY_TYPE_REGISTRY, canTeleportRl);
+                    if (mob.getType().is(canTeleportTag)) {
+                        scheduleAddGoal(mob, 2, new TeleportToSoundGoal(mob));
+                    }
+                }
+            }
+        }
+
+        if (SoundAttractConfig.COMMON.enablePickUpAndThrowToSound.get()) {
+            String pickUpPerformerTagId = SoundAttractConfig.COMMON.pickUpCanPickUpTag.get();
+            String pickUpTargetTagId = SoundAttractConfig.COMMON.pickUpCanBePickedUpTag.get();
+            if (pickUpPerformerTagId != null && !pickUpPerformerTagId.isEmpty() && pickUpTargetTagId != null && !pickUpTargetTagId.isEmpty()) {
+                net.minecraft.resources.ResourceLocation performerRl = net.minecraft.resources.ResourceLocation.tryParse(pickUpPerformerTagId);
+                net.minecraft.resources.ResourceLocation targetRl = net.minecraft.resources.ResourceLocation.tryParse(pickUpTargetTagId);
+                if (performerRl != null && targetRl != null) {
+                    TagKey<EntityType<?>> pickUpPerformerTag = TagKey.create(Registry.ENTITY_TYPE_REGISTRY, performerRl);
+                    if (mob.getType().is(pickUpPerformerTag)) {
+                        scheduleAddGoal(mob, 2, new PickUpAndThrowToSoundGoal(mob));
+                    }
+                }
+            }
+        }
 
         scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
         scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));

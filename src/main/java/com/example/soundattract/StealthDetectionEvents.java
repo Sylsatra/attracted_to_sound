@@ -4,6 +4,7 @@ import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.FovEvents;
 import com.example.soundattract.enchantment.ModEnchantments;
+import com.example.soundattract.integration.EnhancedAICompat;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +20,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ArmorItem;
@@ -31,6 +33,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.tags.TagKey;
+import net.minecraft.core.Registry;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -46,6 +50,7 @@ public class StealthDetectionEvents {
     private static final Map<Player, net.minecraft.world.phys.Vec3> lastPlayerPositions = new HashMap<>();
     private static long lastStealthCheckTick = -1;
     private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
+    private static final Map<UUID, Double> XRAY_RANGE_CACHE = new HashMap<>();
 
     private static int getStealthCheckInterval() {
         return SoundAttractConfig.COMMON.stealthCheckInterval.get();
@@ -74,6 +79,10 @@ public class StealthDetectionEvents {
             this.timestamp = timestamp;
             this.detectionRange = detectionRange;
         }
+    }
+
+    public static void resetXrayCache() {
+        XRAY_RANGE_CACHE.clear();
     }
 
     public static void recordPlayerGunshot(Player player, double detectionRange) {
@@ -183,7 +192,6 @@ public class StealthDetectionEvents {
             }
             return false;
         }
-
         if (!FovEvents.isTargetInFov(mob, player, true)) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
@@ -193,6 +201,18 @@ public class StealthDetectionEvents {
             }
             return false;
         }
+
+        double xrayRange = getEffectiveXrayRange(mob);
+        if (xrayRange > 0 && distSq <= xrayRange * xrayRange) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info(
+                        "[StealthQuery] Player {} detected by mob {} via XRAY range {}.",
+                        player.getName().getString(), mob.getName().getString(), String.format("%.2f", xrayRange)
+                );
+            }
+            return true;
+        }
+
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
                     "[StealthQuery] Player {} IS DETECTABLE by mob {} (in range and in FOV).",
@@ -200,6 +220,60 @@ public class StealthDetectionEvents {
             );
         }
         return true;
+    }
+
+    private static double getEffectiveXrayRange(Mob mob) {
+        if (mob == null) return 0d;
+        if (!SoundAttractConfig.COMMON.enableXrayTargeting.get()) return 0d;
+
+        try {
+            String applyTagStr = SoundAttractConfig.COMMON.xrayApplyTag.get();
+            if (applyTagStr == null || applyTagStr.trim().isEmpty()) return 0d;
+            ResourceLocation applyRl = ResourceLocation.tryParse(applyTagStr.trim());
+            if (applyRl == null) return 0d;
+            TagKey<EntityType<?>> applyTag = TagKey.create(Registry.ENTITY_TYPE_REGISTRY, applyRl);
+            if (!mob.getType().is(applyTag)) return 0d;
+
+            if (SoundAttractConfig.COMMON.xrayRequireBetterNearby.get()) {
+                String betterTagStr = SoundAttractConfig.COMMON.xrayBetterNearbyTag.get();
+                if (betterTagStr == null || betterTagStr.trim().isEmpty()) return 0d;
+                ResourceLocation betterRl = ResourceLocation.tryParse(betterTagStr.trim());
+                if (betterRl == null) return 0d;
+                TagKey<EntityType<?>> betterTag = TagKey.create(Registry.ENTITY_TYPE_REGISTRY, betterRl);
+                if (!mob.getType().is(betterTag)) return 0d;
+            }
+        } catch (Exception e) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.warn("[XRAY] Tag check failed for mob {}: {}", mob.getName().getString(), e.getMessage());
+            }
+            return 0d;
+        }
+
+        if (EnhancedAICompat.isEnhancedAiLoaded()) {
+            double v = EnhancedAICompat.getXrayAttributeValue(mob);
+            return Math.max(0d, v);
+        }
+
+        Double cached = XRAY_RANGE_CACHE.get(mob.getUUID());
+        if (cached != null) return cached;
+
+        int max = SoundAttractConfig.COMMON.xrayMaxRange.get();
+        if (max <= 0) {
+            XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
+            return 0d;
+        }
+        int min = SoundAttractConfig.COMMON.xrayMinRange.get();
+        min = Math.max(0, Math.min(min, max));
+        double chance = SoundAttractConfig.COMMON.xrayChance.get();
+        if (mob.getRandom().nextDouble() >= chance) {
+            XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
+            return 0d;
+        }
+        int spread = max - min;
+        int chosen = spread <= 0 ? max : (min + mob.getRandom().nextInt(spread + 1));
+        double result = (double) chosen;
+        XRAY_RANGE_CACHE.put(mob.getUUID(), result);
+        return result;
     }
 
     public static boolean shouldSuppressTargeting(Mob mob) {
