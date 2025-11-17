@@ -39,6 +39,7 @@ public class AttractionGoal extends Goal {
     private BlockPos lastPos = null;
     private Vec3d lastPosVec = null;
     private BlockBreakerPosGoal blockBreakerGoal = null;
+    private int navigationRecalcCooldownTicks = 0;
 
     private enum EdgeMobState {
         GOING_TO_SOUND, RETURNING_TO_LEADER
@@ -165,6 +166,9 @@ public class AttractionGoal extends Goal {
 
     @Override
     public void tick() {
+        if (this.navigationRecalcCooldownTicks > 0) {
+            this.navigationRecalcCooldownTicks--;
+        }
         if (this.bestSoundCacheTicks > 0) {
             this.bestSoundCacheTicks--;
         }
@@ -581,14 +585,20 @@ public class AttractionGoal extends Goal {
             return;
         }
 
-        if (targetPos.equals(this.lastNavigationTarget) && !this.mob.getNavigation().isIdle()) {
+        var navigation = this.mob.getNavigation();
 
+        boolean targetChanged = !targetPos.equals(this.lastNavigationTarget);
+        boolean navigationIdle = navigation.isIdle();
+        boolean isStuck = this.stuckTicks >= 10;
+        boolean cooldownElapsed = this.navigationRecalcCooldownTicks <= 0;
+
+        if (!targetChanged && !navigationIdle && !isStuck && !cooldownElapsed) {
             return;
         }
 
-        this.mob.getNavigation().startMovingTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, speed);
-
+        navigation.startMovingTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, speed);
         this.lastNavigationTarget = targetPos;
+        this.navigationRecalcCooldownTicks = 20;
     }
 
     private SoundTracker.SoundRecord findInterestingSoundRecord() {

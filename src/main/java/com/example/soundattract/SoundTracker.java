@@ -599,13 +599,29 @@ public class SoundTracker {
         }
 
         MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
-        SoundRecord bestSound = null;
-        double highestComparisonWeight = -1.0;
-        double closestDistSqrForBest = Double.MAX_VALUE;
-
         double noveltyBonusValue = SoundAttractMod.CONFIG.soundNoveltyBonusWeight;
         int noveltyTicks = SoundAttractMod.CONFIG.soundNoveltyTimeTicks;
         int maxLifetime = SoundAttractMod.CONFIG.soundLifetimeTicks;
+
+        class ApproxCandidate {
+            final SoundRecord record;
+            final String soundId;
+            final double effectiveRange;
+            final double effectiveWeight;
+            final double distSqr;
+            final double approxScore;
+
+            ApproxCandidate(SoundRecord record, String soundId, double effectiveRange, double effectiveWeight, double distSqr, double approxScore) {
+                this.record = record;
+                this.soundId = soundId;
+                this.effectiveRange = effectiveRange;
+                this.effectiveWeight = effectiveWeight;
+                this.distSqr = distSqr;
+                this.approxScore = approxScore;
+            }
+        }
+
+        java.util.List<ApproxCandidate> approx = new java.util.ArrayList<>();
 
         for (SoundRecord r : currentSoundsSnapshot) {
             if (r == null || r.pos == null || !Objects.equals(r.dimensionKey, dimensionKey)) {
@@ -634,12 +650,8 @@ public class SoundTracker {
                 }
             }
 
-            double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effectiveInitialRange, effectiveInitialWeight, soundId);
-            double muffledRange = muffled[0];
-            double muffledWeight = muffled[1];
             double distSqr = mobPos.getSquaredDistance(r.pos);
-
-            if (muffledWeight <= 0 || muffledRange <= 0 || distSqr > (muffledRange * muffledRange)) {
+            if (effectiveInitialRange <= 0 || distSqr > (effectiveInitialRange * effectiveInitialRange)) {
                 continue;
             }
 
@@ -648,12 +660,47 @@ public class SoundTracker {
                 noveltyBonus = noveltyBonusValue;
             }
 
+            double approxScore = effectiveInitialWeight + noveltyBonus;
+            approx.add(new ApproxCandidate(r, soundId, effectiveInitialRange, effectiveInitialWeight, distSqr, approxScore));
+        }
+
+        if (approx.isEmpty()) {
+            return null;
+        }
+
+        approx.sort((a, b) -> {
+            int cmp = Double.compare(b.approxScore, a.approxScore);
+            if (cmp != 0) return cmp;
+            return Double.compare(a.distSqr, b.distSqr);
+        });
+
+        if (approx.size() > MAX_PREFILTER_CANDIDATES) {
+            approx = new java.util.ArrayList<>(approx.subList(0, MAX_PREFILTER_CANDIDATES));
+        }
+
+        SoundRecord bestSound = null;
+        double highestComparisonWeight = -1.0;
+        double closestDistSqrForBest = Double.MAX_VALUE;
+
+        for (ApproxCandidate c : approx) {
+            double[] muffled = applyBlockMuffling(level, c.record.pos, mobPos, c.effectiveRange, c.effectiveWeight, c.soundId);
+            double muffledRange = muffled[0];
+            double muffledWeight = muffled[1];
+            if (muffledWeight <= 0 || muffledRange <= 0 || c.distSqr > (muffledRange * muffledRange)) {
+                continue;
+            }
+
+            double noveltyBonus = 0.0;
+            if (noveltyBonusValue > 0 && c.record.ticksRemaining > (maxLifetime - noveltyTicks)) {
+                noveltyBonus = noveltyBonusValue;
+            }
+
             double finalComparisonWeight = muffledWeight + noveltyBonus;
 
-            if (finalComparisonWeight > highestComparisonWeight || (Math.abs(finalComparisonWeight - highestComparisonWeight) < 0.001 && distSqr < closestDistSqrForBest)) {
+            if (finalComparisonWeight > highestComparisonWeight || (Math.abs(finalComparisonWeight - highestComparisonWeight) < 0.001 && c.distSqr < closestDistSqrForBest)) {
                 highestComparisonWeight = finalComparisonWeight;
-                closestDistSqrForBest = distSqr;
-                bestSound = new SoundRecord(r.sound, soundId, r.pos, r.ticksRemaining, r.dimensionKey, muffledRange, muffledWeight);
+                closestDistSqrForBest = c.distSqr;
+                bestSound = new SoundRecord(c.record.sound, c.soundId, c.record.pos, c.record.ticksRemaining, c.record.dimensionKey, muffledRange, muffledWeight);
             }
         }
 
@@ -669,6 +716,9 @@ public class SoundTracker {
         }
         return ticks;
     }
+
+    private static final int MAX_PREFILTER_CANDIDATES = 24;
+    private static final int MAX_ASYNC_CANDIDATES = 64;
 
     private static final class CandidateSnapshot {
         final BlockPos pos;
@@ -759,6 +809,15 @@ public class SoundTracker {
         }
 
         if (cands.isEmpty()) return;
+
+        if (cands.size() > MAX_ASYNC_CANDIDATES) {
+            cands.sort((a, b) -> {
+                int cmp = Double.compare(b.muffledWeight, a.muffledWeight);
+                if (cmp != 0) return cmp;
+                return Double.compare(a.distSqr, b.distSqr);
+            });
+            cands = new java.util.ArrayList<>(cands.subList(0, MAX_ASYNC_CANDIDATES));
+        }
 
         int noveltyTicks = SoundAttractMod.CONFIG.soundNoveltyTimeTicks;
         double noveltyBonus = SoundAttractMod.CONFIG.soundNoveltyBonusWeight;

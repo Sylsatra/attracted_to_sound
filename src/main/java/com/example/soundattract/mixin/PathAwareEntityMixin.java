@@ -56,14 +56,12 @@ public abstract class PathAwareEntityMixin extends MobEntity implements SoundAtt
     private void soundattract_addGoalsOnConstruct(EntityType<?> type, World world, CallbackInfo ci) {
 
         PathAwareEntity thisMob = (PathAwareEntity) (Object) this;
+        if (SoundAttractMod.CONFIG != null && SoundAttractMod.CONFIG.enableFleeFromUnseenAttackerGoal) {
+            this.goalSelector.add(1, new FleeFromUnseenAttackerGoal(thisMob, 1.2D));
 
-
-
-
-        this.goalSelector.add(1, new FleeFromUnseenAttackerGoal(thisMob, 1.2D));
-
-        if (SoundAttractMod.CONFIG.debugLogging) {
-            SoundAttractMod.LOGGER.info("[PathAwareEntityMixin] Injected FleeFromUnseenAttackerGoal into {}.", this.getName().getString());
+            if (SoundAttractMod.CONFIG.debugLogging) {
+                SoundAttractMod.LOGGER.info("[PathAwareEntityMixin] Injected FleeFromUnseenAttackerGoal into {}.", this.getName().getString());
+            }
         }
     }
 }

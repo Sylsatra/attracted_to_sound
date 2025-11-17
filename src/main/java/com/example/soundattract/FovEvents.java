@@ -23,6 +23,7 @@ import net.minecraft.block.PaneBlock;
 import net.minecraft.block.FenceBlock;
 import net.minecraft.block.WallBlock;
 import net.minecraft.block.ShapeContext;
+import net.minecraft.registry.tag.BlockTags;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -281,10 +282,16 @@ public class FovEvents {
 
 
         if (state.getBlock() instanceof FenceBlock
-                || state.getBlock() instanceof WallBlock
                 || state.getBlock() instanceof PaneBlock) {
             return true;
         }
+
+        // Treat anything in the WALLS tag (including modded walls) as vision-blocking.
+        try {
+            if (state.isIn(BlockTags.WALLS)) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
 
 
         var shape = state.getCollisionShape(world, pos, ShapeContext.absent());

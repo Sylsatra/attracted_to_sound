@@ -101,6 +101,80 @@ public class ConfigLoader {
 
             obj.addProperty("configSchemaVersion", 1);
         }
+
+        if (version < 4) {
+            if (!obj.has("enableFleeFromUnseenAttackerGoal")) {
+                obj.addProperty("enableFleeFromUnseenAttackerGoal", true);
+            }
+            obj.addProperty("configSchemaVersion", 4);
+        }
+
+        if (version < 5) {
+            if (!obj.has("enableTeleportToSound")) {
+                obj.addProperty("enableTeleportToSound", true);
+            }
+            if (!obj.has("teleportChance")) {
+                obj.addProperty("teleportChance", 0.35);
+            }
+            if (!obj.has("teleportCooldownTicks")) {
+                obj.addProperty("teleportCooldownTicks", 300);
+            }
+            if (!obj.has("teleportCanTeleportTag")) {
+                obj.addProperty("teleportCanTeleportTag", "enhancedai:mobs/teleport_to_target/can_teleport");
+            }
+            if (!obj.has("teleportCanBeTeleportedTag")) {
+                obj.addProperty("teleportCanBeTeleportedTag", "enhancedai:mobs/teleport_to_target/can_be_teleported");
+            }
+
+            if (!obj.has("enablePickUpAndThrowToSound")) {
+                obj.addProperty("enablePickUpAndThrowToSound", true);
+            }
+            if (!obj.has("pickUpChance")) {
+                obj.addProperty("pickUpChance", 0.05);
+            }
+            if (!obj.has("pickUpCooldownTicks")) {
+                obj.addProperty("pickUpCooldownTicks", 600);
+            }
+            if (!obj.has("pickUpMinDistanceToPickUp")) {
+                obj.addProperty("pickUpMinDistanceToPickUp", 5);
+            }
+            if (!obj.has("pickUpMaxDistanceToThrow")) {
+                obj.addProperty("pickUpMaxDistanceToThrow", 24);
+            }
+            if (!obj.has("pickUpSpeedModifier")) {
+                obj.addProperty("pickUpSpeedModifier", 1.25);
+            }
+            if (!obj.has("pickUpCanPickUpTag")) {
+                obj.addProperty("pickUpCanPickUpTag", "enhancedai:mobs/pick_up_and_throw/can_pick_up");
+            }
+            if (!obj.has("pickUpCanBePickedUpTag")) {
+                obj.addProperty("pickUpCanBePickedUpTag", "enhancedai:mobs/pick_up_and_throw/can_be_picked_up");
+            }
+
+            if (!obj.has("enableXrayTargeting")) {
+                obj.addProperty("enableXrayTargeting", true);
+            }
+            if (!obj.has("xrayApplyTag")) {
+                obj.addProperty("xrayApplyTag", "enhancedai:mobs/targeting/apply_xray");
+            }
+            if (!obj.has("xrayRequireBetterNearby")) {
+                obj.addProperty("xrayRequireBetterNearby", true);
+            }
+            if (!obj.has("xrayBetterNearbyTag")) {
+                obj.addProperty("xrayBetterNearbyTag", "enhancedai:mobs/targeting/better_nearby_targeting");
+            }
+            if (!obj.has("xrayMinRange")) {
+                obj.addProperty("xrayMinRange", 16);
+            }
+            if (!obj.has("xrayMaxRange")) {
+                obj.addProperty("xrayMaxRange", 24);
+            }
+            if (!obj.has("xrayChance")) {
+                obj.addProperty("xrayChance", 0.5);
+            }
+
+            obj.addProperty("configSchemaVersion", 5);
+        }
     }
 
     private static void renameKey(JsonObject obj, String oldKey, String newKey) {

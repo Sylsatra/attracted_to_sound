@@ -199,13 +199,51 @@ public class SoundAttractionEvents {
 
     public static void onEntityJoinWorld(MobEntity mob) {
         Identifier entityId = Registries.ENTITY_TYPE.getId(mob.getType());
-        if (entityId == null) return;
+        if (entityId == null || SoundAttractMod.CONFIG == null) return;
         String entityIdStr = entityId.toString();
         if (!SoundAttractMod.CONFIG.attractedEntities.contains(entityIdStr)) {
             return;
         }
         double moveSpeed = SoundAttractMod.CONFIG.mobMoveSpeed;
         boolean edgeSmart = SoundAttractMod.CONFIG.edgeMobSmartBehavior;
+
+        try {
+            if (SoundAttractMod.CONFIG.enableTeleportToSound && SoundAttractMod.CONFIG.teleportCanTeleportTag != null) {
+                Identifier tagId = new Identifier(SoundAttractMod.CONFIG.teleportCanTeleportTag);
+                net.minecraft.registry.tag.TagKey<net.minecraft.entity.EntityType<?>> canTeleportTag =
+                        net.minecraft.registry.tag.TagKey.of(Registries.ENTITY_TYPE.getKey(), tagId);
+                if (mob.getType().isIn(canTeleportTag)) {
+                    boolean exists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+                            .anyMatch(pg -> pg.getGoal() instanceof com.example.soundattract.ai.TeleportToSoundGoal);
+                    if (!exists) {
+                        ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(2, new com.example.soundattract.ai.TeleportToSoundGoal(mob));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            if (SoundAttractMod.CONFIG.debugLogging) {
+                SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Failed to apply TeleportToSoundGoal for mob {}: {}", entityIdStr, e.toString());
+            }
+        }
+
+        try {
+            if (SoundAttractMod.CONFIG.enablePickUpAndThrowToSound && SoundAttractMod.CONFIG.pickUpCanPickUpTag != null) {
+                Identifier tagId = new Identifier(SoundAttractMod.CONFIG.pickUpCanPickUpTag);
+                net.minecraft.registry.tag.TagKey<net.minecraft.entity.EntityType<?>> canPickUpTag =
+                        net.minecraft.registry.tag.TagKey.of(Registries.ENTITY_TYPE.getKey(), tagId);
+                if (mob.getType().isIn(canPickUpTag)) {
+                    boolean exists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+                            .anyMatch(pg -> pg.getGoal() instanceof com.example.soundattract.ai.PickUpAndThrowToSoundGoal);
+                    if (!exists) {
+                        ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(2, new com.example.soundattract.ai.PickUpAndThrowToSoundGoal(mob));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            if (SoundAttractMod.CONFIG.debugLogging) {
+                SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Failed to apply PickUpAndThrowToSoundGoal for mob {}: {}", entityIdStr, e.toString());
+            }
+        }
         if (edgeSmart) {
 
             boolean leaderGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()

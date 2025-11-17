@@ -466,10 +466,15 @@ public class SoundAttractConfigData {
     public boolean debugLogging = false;
 
     /**
+     * If true, enables the FleeFromUnseenAttackerGoal behavior for mobs that are attacked by unseen attackers.
+     */
+    public boolean enableFleeFromUnseenAttackerGoal = true;
+
+    /**
      * Internal schema version for config migrations. Increment when structure changes.
      */
-    private static final int CURRENT_SCHEMA_VERSION = 3;
-    public int configSchemaVersion = 3;
+    private static final int CURRENT_SCHEMA_VERSION = 5;
+    public int configSchemaVersion = 5;
 
 
     /** Number of worker threads for off-thread computations. <= 0 uses (CPUs-1). */
@@ -1556,6 +1561,32 @@ public class SoundAttractConfigData {
     public boolean blockBreakListAsWhitelist = false;
     /** List of block IDs used as blacklist or whitelist depending on mode. */
     public java.util.List<String> blockBreakBlockList = new java.util.ArrayList<>();
+
+    // Teleport a nearby target to the current sound location (inspired by EnhancedAI TeleportToTarget)
+    public boolean enableTeleportToSound = false;
+    public double teleportChance = 0.35;
+    public int teleportCooldownTicks = 300;
+    public String teleportCanTeleportTag = "enhancedai:mobs/teleport_to_target/can_teleport";
+    public String teleportCanBeTeleportedTag = "enhancedai:mobs/teleport_to_target/can_be_teleported";
+
+    // Pick up a mob and throw it towards the current sound location (inspired by EnhancedAI PickUpAndThrow)
+    public boolean enablePickUpAndThrowToSound = false;
+    public double pickUpChance = 0.05;
+    public int pickUpCooldownTicks = 600;
+    public int pickUpMinDistanceToPickUp = 5;
+    public int pickUpMaxDistanceToThrow = 24;
+    public double pickUpSpeedModifier = 1.25;
+    public String pickUpCanPickUpTag = "enhancedai:mobs/pick_up_and_throw/can_pick_up";
+    public String pickUpCanBePickedUpTag = "enhancedai:mobs/pick_up_and_throw/can_be_picked_up";
+
+    // XRAY follow range compat (see Enhanced AI Targeting)
+    public boolean enableXrayTargeting = false;
+    public String xrayApplyTag = "enhancedai:mobs/targeting/apply_xray";
+    public boolean xrayRequireBetterNearby = false;
+    public String xrayBetterNearbyTag = "enhancedai:mobs/targeting/better_nearby_targeting";
+    public int xrayMinRange = 16;
+    public int xrayMaxRange = 24;
+    public double xrayChance = 0.5;
 
 
     /**
