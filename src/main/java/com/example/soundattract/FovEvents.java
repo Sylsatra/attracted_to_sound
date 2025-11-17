@@ -23,6 +23,7 @@ import net.minecraft.block.PaneBlock;
 import net.minecraft.block.FenceBlock;
 import net.minecraft.block.WallBlock;
 import net.minecraft.block.ShapeContext;
+import net.minecraft.registry.tag.BlockTags;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -285,9 +286,11 @@ public class FovEvents {
         }
 
 
-        if (state.getBlock() instanceof FenceBlock
-                || state.getBlock() instanceof WallBlock
-                || state.getBlock() instanceof PaneBlock) {
+        if (state.isIn(BlockTags.WALLS) || state.isIn(BlockTags.FENCES)) {
+            return false;
+        }
+
+        if (state.getBlock() instanceof PaneBlock) {
             return true;
         }
 

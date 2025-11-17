@@ -3,6 +3,8 @@ package com.example.soundattract;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.BlockBreakerManager;
+import com.example.soundattract.ai.TeleportToSoundGoal;
+import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.registry.Registries;
 import net.minecraft.entity.mob.MobEntity;
@@ -91,7 +93,8 @@ public class SoundAttractionEvents {
                     if (isEdge) {
                         if (!com.example.soundattract.SoundAttractMod.CONFIG.edgeMobSmartBehavior) {
                             MobEntity leader = com.example.soundattract.ai.MobGroupManager.getLeader(mob);
-                            if (leader != null && leader != mob && leader.squaredDistanceTo(mob) <= sound.range * sound.range) {
+                            double maxLeaderEdgeDistance = com.example.soundattract.SoundAttractMod.CONFIG.groupDistance;
+                            if (leader != null && leader != mob && leader.squaredDistanceTo(mob) <= maxLeaderEdgeDistance * maxLeaderEdgeDistance) {
                                 com.example.soundattract.ai.AttractionGoal.handleRelayToLeader(leader, sound, mob);
                                 if (SoundAttractMod.CONFIG.debugLogging) {
                                     SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Edge {} relays sound {} to leader {} immediately", mob.getUuid(), sound.pos, leader.getUuid());
@@ -161,15 +164,34 @@ public class SoundAttractionEvents {
             return;
         }
         double moveSpeed = SoundAttractMod.CONFIG.mobMoveSpeed;
-        boolean attractionGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+        com.example.soundattract.mixin.MobEntityAccessor accessor = (com.example.soundattract.mixin.MobEntityAccessor) mob;
+
+        boolean attractionGoalExists = accessor.getGoalSelector().getGoals().stream()
                 .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof AttractionGoal);
         if (!attractionGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new AttractionGoal(mob, moveSpeed));
+            accessor.getGoalSelector().add(3, new AttractionGoal(mob, moveSpeed));
         }
-        boolean followLeaderGoalExists = ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().getGoals().stream()
+
+        boolean followLeaderGoalExists = accessor.getGoalSelector().getGoals().stream()
                 .anyMatch(prioritizedGoal -> prioritizedGoal.getGoal() instanceof FollowLeaderGoal);
         if (!followLeaderGoalExists) {
-            ((com.example.soundattract.mixin.MobEntityAccessor) mob).getGoalSelector().add(3, new FollowLeaderGoal(mob, moveSpeed));
+            accessor.getGoalSelector().add(3, new FollowLeaderGoal(mob, moveSpeed));
+        }
+
+        if (SoundAttractMod.CONFIG.enableTeleportToSound) {
+            boolean hasTeleport = accessor.getGoalSelector().getGoals().stream()
+                    .anyMatch(pg -> pg.getGoal() instanceof TeleportToSoundGoal);
+            if (!hasTeleport) {
+                accessor.getGoalSelector().add(3, new TeleportToSoundGoal(mob));
+            }
+        }
+
+        if (SoundAttractMod.CONFIG.enablePickUpAndThrowToSound) {
+            boolean hasPickup = accessor.getGoalSelector().getGoals().stream()
+                    .anyMatch(pg -> pg.getGoal() instanceof PickUpAndThrowToSoundGoal);
+            if (!hasPickup) {
+                accessor.getGoalSelector().add(3, new PickUpAndThrowToSoundGoal(mob));
+            }
         }
     }
 

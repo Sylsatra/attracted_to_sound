@@ -36,6 +36,10 @@ public abstract class PhantomEntityMixin extends MobEntity implements FleeOnDama
 
     @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
     private void soundattract_addFleeGoal(EntityType<?> type, World world, CallbackInfo ci) {
+        if (!SoundAttractMod.CONFIG.enableFleeFromUnseenAttackerGoal) {
+            return;
+        }
+
         MobEntity self = (MobEntity) (Object) this;
         this.goalSelector.add(3, new FleeFromUnseenAttackerGoal(self, 1.2D));
         if (SoundAttractMod.CONFIG.debugLogging) {

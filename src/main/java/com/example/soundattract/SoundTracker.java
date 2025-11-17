@@ -162,6 +162,9 @@ public class SoundTracker {
     private static final Map<Identifier, Map<Long, List<SoundRecord>>> SPATIAL_SOUNDS_BY_DIM = new ConcurrentHashMap<>();
     private static final Map<Identifier, WeakHashMap<RaycastCacheKey, double[]>> RAYCAST_CACHE_BY_DIM = new ConcurrentHashMap<>();
 
+    private static final int PREFILTER_LIMIT = 24;
+    private static final double WEIGHT_EPSILON = 1.0e-4;
+
     private static synchronized List<SoundRecord> getRecentSoundsList(World world) {
         return RECENT_SOUNDS_BY_DIM.computeIfAbsent(world.getRegistryKey().getValue(), k -> Collections.synchronizedList(new ArrayList<>()));
     }
@@ -578,17 +581,16 @@ public class SoundTracker {
         if (currentSoundsSnapshot.isEmpty()) {
             return null;
         }
-        
+
         String dimensionKey = level.getRegistryKey().getValue().toString();
 
         MobProfile profile = SoundAttractMod.CONFIG.getMatchingProfile(mob);
-        SoundRecord bestSound = null;
-        double highestComparisonWeight = -1.0;
-        double closestDistSqrForBest = Double.MAX_VALUE;
 
         double noveltyBonusValue = SoundAttractMod.CONFIG.soundNoveltyBonusWeight;
         int noveltyTicks = SoundAttractMod.CONFIG.soundNoveltyTimeTicks;
         int maxLifetime = SoundAttractMod.CONFIG.soundLifetimeTicks;
+
+        Map<String, ApproxCandidate> approxBySound = new HashMap<>();
 
         for (SoundRecord r : currentSoundsSnapshot) {
             if (r == null || r.pos == null || !Objects.equals(r.dimensionKey, dimensionKey)) {
@@ -604,48 +606,119 @@ public class SoundTracker {
                 continue;
             }
 
-            double effectiveInitialRange = r.range;
-            double effectiveInitialWeight = r.weight;
-            if (profile != null) {
-                Identifier rl = Identifier.tryParse(soundId);
-                if (rl != null) {
-                    Optional<com.example.soundattract.config.SoundOverride> ov = profile.getSoundOverride(rl);
-                    if (ov.isPresent()) {
-                        effectiveInitialRange = ov.get().getRange();
-                        effectiveInitialWeight = ov.get().getWeight();
-                    }
+            double effRange = r.range;
+            double effWeight = r.weight;
+            Identifier rl = Identifier.tryParse(soundId);
+            if (profile != null && rl != null) {
+                Optional<com.example.soundattract.config.SoundOverride> ov = profile.getSoundOverride(rl);
+                if (ov.isPresent()) {
+                    effRange = ov.get().getRange();
+                    effWeight = ov.get().getWeight();
                 }
             }
 
-            double[] muffled = applyBlockMuffling(level, r.pos, mobPos, effectiveInitialRange, effectiveInitialWeight, soundId);
-            double muffledRange = muffled[0];
-            double muffledWeight = muffled[1];
             double distSqr = mobPos.getSquaredDistance(r.pos);
-
-            if (muffledWeight <= 0 || muffledRange <= 0 || distSqr > (muffledRange * muffledRange)) {
+            if (distSqr > (effRange * effRange)) {
                 continue;
             }
 
-            double noveltyBonus = 0.0;
-            if (noveltyBonusValue > 0 && r.ticksRemaining > (maxLifetime - noveltyTicks)) {
-                noveltyBonus = noveltyBonusValue;
+            double novelty = (noveltyBonusValue > 0 && r.ticksRemaining > (maxLifetime - noveltyTicks))
+                    ? noveltyBonusValue
+                    : 0.0;
+            double approxWeight = effWeight + novelty;
+            if (approxWeight <= 0.0) {
+                continue;
             }
 
-            double finalComparisonWeight = muffledWeight + noveltyBonus;
-
-            if (finalComparisonWeight > highestComparisonWeight || (Math.abs(finalComparisonWeight - highestComparisonWeight) < 0.001 && distSqr < closestDistSqrForBest)) {
-                highestComparisonWeight = finalComparisonWeight;
-                closestDistSqrForBest = distSqr;
-                bestSound = new SoundRecord(r.sound, soundId, r.pos, r.dimensionKey, muffledRange, muffledWeight);
-                bestSound.ticksRemaining = r.ticksRemaining;
+            ApproxCandidate existing = approxBySound.get(soundId);
+            if (existing == null
+                    || approxWeight > existing.approxWeight
+                    || (Math.abs(approxWeight - existing.approxWeight) < 0.001 && distSqr < existing.distSqr)) {
+                approxBySound.put(soundId, new ApproxCandidate(r, effRange, effWeight, novelty, approxWeight, distSqr, soundId, rl));
             }
         }
 
-        return bestSound;
+        if (approxBySound.isEmpty()) {
+            return null;
+        }
+
+        java.util.List<ApproxCandidate> shortlist = new java.util.ArrayList<>(approxBySound.values());
+        shortlist.sort((a, b) -> {
+            int cmp = Double.compare(b.approxWeight, a.approxWeight);
+            if (cmp != 0) {
+                return cmp;
+            }
+            return Double.compare(a.distSqr, b.distSqr);
+        });
+        if (shortlist.size() > PREFILTER_LIMIT) {
+            shortlist = new java.util.ArrayList<>(shortlist.subList(0, PREFILTER_LIMIT));
+        }
+
+        ApproxCandidate bestCandidate = null;
+        double bestFinalWeight = -1.0;
+        double bestFinalDist = Double.MAX_VALUE;
+
+        for (ApproxCandidate candidate : shortlist) {
+            if (bestCandidate != null && candidate.approxWeight < bestFinalWeight - WEIGHT_EPSILON) {
+                continue;
+            }
+
+            double[] muffled = applyBlockMuffling(level, candidate.rec.pos, mobPos, candidate.effRange, candidate.effWeight, candidate.soundKey);
+            candidate.muffledRange = muffled[0];
+            candidate.muffledWeight = muffled[1];
+
+            if (candidate.muffledWeight <= 0 || candidate.muffledRange <= 0 || candidate.distSqr > (candidate.muffledRange * candidate.muffledRange)) {
+                continue;
+            }
+
+            double finalWeight = candidate.finalWeight();
+            if (finalWeight > bestFinalWeight
+                    || (Math.abs(finalWeight - bestFinalWeight) < 0.001 && candidate.distSqr < bestFinalDist)) {
+                bestCandidate = candidate;
+                bestFinalWeight = finalWeight;
+                bestFinalDist = candidate.distSqr;
+            }
+        }
+
+        if (bestCandidate == null) {
+            return null;
+        }
+
+        SoundRecord src = bestCandidate.rec;
+        SoundRecord result = new SoundRecord(src.sound, src.soundId, src.pos, src.dimensionKey, bestCandidate.muffledRange, bestCandidate.muffledWeight);
+        result.ticksRemaining = src.ticksRemaining;
+        return result;
     }
     
+    private static class ApproxCandidate {
+        final SoundRecord rec;
+        final double effRange;
+        final double effWeight;
+        final double novelty;
+        final double approxWeight;
+        double distSqr;
+        final String soundKey;
+        final Identifier soundId;
+        double muffledRange;
+        double muffledWeight;
 
+        public ApproxCandidate(SoundRecord rec, double effRange, double effWeight, double novelty, double approxWeight, double distSqr, String soundKey, Identifier soundId) {
+            this.rec = rec;
+            this.effRange = effRange;
+            this.effWeight = effWeight;
+            this.novelty = novelty;
+            this.approxWeight = approxWeight;
+            this.distSqr = distSqr;
+            this.soundKey = soundKey;
+            this.soundId = soundId;
+            this.muffledRange = effRange;
+            this.muffledWeight = effWeight;
+        }
 
+        double finalWeight() {
+            return this.muffledWeight + this.novelty;
+        }
+    }
 
     public static java.util.List<MobEntity> getMobsForSound(
             java.util.List<MobEntity> mobsToFilter,

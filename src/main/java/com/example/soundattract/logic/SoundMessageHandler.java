@@ -104,13 +104,14 @@ public class SoundMessageHandler {
             } else {
                 double range = payload.range();
                 double weight = payload.weight();
-                if (range < 0 && payload.soundId() != null) {
+                if (range <= 0 && payload.soundId() != null) {
                     var config = SoundAttractMod.CONFIG.getSoundConfigForId(payload.soundId().toString());
                     if (config != null) {
                         range = config.range;
                         weight = config.weight;
                     }
                 }
+
                 SoundTracker.addSound(serverWorld, null, pos, range, weight, payload.soundId().toString());
             }
         } catch (Exception e) {

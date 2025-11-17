@@ -47,10 +47,11 @@ public abstract class PathAwareEntityMixin extends MobEntity implements SoundAtt
     @Inject(method = "<init>(Lnet/minecraft/entity/EntityType;Lnet/minecraft/world/World;)V", at = @At("RETURN"))
     private void soundattract_addGoalsOnConstruct(EntityType<?> type, World world, CallbackInfo ci) {
 
+        if (!SoundAttractMod.CONFIG.enableFleeFromUnseenAttackerGoal) {
+            return;
+        }
+
         MobEntity thisMob = (MobEntity) (Object) this;
-
-
-
 
         this.goalSelector.add(3, new FleeFromUnseenAttackerGoal(thisMob, 1.2D));
 

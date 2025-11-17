@@ -10,6 +10,7 @@ import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundTracker;
 import com.example.soundattract.StealthDetectionEvents;
 import com.example.soundattract.FovEvents;
+import com.example.soundattract.DynamicScanCooldownManager;
 
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.mob.MobEntity;
@@ -47,6 +48,9 @@ public class AttractionGoal extends Goal {
     private int bestSoundCacheTicks;
     private static final Map<MobEntity, DelayedRelay> pendingDelayedRelays = new HashMap<>();
 
+
+    private int navigationRecalcCooldown = 0;
+
     private static class DelayedRelay {
         public final MobEntity leader;
         public final BlockPos soundPos;
@@ -71,7 +75,7 @@ public class AttractionGoal extends Goal {
     }
 
     private int getWaitTicks() {
-        return SoundAttractMod.CONFIG.scanCooldownTicks;
+        return DynamicScanCooldownManager.currentScanCooldownTicks;
     }
 
     public BlockPos getTargetSoundPos() {
@@ -190,6 +194,10 @@ public class AttractionGoal extends Goal {
         }
         boolean isFollower = !isLeader;
         boolean smartEdgeEnabled = SoundAttractMod.CONFIG.edgeMobSmartBehavior;
+
+        if (this.navigationRecalcCooldown > 0) {
+            this.navigationRecalcCooldown--;
+        }
 
         if (this.bestSoundCacheTicks >0) {
             this.bestSoundCacheTicks--;
@@ -607,7 +615,9 @@ public class AttractionGoal extends Goal {
         }
 
 
-        if (targetPos.equals(this.lastNavigationTarget) && !this.mob.getNavigation().isIdle()) {
+        if (targetPos.equals(this.lastNavigationTarget)
+                && !this.mob.getNavigation().isIdle()
+                && this.navigationRecalcCooldown > 0) {
 
             return;
         }
@@ -616,6 +626,7 @@ public class AttractionGoal extends Goal {
         this.mob.getNavigation().startMovingTo(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5, speed);
 
         this.lastNavigationTarget = targetPos;
+        this.navigationRecalcCooldown = 20;
     }
     private SoundTracker.SoundRecord findInterestingSoundRecord() {
         if (this.bestSoundCacheTicks > 0) {
