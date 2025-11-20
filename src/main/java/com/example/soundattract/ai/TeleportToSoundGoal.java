@@ -52,21 +52,17 @@ public class TeleportToSoundGoal extends Goal {
         if (--this.cooldown > 0) return false;
         if (this.mob.isBaby()) return false;
 
-        // Check teleporter eligibility via tag from config (defaults mirror EnhancedAI)
         String teleporterTagStr = SoundAttractConfig.COMMON.teleportCanTeleportTag.get();
         if (teleporterTagStr == null || teleporterTagStr.isBlank()) return false;
         TagKey<EntityType<?>> teleporterTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(teleporterTagStr));
         if (!this.mob.getType().is(teleporterTag)) return false;
 
-        // Chance gate: prefer EnhancedAI value if present, else config
         double chance = EnhancedAICompat.getTeleportToTargetChance(this.mob.level());
         if (this.mob.getRandom().nextDouble() >= chance) return false;
 
-        // Pick a sound to act upon
         this.targetSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
         if (this.targetSound == null) return false;
 
-        // Find a nearby mob to teleport (respect tag from config / EnhancedAI)
         String targetTagStr = SoundAttractConfig.COMMON.teleportCanBeTeleportedTag.get();
         if (targetTagStr == null || targetTagStr.isBlank()) return false;
         TagKey<EntityType<?>> targetTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(targetTagStr));
@@ -131,10 +127,8 @@ public class TeleportToSoundGoal extends Goal {
         else {
             if (--this.teleportTick <= 0) {
                 show(this.mob);
-                // Teleport the target mob to the sound position (safe placement)
                 teleportSafely(this.toTeleport, soundPos.getX() + 0.5, soundPos.getY(), soundPos.getZ() + 0.5);
                 show(this.toTeleport);
-                // Cooldown
                 this.cooldown = this.adjustedTickDelay(EnhancedAICompat.getTeleportCooldownTicks());
                 this.stop();
                 return;

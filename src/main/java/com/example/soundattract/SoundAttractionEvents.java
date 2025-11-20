@@ -18,6 +18,7 @@ import com.example.soundattract.ai.LeaderAttractionGoal;
 import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
 import com.example.soundattract.ai.TeleportToSoundGoal;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.DataDrivenTags;
 import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 
@@ -64,62 +65,125 @@ public class SoundAttractionEvents {
     private static long lastMobCountUpdateTime_ServerTick = -1;
     private static int cachedAttractedMobCount_ServerTick = 0;
     private static Set<EntityType<?>> CACHED_ATTRACTED_ENTITY_TYPES = null;
-    private static List<String> lastKnownAttractedEntitiesConfig_Copy = null;
     private static Set<EntityType<?>> CACHED_BLACKLISTED_ENTITY_TYPES = null;
-    private static List<String> lastKnownBlacklistConfig_Copy = null;
 
-    public static Set<EntityType<?>> getCachedAttractedEntityTypes() {
-        List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.attractedEntities.get();
-        List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
+    public static void invalidateCachedEntityTypes() {
+        CACHED_ATTRACTED_ENTITY_TYPES = null;
+        CACHED_BLACKLISTED_ENTITY_TYPES = null;
+    }
 
-        if (CACHED_ATTRACTED_ENTITY_TYPES == null || lastKnownAttractedEntitiesConfig_Copy == null || !lastKnownAttractedEntitiesConfig_Copy.equals(currentConfigListMutableCopy)) {
-            if (SoundAttractConfig.COMMON.debugLogging.get() && CACHED_ATTRACTED_ENTITY_TYPES != null) {
-                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Attracted entities config changed, rebuilding EntityType cache.");
+    private static Set<EntityType<?>> getEntityTypesForTag(TagKey<EntityType<?>> tagKey) {
+        Set<EntityType<?>> result = new HashSet<>();
+        for (EntityType<?> type : ForgeRegistries.ENTITY_TYPES.getValues()) {
+            if (type == null) {
+                continue;
             }
-            CACHED_ATTRACTED_ENTITY_TYPES = currentConfigListFromGetter.stream()
-                    .map(idStr -> {
-                        try {
-                            return ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
-                        } catch (Exception e) {
-                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for attracted entity type in config: {}", idStr, e);
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-            lastKnownAttractedEntitiesConfig_Copy = currentConfigListMutableCopy;
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                String resultingTypes = CACHED_ATTRACTED_ENTITY_TYPES.stream().map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
-                        .collect(Collectors.joining(", "));
-                SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final attracted EntityType cache contains: [{}]", resultingTypes);
+            try {
+                if (type.is(tagKey)) {
+                    result.add(type);
+                }
+            } catch (Exception e) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Error checking tag {} for entity type {}", tagKey.location(), ForgeRegistries.ENTITY_TYPES.getKey(type), e);
+                }
             }
         }
+        return result;
+    }
+
+    public static Set<EntityType<?>> getCachedAttractedEntityTypes() {
+        if (CACHED_ATTRACTED_ENTITY_TYPES != null) {
+            return CACHED_ATTRACTED_ENTITY_TYPES;
+        }
+
+        Set<EntityType<?>> configSet = new HashSet<>();
+        for (String idStr : SoundAttractConfig.COMMON.attractedEntities.get()) {
+            try {
+                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                if (type != null) {
+                    configSet.add(type);
+                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown attracted entity type in config: {}", idStr);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for attracted entity type in config: {}", idStr, e);
+            }
+        }
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        Set<EntityType<?>> tagSet = enableDataDriven ? getEntityTypesForTag(DataDrivenTags.ATTRACTED_MOBS) : java.util.Collections.emptySet();
+
+        Set<EntityType<?>> result = new HashSet<>();
+        if (!enableDataDriven || tagSet.isEmpty()) {
+            result.addAll(configSet);
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                result.addAll(tagSet);
+            } else {
+                result.addAll(configSet);
+                result.addAll(tagSet);
+            }
+        }
+
+        CACHED_ATTRACTED_ENTITY_TYPES = result;
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            String resultingTypes = result.stream()
+                    .map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
+                    .collect(Collectors.joining(", "));
+            SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final attracted EntityType cache contains: [{}]", resultingTypes);
+        }
+
         return CACHED_ATTRACTED_ENTITY_TYPES;
     }
 
     public static Set<EntityType<?>> getCachedBlacklistedEntityTypes() {
-        List<? extends String> currentConfigListFromGetter = SoundAttractConfig.COMMON.mobBlacklist.get();
-        List<String> currentConfigListMutableCopy = new ArrayList<>(currentConfigListFromGetter);
-        if (CACHED_BLACKLISTED_ENTITY_TYPES == null || lastKnownBlacklistConfig_Copy == null || !lastKnownBlacklistConfig_Copy.equals(currentConfigListMutableCopy)) {
-            if (SoundAttractConfig.COMMON.debugLogging.get() && CACHED_BLACKLISTED_ENTITY_TYPES != null) {
-                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Mob blacklist config changed, rebuilding EntityType cache.");
-            }
-            CACHED_BLACKLISTED_ENTITY_TYPES = currentConfigListFromGetter.stream()
-                    .map(idStr -> {
-                        try {
-                            return ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
-                        } catch (Exception e) {
-                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for blacklisted entity type in config: {}", idStr, e);
-                            return null;
-                        }
-                    }).filter(Objects::nonNull).collect(Collectors.toSet());
-            lastKnownBlacklistConfig_Copy = currentConfigListMutableCopy;
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                String resultingTypes = CACHED_BLACKLISTED_ENTITY_TYPES.stream().map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
-                        .collect(Collectors.joining(", "));
-                SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final blacklisted EntityType cache contains: [{}]", resultingTypes);
+        if (CACHED_BLACKLISTED_ENTITY_TYPES != null) {
+            return CACHED_BLACKLISTED_ENTITY_TYPES;
+        }
+
+        Set<EntityType<?>> configSet = new HashSet<>();
+        for (String idStr : SoundAttractConfig.COMMON.mobBlacklist.get()) {
+            try {
+                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                if (type != null) {
+                    configSet.add(type);
+                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown blacklisted entity type in config: {}", idStr);
+                }
+            } catch (Exception e) {
+                SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for blacklisted entity type in config: {}", idStr, e);
             }
         }
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        Set<EntityType<?>> tagSet = enableDataDriven ? getEntityTypesForTag(DataDrivenTags.BLACKLISTED_MOBS) : java.util.Collections.emptySet();
+
+        Set<EntityType<?>> result = new HashSet<>();
+        if (!enableDataDriven || tagSet.isEmpty()) {
+            result.addAll(configSet);
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                result.addAll(tagSet);
+            } else {
+                result.addAll(configSet);
+                result.addAll(tagSet);
+            }
+        }
+
+        CACHED_BLACKLISTED_ENTITY_TYPES = result;
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            String resultingTypes = result.stream()
+                    .map(et -> ForgeRegistries.ENTITY_TYPES.getKey(et).toString())
+                    .collect(Collectors.joining(", "));
+            SoundAttractMod.LOGGER.info("[DIAGNOSTIC] Final blacklisted EntityType cache contains: [{}]", resultingTypes);
+        }
+
         return CACHED_BLACKLISTED_ENTITY_TYPES;
     }
 

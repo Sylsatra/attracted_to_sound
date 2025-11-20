@@ -9,6 +9,7 @@ import com.example.soundattract.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.SoundAttractionEvents;
 import com.example.soundattract.SoundTracker;
+import com.example.soundattract.CamoUtil;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
 
@@ -112,11 +113,8 @@ public class AttractionGoal extends Goal {
         int wornCamouflagePieces = 0;
         if (SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             for (ItemStack armorItem : player.getArmorSlots()) {
-                if (!armorItem.isEmpty()) {
-                    String itemId = ForgeRegistries.ITEMS.getKey(armorItem.getItem()).toString();
-                    if (SoundAttractConfig.COMMON.camouflageArmorItems.get().contains(itemId)) {
-                        wornCamouflagePieces++;
-                    }
+                if (!armorItem.isEmpty() && CamoUtil.isCamouflageArmorItem(armorItem.getItem())) {
+                    wornCamouflagePieces++;
                 }
             }
             if (SoundAttractConfig.COMMON.requireFullSetForCamouflageBonus.get()) {
@@ -136,8 +134,7 @@ public class AttractionGoal extends Goal {
                     continue;
                 }
                 Item item = stack.getItem();
-                ResourceLocation itemId = ForgeRegistries.ITEMS.getKey(item);
-                if (itemId != null && SoundAttractConfig.COMMON.camouflageArmorItems.get().contains(itemId.toString())) {
+                if (CamoUtil.isCamouflageArmorItem(item)) {
                     switch (i) {
                         case 3:
                             totalEffectiveness += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get();

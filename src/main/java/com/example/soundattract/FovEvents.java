@@ -20,7 +20,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
-import net.minecraft.world.level.block.GlassPaneBlock;
 import net.minecraft.world.level.block.IceBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
@@ -248,6 +247,7 @@ public class FovEvents {
 
         try {
             ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            boolean inConfig = false;
             if (id != null) {
                 if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.isEmpty()) {
                     List<? extends String> list = SoundAttractConfig.COMMON != null
@@ -257,8 +257,28 @@ public class FovEvents {
                         SoundAttractConfig.parseAndCacheNonBlockingVisionAllowList();
                     }
                 }
-                if (SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.contains(id)) {
-                    return true;
+                inConfig = SoundAttractConfig.NON_BLOCKING_VISION_ALLOW_CACHE.contains(id);
+            }
+
+            boolean enableDataDriven = SoundAttractConfig.COMMON != null && SoundAttractConfig.COMMON.enableDataDriven.get();
+            boolean inTag = false;
+            if (enableDataDriven) {
+                try {
+                    inTag = state.is(DataDrivenTags.NON_BLOCKING_VISION);
+                } catch (Throwable ignoredInner) {}
+            }
+
+            if (!enableDataDriven) {
+                if (inConfig) return true;
+            } else {
+                String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+                boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+                if (datapackOverConfig) {
+                    if (inTag) return true;
+                    if (inConfig) return true;
+                } else {
+                    if (inConfig) return true;
+                    if (inTag) return true;
                 }
             }
         } catch (Throwable ignored) {}
@@ -276,10 +296,6 @@ public class FovEvents {
         }
 
         if (state.getBlock() instanceof FenceBlock || state.is(BlockTags.FENCES)) {
-            return true;
-        }
-
-        if (state.getBlock() instanceof GlassPaneBlock) {
             return true;
         }
 

@@ -41,6 +41,8 @@ public class SoundAttractConfig {
 
     public static Set<ResourceLocation> SOUND_ID_WHITELIST_CACHE = new HashSet<>();
     public static Map<ResourceLocation, SoundDefaultEntry> SOUND_DEFAULT_ENTRIES_CACHE = new HashMap<>();
+    public static final Set<ResourceLocation> DP_SOUND_WHITELIST_CACHE = new HashSet<>();
+    public static final Map<ResourceLocation, SoundDefaultEntry> DP_SOUND_DEFAULTS_CACHE = new HashMap<>();
     public static Set<ResourceLocation> CUSTOM_LIQUID_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_WOOL_BLOCKS_CACHE = new HashSet<>();
     public static Set<ResourceLocation> CUSTOM_SOLID_BLOCKS_CACHE = new HashSet<>();
@@ -56,6 +58,9 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static final Map<String, Double> DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static boolean POINT_BLANK_ENABLED_CACHE = false;
     public static double POINT_BLANK_RELOAD_RANGE_CACHE = 9.0;
     public static double POINT_BLANK_RELOAD_WEIGHT_CACHE = 1.0;
@@ -65,10 +70,16 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Double> POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
     public static final Map<String, Double> POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static double POINT_BLANK_ATTACHMENT_REDUCTION_DEFAULT_CACHE = 20.0;
+    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_GUN_RANGE_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<String, Double> DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
 
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static List<com.example.soundattract.config.PlayerProfile> SPECIAL_PLAYER_PROFILES_CACHE = Collections.emptyList();
+    public static List<com.example.soundattract.config.MobProfile> DP_MOB_PROFILES_CACHE = Collections.emptyList();
+    public static List<com.example.soundattract.config.PlayerProfile> DP_PLAYER_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Integer> DP_CUSTOM_ARMOR_COLORS = new ConcurrentHashMap<>();
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
 
     public static void parseAndCacheCustomArmorColors() {
@@ -124,8 +135,24 @@ public class SoundAttractConfig {
                 SoundAttractMod.LOGGER.warn("SoundAttractConfig: Malformed custom armor color entry: '{}'. Expected format: 'modid:item_id;#RRGGBB'", entry);
             }
         }
+
+        boolean enableDataDriven = COMMON != null && COMMON.enableDataDriven != null && COMMON.enableDataDriven.get();
+        String priority = COMMON != null && COMMON.datapackPriority != null ? COMMON.datapackPriority.get() : "datapack_over_config";
+        boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+
+        if (enableDataDriven && !DP_CUSTOM_ARMOR_COLORS.isEmpty()) {
+            if (datapackOverConfig) {
+                customArmorColors.clear();
+                customArmorColors.putAll(DP_CUSTOM_ARMOR_COLORS);
+            } else {
+                for (Map.Entry<ResourceLocation, Integer> e : DP_CUSTOM_ARMOR_COLORS.entrySet()) {
+                    customArmorColors.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("SoundAttractConfig: Finished parsing custom armor colors. {} entries loaded.", customArmorColors.size());
+            SoundAttractMod.LOGGER.info("SoundAttractConfig: Loaded {} entries into customArmorColors (after datapack merge).", customArmorColors.size());
         }
     }
 
@@ -167,6 +194,8 @@ public class SoundAttractConfig {
     public static class Common {
 
         public final ForgeConfigSpec.BooleanValue debugLogging;
+        public final ForgeConfigSpec.BooleanValue enableDataDriven;
+        public final ForgeConfigSpec.ConfigValue<String> datapackPriority;
         public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior;
         public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
@@ -354,6 +383,15 @@ public class SoundAttractConfig {
             builder.comment("Sound Attract Mod Configuration").push("general");
             debugLogging = builder.comment("Enable debug logging for troubleshooting.")
                     .define("debugLogging", false);
+            enableDataDriven = builder.comment(
+                            "Enable datapack-based configuration (tags/JSON).",
+                            "If false, only the TOML configuration is used for sounds and other features.")
+                    .define("enableDataDriven", true);
+            datapackPriority = builder.comment(
+                            "Controls precedence when both datapacks and config define the same entries.",
+                            "'datapack_over_config' = datapacks override config values.",
+                            "'config_over_datapack' = config overrides datapack values.")
+                    .define("datapackPriority", "datapack_over_config");
             enableFleeFromUnseenAttackerGoal = builder
                     .comment("Enable the FleeFromUnseenAttackerGoal that makes mobs flee after being hurt by an attacker they cannot see.")
                     .define("enableFleeFromUnseenAttackerGoal", true);
@@ -2524,6 +2562,33 @@ public class SoundAttractConfig {
             });
         }
 
+        boolean enableDataDriven = COMMON.enableDataDriven.get();
+        String priority = COMMON.datapackPriority.get();
+        boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+
+        if (enableDataDriven && !DP_SOUND_WHITELIST_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                SOUND_ID_WHITELIST_CACHE.clear();
+                SOUND_ID_WHITELIST_CACHE.addAll(DP_SOUND_WHITELIST_CACHE);
+            } else {
+                for (ResourceLocation loc : DP_SOUND_WHITELIST_CACHE) {
+                    SOUND_ID_WHITELIST_CACHE.add(loc);
+                }
+            }
+        }
+
+        if (enableDataDriven && !DP_SOUND_DEFAULTS_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                for (Map.Entry<ResourceLocation, SoundDefaultEntry> e : DP_SOUND_DEFAULTS_CACHE.entrySet()) {
+                    SOUND_DEFAULT_ENTRIES_CACHE.put(e.getKey(), e.getValue());
+                }
+            } else {
+                for (Map.Entry<ResourceLocation, SoundDefaultEntry> e : DP_SOUND_DEFAULTS_CACHE.entrySet()) {
+                    SOUND_DEFAULT_ENTRIES_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
         CUSTOM_LIQUID_BLOCKS_CACHE.clear();
         if (COMMON.customLiquidBlocks != null) {
             COMMON.customLiquidBlocks.get().forEach(id -> CUSTOM_LIQUID_BLOCKS_CACHE.add(ResourceLocation.parse(id)));
@@ -2600,6 +2665,39 @@ public class SoundAttractConfig {
             }
         }
 
+        if (enableDataDriven && !DP_TACZ_GUN_SHOOT_DB_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                TACZ_GUN_SHOOT_DB_CACHE.clear();
+                TACZ_GUN_SHOOT_DB_CACHE.putAll(DP_TACZ_GUN_SHOOT_DB_CACHE);
+            } else {
+                for (Map.Entry<ResourceLocation, Pair<Double, Double>> e : DP_TACZ_GUN_SHOOT_DB_CACHE.entrySet()) {
+                    TACZ_GUN_SHOOT_DB_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        if (enableDataDriven && !DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                TACZ_ATTACHMENT_REDUCTION_DB_CACHE.clear();
+                TACZ_ATTACHMENT_REDUCTION_DB_CACHE.putAll(DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE);
+            } else {
+                for (Map.Entry<ResourceLocation, Pair<Double, Double>> e : DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE.entrySet()) {
+                    TACZ_ATTACHMENT_REDUCTION_DB_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        if (enableDataDriven && !DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                TACZ_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+                TACZ_MUZZLE_FLASH_REDUCTION_CACHE.putAll(DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE);
+            } else {
+                for (Map.Entry<String, Double> e : DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
+                    TACZ_MUZZLE_FLASH_REDUCTION_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
         parseAndCacheCustomArmorColors();
 
         POINT_BLANK_ENABLED_CACHE = net.minecraftforge.fml.ModList.get().isLoaded("pointblank") && COMMON.enablePointBlankIntegration.get();
@@ -2651,6 +2749,39 @@ public class SoundAttractConfig {
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("Failed to parse Point Blank muzzle flash reduction entry: {}", raw, e);
+            }
+        }
+
+        if (enableDataDriven && !DP_POINT_BLANK_GUN_RANGE_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                POINT_BLANK_GUN_RANGE_CACHE.clear();
+                POINT_BLANK_GUN_RANGE_CACHE.putAll(DP_POINT_BLANK_GUN_RANGE_CACHE);
+            } else {
+                for (Map.Entry<ResourceLocation, Double> e : DP_POINT_BLANK_GUN_RANGE_CACHE.entrySet()) {
+                    POINT_BLANK_GUN_RANGE_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        if (enableDataDriven && !DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.clear();
+                POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.putAll(DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE);
+            } else {
+                for (Map.Entry<ResourceLocation, Double> e : DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.entrySet()) {
+                    POINT_BLANK_ATTACHMENT_REDUCTION_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        if (enableDataDriven && !DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.isEmpty()) {
+            if (datapackOverConfig) {
+                POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.clear();
+                POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.putAll(DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE);
+            } else {
+                for (Map.Entry<String, Double> e : DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
+                    POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.putIfAbsent(e.getKey(), e.getValue());
+                }
             }
         }
 
@@ -2740,7 +2871,22 @@ public class SoundAttractConfig {
                 }
             }
         }
-        SPECIAL_MOB_PROFILES_CACHE = tmpMobProfiles;
+        boolean enableDataDrivenProfiles = COMMON != null && COMMON.enableDataDriven != null && COMMON.enableDataDriven.get();
+        String profilePriority = COMMON != null && COMMON.datapackPriority != null ? COMMON.datapackPriority.get() : "datapack_over_config";
+        boolean profilesDpOverConfig = "datapack_over_config".equalsIgnoreCase(profilePriority);
+
+        if (enableDataDrivenProfiles && DP_MOB_PROFILES_CACHE != null && !DP_MOB_PROFILES_CACHE.isEmpty()) {
+            List<MobProfile> merged = new ArrayList<>();
+            if (profilesDpOverConfig) {
+                merged.addAll(DP_MOB_PROFILES_CACHE);
+            } else {
+                merged.addAll(tmpMobProfiles);
+                merged.addAll(DP_MOB_PROFILES_CACHE);
+            }
+            SPECIAL_MOB_PROFILES_CACHE = merged;
+        } else {
+            SPECIAL_MOB_PROFILES_CACHE = tmpMobProfiles;
+        }
 
         List<PlayerProfile> tmpPlayerProfiles = new ArrayList<>();
         if (COMMON.specialPlayerProfilesRaw != null) {
@@ -2787,7 +2933,18 @@ public class SoundAttractConfig {
                 }
             }
         }
-        SPECIAL_PLAYER_PROFILES_CACHE = tmpPlayerProfiles;
+        if (enableDataDrivenProfiles && DP_PLAYER_PROFILES_CACHE != null && !DP_PLAYER_PROFILES_CACHE.isEmpty()) {
+            List<PlayerProfile> mergedPlayers = new ArrayList<>();
+            if (profilesDpOverConfig) {
+                mergedPlayers.addAll(DP_PLAYER_PROFILES_CACHE);
+            } else {
+                mergedPlayers.addAll(tmpPlayerProfiles);
+                mergedPlayers.addAll(DP_PLAYER_PROFILES_CACHE);
+            }
+            SPECIAL_PLAYER_PROFILES_CACHE = mergedPlayers;
+        } else {
+            SPECIAL_PLAYER_PROFILES_CACHE = tmpPlayerProfiles;
+        }
 
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(

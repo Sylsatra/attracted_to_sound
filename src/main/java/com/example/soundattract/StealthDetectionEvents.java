@@ -3,6 +3,7 @@ package com.example.soundattract;
 import com.example.soundattract.config.PlayerStance;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.FovEvents;
+import com.example.soundattract.CamoUtil;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.ai.MobGroupManager;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -53,7 +54,6 @@ public class StealthDetectionEvents {
     private static long lastStealthCheckTick = -1;
     private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
 
-    // XRAY fallback cache when Enhanced AI is not present
     private static final Map<UUID, Double> XRAY_RANGE_CACHE = new HashMap<>();
 
     private static final Set<UUID> suppressedEdgeDetections = new HashSet<>();
@@ -96,7 +96,6 @@ public class StealthDetectionEvents {
         }
     }
 
-    // Overload for mob targets. Uses the same factors as the player path but evaluates the target Mob's visibility.
     public static double getRealisticStealthDetectionRange(Mob target, Mob looker, Level level) {
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
@@ -104,13 +103,11 @@ public class StealthDetectionEvents {
 
         double baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
 
-        // Invisibility on target reduces detectability
         if (target.hasEffect(net.minecraft.world.effect.MobEffects.INVISIBILITY)) {
             double invisFactor = SoundAttractConfig.COMMON.invisibilityStealthFactor.get();
             baseRange *= invisFactor;
         }
 
-        // Light level at target (feet and eyes)
         int effectiveLight = 0;
         net.minecraft.core.BlockPos feet = target.blockPosition();
         net.minecraft.core.BlockPos eyes = feet.above();
@@ -136,7 +133,6 @@ public class StealthDetectionEvents {
         lightFactor = Math.min(SoundAttractConfig.COMMON.maxLightFactor.get(), lightFactor);
         baseRange *= lightFactor;
 
-        // Weather factors at target position
         if (level.isRainingAt(feet)) {
             baseRange *= SoundAttractConfig.COMMON.rainStealthFactor.get();
         }
@@ -144,7 +140,6 @@ public class StealthDetectionEvents {
             baseRange *= SoundAttractConfig.COMMON.thunderStealthFactor.get();
         }
 
-        // Held item penalty on target
         if (SoundAttractConfig.COMMON.enableHeldItemPenalty.get()) {
             int held = (target.getMainHandItem().isEmpty() ? 0 : 1) + (target.getOffhandItem().isEmpty() ? 0 : 1);
             if (held > 0) {
@@ -153,7 +148,6 @@ public class StealthDetectionEvents {
             }
         }
 
-        // Enchantment penalties on target (armor and held items)
         if (SoundAttractConfig.COMMON.enableEnchantmentPenalty.get()) {
             int enchantedArmor = 0;
             for (net.minecraft.world.item.ItemStack armor : target.getArmorSlots()) {
@@ -172,7 +166,6 @@ public class StealthDetectionEvents {
             }
         }
 
-        // Environmental camouflage color matching for target
         if (SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
             java.util.Optional<Integer> armorColorOpt = getEffectiveArmorColorEntity(target);
             java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColorEntity(target, level);
@@ -202,7 +195,6 @@ public class StealthDetectionEvents {
             }
         }
 
-        // Movement penalty/bonus for target mobs
         double moveThreshold = SoundAttractConfig.COMMON.movementThreshold.get();
         if (isMobMoving(target, moveThreshold)) {
             baseRange *= SoundAttractConfig.COMMON.movementStealthPenalty.get();
@@ -210,7 +202,6 @@ public class StealthDetectionEvents {
             baseRange *= SoundAttractConfig.COMMON.stationaryStealthBonusFactor.get();
         }
 
-        // General item camouflage by listed items (reuse player config for simplicity)
         if (SoundAttractConfig.COMMON.enableCamouflage.get()) {
             java.util.List<String> camouflageItems = new java.util.ArrayList<>(SoundAttractConfig.COMMON.camouflageArmorItems.get());
             if (!camouflageItems.isEmpty()) {
@@ -221,8 +212,7 @@ public class StealthDetectionEvents {
                 target.getArmorSlots().forEach(armorItemsList::add);
                 for (net.minecraft.world.item.ItemStack stack : armorItemsList) {
                     if (!stack.isEmpty()) totalActualArmorPieces++;
-                    net.minecraft.resources.ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
-                    if (itemId != null && camouflageItems.contains(itemId.toString())) {
+                    if (CamoUtil.isCamouflageArmorItem(stack.getItem())) {
                         wornListedCamouflagePieces++;
                     }
                 }
@@ -235,8 +225,7 @@ public class StealthDetectionEvents {
                         for (int i = 0; i < armorItemsList.size(); i++) {
                             net.minecraft.world.item.ItemStack stack = armorItemsList.get(i);
                             if (stack.isEmpty()) continue;
-                            net.minecraft.resources.ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
-                            if (itemId != null && camouflageItems.contains(itemId.toString())) {
+                            if (CamoUtil.isCamouflageArmorItem(stack.getItem())) {
                                 switch (i) {
                                     case 0: totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get(); break;
                                     case 1: totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get(); break;
@@ -255,8 +244,7 @@ public class StealthDetectionEvents {
                         for (int i = 0; i < armorItemsList.size(); i++) {
                             net.minecraft.world.item.ItemStack stack = armorItemsList.get(i);
                             if (stack.isEmpty()) continue;
-                            net.minecraft.resources.ResourceLocation itemId = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(stack.getItem());
-                            if (itemId != null && camouflageItems.contains(itemId.toString())) {
+                            if (CamoUtil.isCamouflageArmorItem(stack.getItem())) {
                                 switch (i) {
                                     case 0: totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get(); break;
                                     case 1: totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get(); break;
@@ -302,13 +290,11 @@ public class StealthDetectionEvents {
         if (!SoundAttractConfig.COMMON.enableXrayTargeting.get()) return 0d;
 
         try {
-            // Check apply_xray tag
             String applyTagStr = SoundAttractConfig.COMMON.xrayApplyTag.get();
             if (applyTagStr == null || applyTagStr.isBlank()) return 0d;
             TagKey<EntityType<?>> applyTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(applyTagStr));
             if (!mob.getType().is(applyTag)) return 0d;
 
-            // Optionally require better_nearby tag
             if (SoundAttractConfig.COMMON.xrayRequireBetterNearby.get()) {
                 String betterTagStr = SoundAttractConfig.COMMON.xrayBetterNearbyTag.get();
                 if (betterTagStr == null || betterTagStr.isBlank()) return 0d;
@@ -322,13 +308,11 @@ public class StealthDetectionEvents {
             return 0d;
         }
 
-        // If Enhanced AI is loaded, use its attribute value only
         if (EnhancedAICompat.isEnhancedAiLoaded()) {
             double v = EnhancedAICompat.getXrayAttributeValue(mob);
             return Math.max(0d, v);
         }
 
-        // Fallback: compute once per mob and cache
         Double cached = XRAY_RANGE_CACHE.get(mob.getUUID());
         if (cached != null) return cached;
 
@@ -493,7 +477,6 @@ public class StealthDetectionEvents {
                 }
             }
         } else if (newTarget instanceof Mob targetMob) {
-            // Apply stealth rules for mob vs mob using similar factors as players
             if (!FovEvents.isTargetInFov(mob, targetMob, true)) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
@@ -545,7 +528,6 @@ public class StealthDetectionEvents {
 
         Level level = mob.level();
 
-        // XRAY detection (Enhanced AI compat): allow detection through walls within XRAY range
         double xrayRange = getEffectiveXrayRange(mob);
         if (xrayRange > 0) {
             double distSqXray = mob.distanceToSqr(player);

@@ -559,8 +559,29 @@ public class SoundTracker {
     }
 
     private static boolean isCustomWool(BlockState state, Block block, Level level, BlockPos pos) {
-        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customWoolBlocks.get().stream().map(String::valueOf).toList())) {
-            return true;
+        boolean inConfig = isBlockInConfigList(state, block,
+                SoundAttractConfig.COMMON.customWoolBlocks.get().stream().map(String::valueOf).toList());
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        boolean inTag = false;
+        if (enableDataDriven) {
+            try {
+                inTag = state.is(DataDrivenTags.MUFFLING_WOOL);
+            } catch (Exception ignored) {}
+        }
+
+        if (!enableDataDriven) {
+            if (inConfig) return true;
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                if (inTag) return true;
+                if (inConfig) return true;
+            } else {
+                if (inConfig) return true;
+                if (inTag) return true;
+            }
         }
 
         try {
@@ -572,9 +593,31 @@ public class SoundTracker {
     }
 
     private static boolean isCustomSolid(BlockState state, Block block, Level level, BlockPos pos) {
-        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customSolidBlocks.get().stream().map(String::valueOf).toList())) {
-            return true;
+        boolean inConfig = isBlockInConfigList(state, block,
+                SoundAttractConfig.COMMON.customSolidBlocks.get().stream().map(String::valueOf).toList());
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        boolean inTag = false;
+        if (enableDataDriven) {
+            try {
+                inTag = state.is(DataDrivenTags.MUFFLING_SOLID);
+            } catch (Exception ignored) {}
         }
+
+        if (!enableDataDriven) {
+            if (inConfig) return true;
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                if (inTag) return true;
+                if (inConfig) return true;
+            } else {
+                if (inConfig) return true;
+                if (inTag) return true;
+            }
+        }
+
         try {
             return state.isSolidRender(level, pos);
         } catch (NullPointerException npe) {
@@ -587,9 +630,31 @@ public class SoundTracker {
     }
 
     private static boolean isCustomNonSolid(BlockState state, Block block, Level level, BlockPos pos) {
-        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customNonSolidBlocks.get().stream().map(String::valueOf).toList())) {
-            return true;
+        boolean inConfig = isBlockInConfigList(state, block,
+                SoundAttractConfig.COMMON.customNonSolidBlocks.get().stream().map(String::valueOf).toList());
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        boolean inTag = false;
+        if (enableDataDriven) {
+            try {
+                inTag = state.is(DataDrivenTags.MUFFLING_NON_SOLID);
+            } catch (Exception ignored) {}
         }
+
+        if (!enableDataDriven) {
+            if (inConfig) return true;
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                if (inTag) return true;
+                if (inConfig) return true;
+            } else {
+                if (inConfig) return true;
+                if (inTag) return true;
+            }
+        }
+
         boolean isNormallySolid;
         try {
             isNormallySolid = state.isSolid();
@@ -604,9 +669,31 @@ public class SoundTracker {
     }
 
     private static boolean isCustomThin(BlockState state, Block block, Level level, BlockPos pos) {
-        if (isBlockInConfigList(state, block, SoundAttractConfig.COMMON.customThinBlocks.get().stream().map(String::valueOf).toList())) {
-            return true;
+        boolean inConfig = isBlockInConfigList(state, block,
+                SoundAttractConfig.COMMON.customThinBlocks.get().stream().map(String::valueOf).toList());
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        boolean inTag = false;
+        if (enableDataDriven) {
+            try {
+                inTag = state.is(DataDrivenTags.MUFFLING_THIN);
+            } catch (Exception ignored) {}
         }
+
+        if (!enableDataDriven) {
+            if (inConfig) return true;
+        } else {
+            String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+            boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+            if (datapackOverConfig) {
+                if (inTag) return true;
+                if (inConfig) return true;
+            } else {
+                if (inConfig) return true;
+                if (inTag) return true;
+            }
+        }
+
         ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         if (id == null) {
             return false;
@@ -618,11 +705,28 @@ public class SoundTracker {
     }
 
     private static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) {
-        String blockId = BuiltInRegistries.BLOCK.getKey(block).toString();
-        if (SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(blockId)) {
-            return true;
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        boolean inConfig = id != null && SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(id);
+
+        boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
+        boolean inTag = false;
+        if (enableDataDriven) {
+            try {
+                inTag = state.is(DataDrivenTags.MUFFLING_LIQUID);
+            } catch (Exception ignored) {}
         }
-        return false;
+
+        if (!enableDataDriven) {
+            return inConfig;
+        }
+
+        String priority = SoundAttractConfig.COMMON.datapackPriority.get();
+        boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+        if (datapackOverConfig) {
+            return inTag || inConfig;
+        } else {
+            return inConfig || inTag;
+        }
     }
 
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 mobEyePos) {

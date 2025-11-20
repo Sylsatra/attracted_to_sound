@@ -112,7 +112,11 @@ public class TaczIntegration {
             ResourceLocation gunId = iGun.getGunId(gunStack);
             ResourceLocation attId = iGun.getAttachmentId(gunStack, AttachmentType.MUZZLE);
 
-            Pair<Double, Double> gunStats = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(gunId.toString());
+            Pair<Double, Double> gunStats = SoundAttractConfig.TACZ_GUN_SHOOT_DB_CACHE.get(gunId);
+
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[TaczIntegration][DEBUG] gunId={}, statsInCache={}", gunId, gunStats);
+            }
 
             double gunRange;
             if (gunStats != null) {
@@ -123,7 +127,7 @@ public class TaczIntegration {
 
             double reduction = 0.0;
             if (attId != null) {
-                Pair<Double, Double> attachmentStats = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attId.toString());
+                Pair<Double, Double> attachmentStats = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attId);
                 if (attachmentStats != null) {
                     reduction = attachmentStats.getRight();
                 }

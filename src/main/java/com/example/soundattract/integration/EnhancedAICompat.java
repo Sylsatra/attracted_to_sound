@@ -25,7 +25,6 @@ public class EnhancedAICompat {
 
     private static final TagKey<Block> EMPTY_BLACKLIST = TagKey.create(Registries.BLOCK, new ResourceLocation("soundattract", "empty_block_tag"));
 
-    // Miner config proxies (existing)
     public static int getMaxY() {
         if (IS_ENHANCED_AI_LOADED) {
             return MinerMobsProxy.getMaxY();
@@ -54,7 +53,6 @@ public class EnhancedAICompat {
         return EMPTY_BLACKLIST;
     }
 
-    // TeleportToTarget (used for teleport-to-sound)
     public static double getTeleportToTargetChance(Level level) {
         if (IS_ENHANCED_AI_LOADED) {
             return TeleportProxy.getChance(level);
@@ -69,7 +67,6 @@ public class EnhancedAICompat {
         return SoundAttractConfig.COMMON.teleportCooldownTicks.get();
     }
 
-    // PickUpAndThrow values
     public static double getPickUpAndThrowChance(Level level) {
         if (IS_ENHANCED_AI_LOADED) {
             return PickUpProxy.getChance(level);
@@ -109,7 +106,6 @@ public class EnhancedAICompat {
         return IS_ENHANCED_AI_LOADED;
     }
 
-    // XRAY attribute value (Enhanced AI Targeting)
     public static double getXrayAttributeValue(Mob mob) {
         if (!IS_ENHANCED_AI_LOADED || mob == null) return 0d;
         try {

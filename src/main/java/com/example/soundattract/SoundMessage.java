@@ -93,9 +93,14 @@ public class SoundMessage {
     public static void handle(SoundMessage msg, Supplier<NetworkEvent.Context> ctx) {
         try {
             ResourceLocation loc = msg.soundId;
+            boolean isIntegration = (msg.taczType != null) || (msg.pointBlankType != null);
             if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                     && (loc == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc))
-                    && !msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
+                    && !msg.soundId.equals(VOICE_CHAT_SOUND_ID)
+                    && !isIntegration) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundMessage] Dropping sound {} because it is not in whitelist (dim={})", loc, msg.dimension);
+                }
                 if (ctx != null && ctx.get() != null) ctx.get().setPacketHandled(true);
                 return;
             }
@@ -166,6 +171,12 @@ public class SoundMessage {
                                 "[SoundMessage] Using fallback range/weight for {}: range={}, weight={}",
                                 msg.soundId, range, weight);
                         }
+                    }
+
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info(
+                            "[SoundMessage] Adding sound {} at {} dim={} range={} weight={} (taczType={}, pointBlankType={})",
+                            msg.soundId, pos, dimString, range, weight, msg.taczType, msg.pointBlankType);
                     }
 
                     if (se != null) {

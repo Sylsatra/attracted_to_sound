@@ -43,13 +43,9 @@ public class SoundAttractClientEvents {
         }
 
         if (event.getSound() instanceof AbstractSoundInstance soundInstance) {
-                        ResourceLocation soundRL = soundInstance.getLocation();
+            ResourceLocation soundRL = soundInstance.getLocation();
             if (soundRL == null || soundRL.equals(SoundMessage.VOICE_CHAT_SOUND_ID)) {
                 return;
-            }
-            if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
-                    && !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundRL)) {
-                return; 
             }
 
             SoundEvent se = BuiltInRegistries.SOUND_EVENT.get(soundRL);
