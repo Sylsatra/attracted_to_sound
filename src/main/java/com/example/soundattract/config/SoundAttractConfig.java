@@ -56,11 +56,13 @@ public class SoundAttractConfig {
     public static double TACZ_SHOOT_WEIGHT_CACHE = 15;
     public static boolean TACZ_ENABLED_CACHE = false;
     public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
-    public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static final Map<String, Double> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
     public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
-    public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
+    public static final Map<String, Double> DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
     public static final Map<String, Double> DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static double TACZ_ATTACHMENT_REDUCTION_DEFAULT_CACHE = 20.0;
+    public static double TACZ_ATTACHMENT_FLASH_REDUCTION_DEFAULT_CACHE = 0.0;
     public static boolean POINT_BLANK_ENABLED_CACHE = false;
     public static double POINT_BLANK_RELOAD_RANGE_CACHE = 9.0;
     public static double POINT_BLANK_RELOAD_WEIGHT_CACHE = 1.0;
@@ -321,6 +323,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue gunshotBaseDetectionRange;
         public final ForgeConfigSpec.IntValue gunshotDetectionDurationTicks;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> taczMuzzleFlashReductions;
+        public final ForgeConfigSpec.DoubleValue taczAttachmentFlashReductionDefault;
         public final ForgeConfigSpec.BooleanValue enablePointBlankIntegration;
         public final ForgeConfigSpec.DoubleValue pointBlankReloadRange;
         public final ForgeConfigSpec.DoubleValue pointBlankReloadWeight;
@@ -2193,6 +2196,8 @@ public class SoundAttractConfig {
                             return false;
                         }
                     });
+            taczAttachmentFlashReductionDefault = builder.comment("Default flash reduction value for Tacz attachments if the attachment id is not in the list.")
+                    .defineInRange("taczAttachmentFlashReductionDefault", 0.0, -300.0, 300.0);
 
             builder.pop();
 
@@ -2621,6 +2626,7 @@ public class SoundAttractConfig {
         TACZ_RELOAD_WEIGHT_CACHE = COMMON.taczReloadWeight.get();
         TACZ_SHOOT_RANGE_CACHE = COMMON.taczShootRange.get();
         TACZ_SHOOT_WEIGHT_CACHE = COMMON.taczShootWeight.get();
+        TACZ_ATTACHMENT_REDUCTION_DEFAULT_CACHE = COMMON.taczAttachmentReductionDefault.get();
         TACZ_GUN_SHOOT_DB_CACHE.clear();
         List<? extends String> rawShoot = COMMON.taczGunShootDecibels.get();
         for (String raw : rawShoot) {
@@ -2641,10 +2647,11 @@ public class SoundAttractConfig {
         for (String raw : rawAtt) {
             try {
                 String[] parts = raw.split(";", 2);
-                ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
-                double db = Double.parseDouble(parts[1]);
+                String idStr = parts[0].trim();
+                ResourceLocation rl = ResourceLocation.tryParse(idStr);
+                double reduction = Double.parseDouble(parts[1]);
                 if (rl != null) {
-                    TACZ_ATTACHMENT_REDUCTION_DB_CACHE.put(rl, Pair.of(db, 0.0));
+                    TACZ_ATTACHMENT_REDUCTION_DB_CACHE.put(rl.toString(), reduction);
                 }
             } catch (Exception e) {
             }
@@ -2665,6 +2672,8 @@ public class SoundAttractConfig {
             }
         }
 
+        TACZ_ATTACHMENT_FLASH_REDUCTION_DEFAULT_CACHE = COMMON.taczAttachmentFlashReductionDefault.get();
+
         if (enableDataDriven && !DP_TACZ_GUN_SHOOT_DB_CACHE.isEmpty()) {
             if (datapackOverConfig) {
                 TACZ_GUN_SHOOT_DB_CACHE.clear();
@@ -2681,7 +2690,7 @@ public class SoundAttractConfig {
                 TACZ_ATTACHMENT_REDUCTION_DB_CACHE.clear();
                 TACZ_ATTACHMENT_REDUCTION_DB_CACHE.putAll(DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE);
             } else {
-                for (Map.Entry<ResourceLocation, Pair<Double, Double>> e : DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE.entrySet()) {
+                for (Map.Entry<String, Double> e : DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE.entrySet()) {
                     TACZ_ATTACHMENT_REDUCTION_DB_CACHE.putIfAbsent(e.getKey(), e.getValue());
                 }
             }

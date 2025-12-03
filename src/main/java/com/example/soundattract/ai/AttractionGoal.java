@@ -522,6 +522,8 @@ public class AttractionGoal extends Goal {
                     && bestSoundOverall.pos.distSqr(mobPos)
                     < currentTargetSound.pos.distSqr(mobPos));
             if (!canSwitch) {
+                this.isPursuingSound = true;
+                this.pursuingSoundTicksRemaining = DynamicScanCooldownManager.currentScanCooldownTicks;
                 return currentTargetSound;
             }
         }

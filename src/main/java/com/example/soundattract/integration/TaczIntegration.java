@@ -36,17 +36,20 @@ public class TaczIntegration {
             double reduction = 0.0;
             ResourceLocation muzzleId = iGun.getAttachmentId(event.getGunItemStack(), AttachmentType.MUZZLE);
             if (muzzleId != null) {
-                reduction = SoundAttractConfig.TACZ_MUZZLE_FLASH_REDUCTION_CACHE.getOrDefault(muzzleId.toString(), 0.0);
+                reduction = SoundAttractConfig.TACZ_MUZZLE_FLASH_REDUCTION_CACHE.getOrDefault(
+                        muzzleId.toString(),
+                        SoundAttractConfig.TACZ_ATTACHMENT_FLASH_REDUCTION_DEFAULT_CACHE
+                );
             }
             double finalDetectionRange = Math.max(0, flashRange - reduction);
             StealthDetectionEvents.recordPlayerGunshot(player, finalDetectionRange);
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
-                "[TaczIntegration] Gunshot Flash: BaseRange={}, Muzzle='{}', Reduction={}, FinalRange={}",
-                String.format("%.2f", flashRange),
-                muzzleId != null ? muzzleId.toString() : "None",
-                String.format("%.2f", reduction),
-                String.format("%.2f", finalDetectionRange)
+                        "[TaczIntegration] Gunshot Flash: BaseRange={}, Muzzle='{}', Reduction={}, FinalRange={}",
+                        String.format("%.2f", flashRange),
+                        muzzleId != null ? muzzleId.toString() : "None",
+                        String.format("%.2f", reduction),
+                        String.format("%.2f", finalDetectionRange)
                 );
             }
         }
@@ -127,9 +130,10 @@ public class TaczIntegration {
 
             double reduction = 0.0;
             if (attId != null) {
-                Pair<Double, Double> attachmentStats = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attId);
-                if (attachmentStats != null) {
-                    reduction = attachmentStats.getRight();
+                String attKey = attId.toString();
+                Double configured = SoundAttractConfig.TACZ_ATTACHMENT_REDUCTION_DB_CACHE.get(attKey);
+                if (configured != null) {
+                    reduction = configured;
                 }
             }
 

@@ -34,6 +34,7 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) return false;
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false; 
         if (!leader.isAlive()) return false;
@@ -70,6 +71,7 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) return false;
         if (leader == null || !leader.isAlive()) return false;
 
 
