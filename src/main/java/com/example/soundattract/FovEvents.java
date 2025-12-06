@@ -1,6 +1,7 @@
 package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.integration.EnhancedAICompat;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -117,6 +118,18 @@ public class FovEvents {
         Entity target = event.getLookingEntity();
         if (target == null) {
             return;
+        }
+
+        if (SoundAttractConfig.COMMON.enableXrayTargeting.get()
+                && target instanceof Player player
+                && EnhancedAICompat.isEnhancedAiLoaded()) {
+            double xrayRange = EnhancedAICompat.getXrayAttributeValue(looker);
+            if (xrayRange > 0d) {
+                double distSq = looker.distanceToSqr(player);
+                if (distSq <= xrayRange * xrayRange) {
+                    return;
+                }
+            }
         }
 
         if (!isTargetInFov(looker, target, false)) {

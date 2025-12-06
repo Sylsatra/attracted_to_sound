@@ -289,6 +289,14 @@ public class StealthDetectionEvents {
         if (mob == null) return 0d;
         if (!SoundAttractConfig.COMMON.enableXrayTargeting.get()) return 0d;
 
+        if (EnhancedAICompat.isEnhancedAiLoaded()) {
+            double v = EnhancedAICompat.getXrayAttributeValue(mob);
+            if (v > 0d) {
+                return v;
+            }
+            return 0d;
+        }
+
         try {
             String applyTagStr = SoundAttractConfig.COMMON.xrayApplyTag.get();
             if (applyTagStr == null || applyTagStr.isBlank()) return 0d;
@@ -306,11 +314,6 @@ public class StealthDetectionEvents {
                 SoundAttractMod.LOGGER.warn("[XRAY] Tag check failed for mob {}: {}", mob.getName().getString(), e.getMessage());
             }
             return 0d;
-        }
-
-        if (EnhancedAICompat.isEnhancedAiLoaded()) {
-            double v = EnhancedAICompat.getXrayAttributeValue(mob);
-            return Math.max(0d, v);
         }
 
         Double cached = XRAY_RANGE_CACHE.get(mob.getUUID());
