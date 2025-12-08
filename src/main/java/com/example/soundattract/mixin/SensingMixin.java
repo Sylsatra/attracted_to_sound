@@ -1,6 +1,8 @@
 package com.example.soundattract.mixin;
 
 import com.example.soundattract.FovEvents;
+import com.example.soundattract.StealthDetectionEvents;
+import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.sensing.Sensing;
@@ -24,6 +26,17 @@ public abstract class SensingMixin {
         }
 
         boolean visible = FovEvents.hasSmartLineOfSight(this.mob, player);
+        if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
+            cir.setReturnValue(visible);
+            return;
+        }
+
+        if (!visible) {
+            if (StealthDetectionEvents.canMobDetectPlayer(this.mob, player)) {
+                visible = true;
+            }
+        }
+
         cir.setReturnValue(visible);
     }
 }

@@ -41,6 +41,9 @@ public class AttractionGoal extends Goal {
     private int stuckTicks = 0;
     private static final int STUCK_THRESHOLD = 10;
     private static final int RECALC_THRESHOLD = 30;
+    private long lastMoveToTick = -1L;
+    private BlockPos lastMoveToTarget = null;
+    private static final int MOVE_TO_COOLDOWN_TICKS = 20;
     private int lastSoundTicksRemaining = -1;
     private int scanTickCounter = 0;
     private int scanCooldownCounter = 0;
@@ -250,12 +253,21 @@ public class AttractionGoal extends Goal {
             return false;
         }
 
-        if (this.mob.getNavigation().isDone()) {
-            double arrivalDistSq = getArrivalDistance() * getArrivalDistance();
-            double stopRangeSq = Math.max(4.0D, arrivalDistSq);
-            if (this.mob.blockPosition().distSqr(this.targetSoundPos) <= stopRangeSq) {
+        double arrivalDistSq = getArrivalDistance() * getArrivalDistance();
+        double stopRangeSq = Math.max(4.0D, arrivalDistSq);
+        BlockPos navTarget = getNavigableTarget(this.targetSoundPos);
+        if (navTarget != null) {
+            double dx = this.mob.getX() - (navTarget.getX() + 0.5);
+            double dz = this.mob.getZ() - (navTarget.getZ() + 0.5);
+            double horizontalDistSq = dx * dx + dz * dz;
+            int dy = Math.abs(this.mob.blockPosition().getY() - navTarget.getY());
+            if ((dy > 3 && horizontalDistSq <= stopRangeSq)
+                || this.mob.position().distanceToSqr(Vec3.atCenterOf(navTarget)) <= stopRangeSq) {
                 return false;
             }
+        }
+        if (this.mob.getNavigation().isDone() && this.mob.blockPosition().distSqr(this.targetSoundPos) <= stopRangeSq) {
+            return false;
         }
 
         Mob leader = MobGroupManager.getLeader(mob);
@@ -287,7 +299,9 @@ public class AttractionGoal extends Goal {
     @Override
     public void start() {
         if (this.targetSoundPos != null) {
-            this.mob.getNavigation().moveTo(this.targetSoundPos.getX(), this.targetSoundPos.getY(), this.targetSoundPos.getZ(), this.moveSpeed);
+            BlockPos navTarget = getNavigableTarget(this.targetSoundPos);
+            BlockPos dest = navTarget != null ? navTarget : this.targetSoundPos;
+            this.mob.getNavigation().moveTo(dest.getX(), dest.getY(), dest.getZ(), this.moveSpeed);
         }
     }
 
@@ -307,6 +321,8 @@ public class AttractionGoal extends Goal {
 
         this.chosenDest = null;
         this.hasPicked = false;
+        this.lastMoveToTick = -1L;
+        this.lastMoveToTarget = null;
         
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[AttractionGoal] stop: {}", mob.getName().getString());
@@ -352,17 +368,15 @@ public class AttractionGoal extends Goal {
         boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         Mob leader = MobGroupManager.getLeader(mob);
 
-        if (lastPos != null && lastPos.equals(mob.blockPosition())) {
+        BlockPos navTarget = getNavigableTarget(targetSoundPos);
+
+        if (navTarget != null && mob.position().distanceToSqr(Vec3.atCenterOf(navTarget)) < getArrivalDistance() * getArrivalDistance()) {
+            this.mob.getNavigation().stop();
+            return;
+        }
+
+        if (lastPos != null && mob.position().distanceToSqr(Vec3.atCenterOf(lastPos)) < 1.0) {
             stuckTicks++;
-            if (stuckTicks >= RECALC_THRESHOLD && !mob.getNavigation().isStuck()) {
-                mob.getNavigation().moveTo(
-                    targetSoundPos.getX(),
-                    targetSoundPos.getY(),
-                    targetSoundPos.getZ(),
-                    moveSpeed
-                );
-                stuckTicks = 0;
-            }
         } else {
             stuckTicks = 0;
             lastPos = mob.blockPosition();
@@ -386,6 +400,44 @@ public class AttractionGoal extends Goal {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info("[AttractionGoal] {} stuck: scheduled BlockBreakerPosGoal toward {}.", mob.getName().getString(), targetSoundPos);
                 }
+            }
+        }
+
+        if (!SoundAttractConfig.COMMON.enableBlockBreaking.get()
+            && stuckTicks >= STUCK_THRESHOLD
+            && (mob.getNavigation().isDone() || mob.getNavigation().isStuck())) {
+
+            double arrivalDistSq2 = getArrivalDistance() * getArrivalDistance();
+            double stopRangeSq2 = Math.max(4.0D, arrivalDistSq2);
+            double distSqToNavTarget = navTarget != null
+                ? mob.position().distanceToSqr(Vec3.atCenterOf(navTarget))
+                : Double.MAX_VALUE;
+
+            if (distSqToNavTarget <= stopRangeSq2) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[AttractionGoal] {} stuck near target (distSq={}). Treating as arrived to avoid spinning.",
+                        mob.getName().getString(),
+                        String.format("%.2f", distSqToNavTarget)
+                    );
+                }
+                targetSoundPos = null;
+                this.mob.getNavigation().stop();
+                this.scanCooldownCounter = scanCooldownTicks();
+                return;
+            }
+
+            if (distSqToNavTarget > stopRangeSq2) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[AttractionGoal] {} stuck near ledge, far from target (distSq={}). Giving up to avoid spinning.",
+                        mob.getName().getString(),
+                        String.format("%.2f", distSqToNavTarget)
+                    );
+                }
+                targetSoundPos = null;
+                this.mob.getNavigation().stop();
+                return;
             }
         }
 
@@ -463,10 +515,12 @@ public class AttractionGoal extends Goal {
                     cachedSound = relayedSoundRecord;
                     targetSoundPos = cachedSound.pos;
                     currentTargetWeight = cachedSound.weight;
+                    BlockPos relayNavTarget = getNavigableTarget(targetSoundPos);
+                    BlockPos dest = relayNavTarget != null ? relayNavTarget : targetSoundPos;
                     mob.getNavigation().moveTo(
-                        targetSoundPos.getX(),
-                        targetSoundPos.getY(),
-                        targetSoundPos.getZ(),
+                        dest.getX(),
+                        dest.getY(),
+                        dest.getZ(),
                         this.moveSpeed
                     );
                     pursuingSoundTicksRemaining = relayedSoundRecord.ticksRemaining > 0
@@ -479,22 +533,12 @@ public class AttractionGoal extends Goal {
         if (leader != null && smartEdge && !hasFollowerEdgeRelayGoal()) {
             if (edgeMobState == null) {
                 edgeMobState = EdgeMobState.GOING_TO_SOUND;
-                mob.getNavigation().moveTo(
-                    targetSoundPos.getX(),
-                    targetSoundPos.getY(),
-                    targetSoundPos.getZ(),
-                    this.moveSpeed
-                );
+                moveToThrottled(navTarget, this.moveSpeed);
             }
 
             if (edgeMobState == EdgeMobState.GOING_TO_SOUND) {
-                mob.getNavigation().moveTo(
-                    targetSoundPos.getX(),
-                    targetSoundPos.getY(),
-                    targetSoundPos.getZ(),
-                    this.moveSpeed
-                );
-                if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos))
+                moveToThrottled(navTarget, this.moveSpeed);
+                if (navTarget != null && mob.position().distanceToSqr(Vec3.atCenterOf(navTarget))
                     < getArrivalDistance() * getArrivalDistance()
                 ) {
                     edgeArrivalTicks++;
@@ -533,12 +577,7 @@ public class AttractionGoal extends Goal {
                 }
             } else if (edgeMobState == EdgeMobState.RETURNING_TO_LEADER) {
                 if (leader != null && !leader.isRemoved() && leader.isAlive()) {
-                    mob.getNavigation().moveTo(
-                        leader.getX(),
-                        leader.getY(),
-                        leader.getZ(),
-                        this.moveSpeed * 0.8
-                    );
+                    moveToThrottled(leader.blockPosition(), this.moveSpeed * 0.8);
                     if (mob.distanceToSqr(leader)
                         < (getArrivalDistance() + 2.0) * (getArrivalDistance() + 2.0)
                     ) {
@@ -553,12 +592,45 @@ public class AttractionGoal extends Goal {
                 }
             }
         } else {
-            mob.getNavigation().moveTo(
-                targetSoundPos.getX(),
-                targetSoundPos.getY(),
-                targetSoundPos.getZ(),
-                this.moveSpeed
-            );
+            BlockPos center = navTarget != null ? navTarget : this.targetSoundPos;
+            if (center != null) {
+                if (!hasPicked) {
+                    double arrivalDist = getArrivalDistance();
+                    net.minecraft.util.RandomSource rand = this.mob.getRandom();
+                    double angle = rand.nextDouble() * (Math.PI * 2.0);
+                    double radius = arrivalDist * Math.sqrt(rand.nextDouble());
+                    double offsetX = Math.cos(angle) * radius;
+                    double offsetZ = Math.sin(angle) * radius;
+                    int blockX = center.getX() + (int) Math.floor(offsetX);
+                    int blockZ = center.getZ() + (int) Math.floor(offsetZ);
+                    int groundY = mob.level().getHeight(
+                        Heightmap.Types.MOTION_BLOCKING,
+                        blockX,
+                        blockZ
+                    );
+                    double finalX = blockX + 0.5;
+                    double finalY = groundY;
+                    double finalZ = blockZ + 0.5;
+                    chosenDest = new Vec3(finalX, finalY, finalZ);
+                    hasPicked = true;
+                }
+
+                if (chosenDest != null) {
+                    Vec3 cur = mob.position();
+                    if (cur.distanceToSqr(chosenDest) > 1.5 * 1.5) {
+                        mob.getNavigation().moveTo(
+                            chosenDest.x,
+                            chosenDest.y,
+                            chosenDest.z,
+                            moveSpeed
+                        );
+                    }
+                    if (mob.getNavigation().isDone()) {
+                        hasPicked = false;
+                        chosenDest = null;
+                    }
+                }
+            }
         }
 
         if (isPursuingSound && this.cachedSound != null) {
@@ -678,5 +750,41 @@ public class AttractionGoal extends Goal {
     private boolean hasFollowerEdgeRelayGoal() {
         return this.mob.goalSelector.getAvailableGoals().stream()
             .anyMatch(w -> w.getGoal() instanceof com.example.soundattract.ai.FollowerEdgeRelayGoal);
+    }
+
+    private BlockPos getNavigableTarget(BlockPos soundPos) {
+        if (soundPos == null) return null;
+
+        Level level = this.mob.level();
+        int x = soundPos.getX();
+        int z = soundPos.getZ();
+        int groundY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+
+        int soundY = soundPos.getY();
+        int dy = Math.abs(groundY - soundY);
+
+
+        if (dy <= 3 || level.isEmptyBlock(soundPos)) {
+            return new BlockPos(x, groundY, z);
+        }
+
+        return soundPos;
+    }
+
+    private void moveToThrottled(BlockPos dest, double speed) {
+        moveToThrottled(dest, speed, false);
+    }
+
+    private void moveToThrottled(BlockPos dest, double speed, boolean force) {
+        if (dest == null) return;
+        long nowTick = this.mob.level().getGameTime();
+        boolean targetChanged = this.lastMoveToTarget == null || !this.lastMoveToTarget.equals(dest);
+        boolean cooldownElapsed = this.lastMoveToTick < 0 || (nowTick - this.lastMoveToTick) >= MOVE_TO_COOLDOWN_TICKS;
+        boolean navDoneOrStuck = this.mob.getNavigation().isDone() || this.mob.getNavigation().isStuck();
+        if (force || targetChanged || navDoneOrStuck || cooldownElapsed) {
+            this.mob.getNavigation().moveTo(dest.getX(), dest.getY(), dest.getZ(), speed);
+            this.lastMoveToTick = nowTick;
+            this.lastMoveToTarget = dest;
+        }
     }
 }

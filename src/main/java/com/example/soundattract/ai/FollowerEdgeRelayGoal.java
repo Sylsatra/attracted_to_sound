@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
@@ -27,11 +28,24 @@ public class FollowerEdgeRelayGoal extends Goal {
 
     private SoundTracker.SoundRecord cachedSound = null;
 
+    private long cacheTick = -1L;
+    private SoundTracker.SoundRecord soundResultCache = null;
+
+    private BlockPos lastIssuedNavTarget = null;
+    private int repathCooldown = 0;
+    private static final int REPATH_COOLDOWN_TICKS = 6;
+
     private BlockBreakerPosGoal blockBreakerGoal = null;
 
     private enum EdgeMobState { GOING_TO_SOUND, RETURNING_TO_LEADER }
     private EdgeMobState edgeMobState = null;
     private boolean raidScheduled = false;
+    private boolean foundPlayerOrHit = false;
+    private boolean relayedToLeader = false;
+    private int edgeArrivalTicks = 0;
+    private static final int EDGE_WAIT_TICKS = 15;
+    private Mob cachedReturnLeader = null;
+    private int returnLogCooldown = 0;
 
     public FollowerEdgeRelayGoal(Mob mob, double moveSpeed) {
         this.mob = mob;
@@ -54,10 +68,58 @@ public class FollowerEdgeRelayGoal extends Goal {
         return SoundAttractConfig.COMMON.arrivalDistance.get();
     }
 
+    private SoundTracker.SoundRecord getCachedNearestSound() {
+        long currentTick = this.mob.level().getGameTime();
+        if (this.cacheTick == currentTick) {
+            return this.soundResultCache;
+        }
+        this.cacheTick = currentTick;
+        this.soundResultCache = findNearestSound();
+        return this.soundResultCache;
+    }
+
     private SoundTracker.SoundRecord findNearestSound() {
         Level level = this.mob.level();
         if (level.isClientSide()) return null;
         return SoundTracker.findNearestSound(this.mob, level, this.mob.blockPosition(), this.mob.getEyePosition());
+    }
+
+    private BlockPos getNavigableTarget(BlockPos soundPos) {
+        if (soundPos == null) return null;
+        Level level = this.mob.level();
+        int x = soundPos.getX();
+        int z = soundPos.getZ();
+        int groundY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
+        int soundY = soundPos.getY();
+        int dy = Math.abs(groundY - soundY);
+        if (dy <= 3 || level.isEmptyBlock(soundPos)) {
+            return new BlockPos(x, groundY, z);
+        }
+        return soundPos;
+    }
+
+    private void moveToThrottled(BlockPos dest, double speed, boolean force) {
+        if (dest == null) return;
+        if (force) {
+            this.mob.getNavigation().moveTo(dest.getX(), dest.getY(), dest.getZ(), speed);
+            this.lastIssuedNavTarget = dest;
+            this.repathCooldown = REPATH_COOLDOWN_TICKS;
+            return;
+        }
+        boolean destChanged = (this.lastIssuedNavTarget == null) || !this.lastIssuedNavTarget.equals(dest);
+        boolean navDoneOrStuck = this.mob.getNavigation().isDone() || this.mob.getNavigation().isStuck();
+        if (this.repathCooldown > 0 && !destChanged && !navDoneOrStuck) {
+            this.repathCooldown--;
+            return;
+        }
+
+        double distSq = dest.distSqr(this.mob.blockPosition());
+        double thresholdSq = 4.0;
+        if (destChanged || navDoneOrStuck || distSq > thresholdSq) {
+            this.mob.getNavigation().moveTo(dest.getX(), dest.getY(), dest.getZ(), speed);
+            this.lastIssuedNavTarget = dest;
+            this.repathCooldown = REPATH_COOLDOWN_TICKS;
+        }
     }
 
     @Override
@@ -75,7 +137,7 @@ public class FollowerEdgeRelayGoal extends Goal {
         }
         scanCooldownCounter = scanCooldownTicks();
 
-        SoundTracker.SoundRecord newSound = findNearestSound();
+        SoundTracker.SoundRecord newSound = getCachedNearestSound();
         if (newSound == null) {
             return false;
         }
@@ -99,7 +161,7 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping()) return false;
         if (this.targetSoundPos == null) return false;
 
-        SoundTracker.SoundRecord bestSound = findNearestSound();
+        SoundTracker.SoundRecord bestSound = getCachedNearestSound();
         if (bestSound == null) return false;
         if (bestSound.pos.equals(this.targetSoundPos)) {
             this.cachedSound = bestSound;
@@ -119,11 +181,24 @@ public class FollowerEdgeRelayGoal extends Goal {
 
     @Override
     public void stop() {
+        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
+        Mob leader = MobGroupManager.getLeader(mob);
         this.mob.getNavigation().stop();
-        this.edgeMobState = null;
-        this.targetSoundPos = null;
-        this.cachedSound = null;
-        this.raidScheduled = false;
+        if (this.mob.isSprinting()) this.mob.setSprinting(false);
+        if (leader != mob && smartEdge && edgeMobState == EdgeMobState.GOING_TO_SOUND) {
+            edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
+            edgeArrivalTicks = 0;
+        } else {
+            edgeMobState = null;
+        }
+        foundPlayerOrHit = false;
+        relayedToLeader = false;
+        edgeArrivalTicks = 0;
+        cachedReturnLeader = null;
+        returnLogCooldown = 0;
+        raidScheduled = false;
+        this.lastIssuedNavTarget = null;
+        this.repathCooldown = 0;
     }
 
     @Override
@@ -132,8 +207,8 @@ public class FollowerEdgeRelayGoal extends Goal {
 
         Mob leader = MobGroupManager.getLeader(mob);
         boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
+        BlockPos navTarget = this.targetSoundPos != null ? getNavigableTarget(this.targetSoundPos) : null;
 
-        // Stuck/Block breaking
         if (lastPos != null && mob.position().distanceToSqr(Vec3.atCenterOf(lastPos)) < 1.0) {
             stuckTicks++;
         } else {
@@ -174,7 +249,7 @@ public class FollowerEdgeRelayGoal extends Goal {
 
         if (!smartEdge) {
             if (this.targetSoundPos != null) {
-                this.mob.getNavigation().moveTo(targetSoundPos.getX(), targetSoundPos.getY(), targetSoundPos.getZ(), this.moveSpeed);
+                moveToThrottled(navTarget != null ? navTarget : this.targetSoundPos, this.moveSpeed, false);
             }
             return;
         }
@@ -184,7 +259,6 @@ public class FollowerEdgeRelayGoal extends Goal {
         }
 
         if (edgeMobState == EdgeMobState.GOING_TO_SOUND) {
-            // If stealth would suppress targeting, signal a RAID and return
             if (StealthDetectionEvents.shouldSuppressTargeting(this.mob)) {
                 if (!raidScheduled && !MobGroupManager.isDeserter(this.mob)) {
                     Mob raidLeader = MobGroupManager.getLeader(this.mob);
@@ -200,20 +274,34 @@ public class FollowerEdgeRelayGoal extends Goal {
                 edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
                 this.mob.getNavigation().stop();
             } else {
-                this.mob.getNavigation().moveTo(targetSoundPos.getX(), targetSoundPos.getY(), targetSoundPos.getZ(), this.moveSpeed);
-                if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < getArrivalDistance() * getArrivalDistance()) {
-                    if (!raidScheduled && !MobGroupManager.isDeserter(this.mob)) {
-                        Mob raidLeader = MobGroupManager.getLeader(this.mob);
-                        if (raidLeader == this.mob) raidLeader = null;
-                        if (raidLeader != null && !RaidManager.isRaidTicking(raidLeader) && !RaidManager.isRaidAdvancing(raidLeader)) {
-                            RaidManager.scheduleRaid(raidLeader, this.targetSoundPos, this.mob.level().getGameTime());
-                            raidScheduled = true;
-                            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                                SoundAttractMod.LOGGER.info("[FollowerEdgeRelayGoal] {} arrival -> schedule RAID for leader {} at {}.", mob.getName().getString(), raidLeader.getName().getString(), this.targetSoundPos);
+                moveToThrottled(navTarget != null ? navTarget : this.targetSoundPos, this.moveSpeed, false);
+                BlockPos arrivalCheck = navTarget != null ? navTarget : this.targetSoundPos;
+                if (arrivalCheck != null && mob.position().distanceToSqr(Vec3.atCenterOf(arrivalCheck)) < getArrivalDistance() * getArrivalDistance()) {
+                    edgeArrivalTicks++;
+                    if (edgeArrivalTicks >= EDGE_WAIT_TICKS || foundPlayerOrHit) {
+                        if (!MobGroupManager.isDeserter(this.mob)) {
+                            Mob raidLeader = MobGroupManager.getLeader(this.mob);
+                            if (raidLeader != null && !raidScheduled && !RaidManager.isRaidTicking(raidLeader) && !RaidManager.isRaidAdvancing(raidLeader)) {
+                                RaidManager.scheduleRaid(raidLeader, this.targetSoundPos, this.mob.level().getGameTime());
+                                raidScheduled = true;
+                                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                                    SoundAttractMod.LOGGER.info("[FollowerEdgeRelayGoal] {} arrival -> schedule RAID for leader {} at {}.", mob.getName().getString(), raidLeader.getName().getString(), this.targetSoundPos);
+                                }
                             }
                         }
+                        if (MobGroupManager.isDeserter(this.mob)) {
+                            this.targetSoundPos = null;
+                            this.edgeMobState = null;
+                            this.cachedReturnLeader = null;
+                            return;
+                        }
+                        this.mob.getNavigation().stop();
+                        this.cachedReturnLeader = leader != mob ? leader : null;
+                        this.edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
+                        this.lastIssuedNavTarget = null;
+                        edgeArrivalTicks = 0;
+                        returnLogCooldown = 0;
                     }
-                    edgeMobState = EdgeMobState.RETURNING_TO_LEADER;
                 }
             }
         } else if (edgeMobState == EdgeMobState.RETURNING_TO_LEADER) {
@@ -222,19 +310,32 @@ public class FollowerEdgeRelayGoal extends Goal {
                 edgeMobState = null;
                 return;
             }
-            Mob returnLeader = leader != mob ? leader : null;
+            Mob returnLeader = this.cachedReturnLeader != null ? this.cachedReturnLeader : (leader != mob ? leader : null);
             if (returnLeader != null && !returnLeader.isRemoved() && !returnLeader.isDeadOrDying()) {
+                if (!this.mob.isSprinting()) this.mob.setSprinting(true);
                 double sprintMult = SoundAttractConfig.COMMON.groupSprintMultiplier.get();
-                this.mob.getNavigation().moveTo(returnLeader.getX(), returnLeader.getY(), returnLeader.getZ(), this.moveSpeed * sprintMult);
+                moveToThrottled(returnLeader.blockPosition(), this.moveSpeed * sprintMult, false);
                 double arrive = SoundAttractConfig.COMMON.leaderReturnArrivalDistance.get();
                 if (mob.distanceToSqr(returnLeader) < (arrive * arrive)) {
+                    if (this.mob.isSprinting()) this.mob.setSprinting(false);
                     this.targetSoundPos = null;
                     this.edgeMobState = null;
+                    this.cachedReturnLeader = null;
+                    this.lastIssuedNavTarget = null;
+                    returnLogCooldown = 0;
+                    return;
                 }
             } else {
+                if (this.mob.isSprinting()) this.mob.setSprinting(false);
                 this.targetSoundPos = null;
                 this.edgeMobState = null;
+                this.cachedReturnLeader = null;
+                this.lastIssuedNavTarget = null;
             }
+        }
+
+        if (this.edgeMobState != EdgeMobState.RETURNING_TO_LEADER && this.mob.isSprinting()) {
+            this.mob.setSprinting(false);
         }
     }
 }

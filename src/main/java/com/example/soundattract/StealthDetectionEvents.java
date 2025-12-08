@@ -130,17 +130,44 @@ public class StealthDetectionEvents {
         Level level = mob.level();
         double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
         double distSq = mob.distanceToSqr(player);
+        double xrayRange = getEffectiveXrayRange(mob);
 
-        if (distSq > detectionRange * detectionRange) {
+        double detectionRangeSq = detectionRange * detectionRange;
+        double xrayRangeSq = xrayRange > 0 ? xrayRange * xrayRange : 0.0D;
+        double maxRangeSq = Math.max(detectionRangeSq, xrayRangeSq);
+
+        if (distSq > maxRangeSq) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
-                        "[StealthQuery] Player {} is OUT OF RANGE for mob {} (distSq: {}, rangeSq: {}).",
+                        "[StealthQuery] Player {} is OUT OF RANGE for mob {} (distSq: {}, stealthRangeSq: {}, xrayRangeSq: {}).",
                         player.getName().getString(), mob.getName().getString(),
                         String.format("%.2f", distSq),
-                        String.format("%.2f", (detectionRange * detectionRange))
+                        String.format("%.2f", detectionRangeSq),
+                        String.format("%.2f", xrayRangeSq)
                 );
             }
             return false;
+        }
+
+        boolean inFovNoObstruction = FovEvents.isTargetInFov(mob, player, false);
+        if (!inFovNoObstruction) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info(
+                        "[StealthQuery] Player {} is IN RANGE for mob {} but OUTSIDE FOV. Denying detection.",
+                        player.getName().getString(), mob.getName().getString()
+                );
+            }
+            return false;
+        }
+
+        if (xrayRange > 0 && distSq <= xrayRangeSq) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info(
+                        "[StealthQuery] Player {} detected by mob {} via XRAY range {}.",
+                        player.getName().getString(), mob.getName().getString(), String.format("%.2f", xrayRange)
+                );
+            }
+            return true;
         }
 
         if (!FovEvents.isTargetInFov(mob, player, true)) {
@@ -151,16 +178,6 @@ public class StealthDetectionEvents {
                 );
             }
             return false;
-        }
-        double xrayRange = getEffectiveXrayRange(mob);
-        if (xrayRange > 0 && distSq <= xrayRange * xrayRange) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info(
-                        "[StealthQuery] Player {} detected by mob {} via XRAY range {}.",
-                        player.getName().getString(), mob.getName().getString(), String.format("%.2f", xrayRange)
-                );
-            }
-            return true;
         }
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {

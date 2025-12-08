@@ -2,8 +2,10 @@ package com.example.soundattract.ai;
 
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.levelgen.Heightmap;
 import java.util.EnumSet;
 
 public class FollowLeaderGoal extends Goal {
@@ -53,7 +55,8 @@ public class FollowLeaderGoal extends Goal {
         double radius = arrival * (0.5 + rand.nextDouble() * 0.5);
         int x = leaderTarget.getX() + (int) Math.floor(Math.cos(angle) * radius);
         int z = leaderTarget.getZ() + (int) Math.floor(Math.sin(angle) * radius);
-        return new BlockPos(x, leaderTarget.getY(), z);
+        int groundY = this.mob.level().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return new BlockPos(x, groundY, z);
     }
 
     public FollowLeaderGoal(Mob mob, double moveSpeed) {
@@ -71,7 +74,7 @@ public class FollowLeaderGoal extends Goal {
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false;
 
-        if (this.mob.distanceToSqr(this.leader) < getGroupDistance() * getGroupDistance()) {
+        if (this.mob.distanceToSqr(this.leader) > getGroupDistance() * getGroupDistance()) {
             return false;
         }
 
@@ -79,8 +82,9 @@ public class FollowLeaderGoal extends Goal {
         if (smartEdge && MobGroupManager.isEdgeMob(mob)) return false;
         if (!leader.isAlive()) return false;
 
-        leaderAttractionGoal = this.leader.goalSelector.getAvailableGoals().stream()
-            .map(net.minecraft.world.entity.ai.goal.WrappedGoal::getGoal)
+        leaderAttractionGoal = leader.goalSelector.getAvailableGoals().stream()
+            .filter(WrappedGoal::isRunning)
+            .map(WrappedGoal::getGoal)
             .filter(goal -> goal instanceof AttractionGoal)
             .map(goal -> (AttractionGoal) goal)
             .filter(AttractionGoal::isPursuingSound)
@@ -105,7 +109,20 @@ public class FollowLeaderGoal extends Goal {
             return true;
         }
 
-        if (leaderAttractionGoal == null || !leaderAttractionGoal.isPursuingSound()) {
+        leaderAttractionGoal = leader.goalSelector.getAvailableGoals().stream()
+            .filter(WrappedGoal::isRunning)
+            .map(WrappedGoal::getGoal)
+            .filter(goal -> goal instanceof AttractionGoal)
+            .map(goal -> (AttractionGoal) goal)
+            .filter(AttractionGoal::isPursuingSound)
+            .findFirst()
+            .orElse(null);
+
+        if (leaderAttractionGoal == null) {
+            return false;
+        }
+
+        if (leader.getNavigation().isDone()) {
             return false;
         }
 
@@ -162,7 +179,6 @@ public class FollowLeaderGoal extends Goal {
                     this.myStableDestination.getZ() + 0.5,
                     speed
                 );
-                startMovingToDestination(speed);
             }
         } else if (curPos.distanceToSqr(leaderPos) > 4.0) {
             moveTowardsLeader(speed);
@@ -171,8 +187,9 @@ public class FollowLeaderGoal extends Goal {
         if (lastPosSample != null && curPos.distanceToSqr(lastPosSample) < 0.04) {
             stuckTicks++;
             if (stuckTicks > stuckThreshold) {
-                stuckTicks = 0;
+                this.myStableDestination = calculateStableDestination(this.leaderObjectivePos != null ? this.leaderObjectivePos : this.leader.blockPosition());
                 startMovingToDestination(speed);
+                stuckTicks = 0;
             }
         } else {
             stuckTicks = 0;
@@ -190,13 +207,19 @@ public class FollowLeaderGoal extends Goal {
             }
         }
 
-        if (com.example.soundattract.config.SoundAttractConfig.COMMON.enableBlockBreaking.get()) {
-            double distSqToTarget = this.myStableDestination != null
-                ? this.mob.position().distanceToSqr(Vec3.atCenterOf(this.myStableDestination))
-                : curPos.distanceToSqr(leaderPos);
-            boolean navIdleAndFar = this.mob.getNavigation().isDone() && distSqToTarget > 4.0;
-            boolean trulyStuck = stuckTicks >= 10;
+        boolean enableBlockBreaking = com.example.soundattract.config.SoundAttractConfig.COMMON.enableBlockBreaking.get();
+        double distSqToTarget = this.myStableDestination != null
+            ? this.mob.position().distanceToSqr(Vec3.atCenterOf(this.myStableDestination))
+            : curPos.distanceToSqr(leaderPos);
+        boolean navIdleAndFar = this.mob.getNavigation().isDone() && distSqToTarget > 4.0;
+        boolean trulyStuck = stuckTicks >= 10;
 
+        if (!enableBlockBreaking && (navIdleAndFar || trulyStuck)) {
+            this.myStableDestination = null;
+            this.mob.getNavigation().stop();
+        }
+
+        if (enableBlockBreaking) {
             if (this.followerBreaker != null) {
                 boolean running = this.mob.goalSelector.getAvailableGoals().stream()
                     .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
@@ -224,12 +247,16 @@ public class FollowLeaderGoal extends Goal {
 
         if (leaderAttractionGoal == null && !com.example.soundattract.ai.RaidManager.isRaidAdvancing(this.leader) && this.mob.distanceToSqr(this.leader) < getGroupDistance() * getGroupDistance()) {
             this.mob.getNavigation().stop();
+            if (this.mob.isSprinting()) {
+                this.mob.setSprinting(false);
+            }
         }
     }
 
     @Override
     public void stop() {
         mob.getNavigation().stop();
+        if (mob.isSprinting()) mob.setSprinting(false);
         leader = null;
         leaderAttractionGoal = null;
         leaderObjectivePos = null;
