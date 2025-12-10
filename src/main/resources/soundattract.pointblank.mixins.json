@@ -1,0 +1,11 @@
+{
+  "required": false,
+  "package": "com.example.soundattract.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.example.soundattract.mixin.SoundAttractMixinPlugin",
+  "mixins": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,108 @@
+package com.example.soundattract;
+
+import org.slf4j.Logger;
+
+import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.loot.ModLootModifiers;
+import com.example.soundattract.event.AIModificationEvents;
+// COMMENTED OUT FOR 1.21.11 - Integration mods not available
+// import com.example.soundattract.integration.TaczIntegrationServerEvents;
+// import com.example.soundattract.integration.PlasmoVoiceBootstrap;
+import com.example.soundattract.integration.VanillaIntegrationEvents;
+import com.mojang.logging.LogUtils;
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.config.ModConfigEvent;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+
+@Mod(SoundAttractMod.MOD_ID)
+public class SoundAttractMod {
+    public static final String MOD_ID = "soundattract";
+    public static final Logger LOGGER = LogUtils.getLogger();
+
+    public SoundAttractMod(IEventBus modEventBus, ModContainer container) {
+
+        modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::clientSetup);
+        modEventBus.addListener(this::onConfigLoad);
+        modEventBus.addListener(this::onConfigReload);
+        ModLootModifiers.register(modEventBus);
+        modEventBus.addListener(this::registerPacketHandlers);
+
+        container.registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC);
+
+        NeoForge.EVENT_BUS.register(new FovEvents());
+        NeoForge.EVENT_BUS.register(new StealthDetectionEvents());
+        NeoForge.EVENT_BUS.register(new AIModificationEvents());
+        NeoForge.EVENT_BUS.register(new SoundAttractionEvents());
+        NeoForge.EVENT_BUS.register(VanillaIntegrationEvents.class);
+        // COMMENTED OUT FOR 1.21.11 - TACZ not available for NeoForge 1.21.11
+        // com.example.soundattract.integration.TaczIntegration.register();
+
+        // COMMENTED OUT FOR 1.21.11 - Plasmo Voice not available for NeoForge 1.21.11
+        // NeoForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
+
+        modEventBus.addListener(this::onClientSetup);
+
+        NeoForge.EVENT_BUS.register(this);
+    }
+
+    private void commonSetup(final FMLCommonSetupEvent event) {
+    }
+
+    private void onClientSetup(final FMLClientSetupEvent event) {
+        LOGGER.info("[SoundAttractMod] Registering SoundAttractClientEvents on client setup");
+        NeoForge.EVENT_BUS.register(new SoundAttractClientEvents());
+        LOGGER.info("[SoundAttractMod] SoundAttractClientEvents registered successfully");
+    }
+
+    private void onConfigLoad(final ModConfigEvent.Loading event) {
+        if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
+            LOGGER.info("Baking SoundAttractMod config values due to config event.");
+            SoundAttractConfig.bakeConfig();
+        }
+    }
+
+    private void onConfigReload(final ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == SoundAttractConfig.COMMON_SPEC) {
+            LOGGER.info("Re-baking SoundAttractMod config values due to config reload.");
+            SoundAttractConfig.bakeConfig();
+        }
+    }
+
+    private void clientSetup(final FMLClientSetupEvent event) {
+        if (ModList.get().isLoaded("voicechat")) {
+            LOGGER.info("[SoundAttractMod] VoiceChat mod is loaded. Integration is active.");
+        } else {
+            LOGGER.info("[SoundAttractMod] VoiceChat mod not present; skipping integration");
+        }
+    }
+    private void registerPacketHandlers(final RegisterPayloadHandlersEvent event) {
+        final PayloadRegistrar registrar = event.registrar("1");
+
+        registrar.playToServer(SoundMessage.TYPE, SoundMessage.STREAM_CODEC, SoundMessage::handle);
+    }
+
+    @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        SoundTracker.initialize();
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        SoundTracker.shutdown();
+    }
+}

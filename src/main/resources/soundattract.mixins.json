@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "com.example.soundattract.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ItemStackMixin",
+    "HurtByTargetGoalMixin",
+    "LivingEntityAccessorMixin",
+    "SensingMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
