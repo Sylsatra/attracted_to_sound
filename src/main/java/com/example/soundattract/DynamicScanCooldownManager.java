@@ -30,7 +30,7 @@ public class DynamicScanCooldownManager {
             long ticksElapsed = totalTickCount - lastTickCount;
             long timeElapsedMs = now - lastCheckTime;
 
-            if (ticksElapsed > 0 && timeElapsedMs > 100) { 
+            if (ticksElapsed > 0 && timeElapsedMs > 0) { 
                 double tps = (double) ticksElapsed * 1000.0 / timeElapsedMs;
                 
                 double lowTpsThreshold = SoundAttractConfig.COMMON.minTpsForScanCooldown.get();

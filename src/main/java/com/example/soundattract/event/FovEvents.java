@@ -238,13 +238,19 @@ public class FovEvents {
             LosPairKey pairKey = new LosPairKey(dim, looker.getId(), target.getId());
             LOS_PAIR_CACHE.put(pairKey, new LosPairEntry(result, now));
             if (maxEntriesFinal > 0 && LOS_PAIR_CACHE.size() > maxEntriesFinal) {
-                LOS_PAIR_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime()) > 1L);
+                java.util.Iterator<java.util.Map.Entry<LosPairKey, LosPairEntry>> it = LOS_PAIR_CACHE.entrySet().iterator();
+                while (it.hasNext()) {
+                    java.util.Map.Entry<LosPairKey, LosPairEntry> e = it.next();
+                    if ((now - e.getValue().gameTime()) > 1L) {
+                        it.remove();
+                    }
+                }
                 if (LOS_PAIR_CACHE.size() > maxEntriesFinal) {
                     int toRemove = LOS_PAIR_CACHE.size() - maxEntriesFinal;
-                    java.util.List<java.util.Map.Entry<LosPairKey, LosPairEntry>> list = new java.util.ArrayList<>(LOS_PAIR_CACHE.entrySet());
-                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime()));
-                    for (int i = 0; i < toRemove && i < list.size(); i++) {
-                        LOS_PAIR_CACHE.remove(list.get(i).getKey());
+                    java.util.Iterator<java.util.Map.Entry<LosPairKey, LosPairEntry>> it2 = LOS_PAIR_CACHE.entrySet().iterator();
+                    for (int i = 0; i < toRemove && it2.hasNext(); i++) {
+                        it2.next();
+                        it2.remove();
                     }
                 }
             }
@@ -280,7 +286,7 @@ public class FovEvents {
                     .append(q(end.x)).append(',').append(q(end.y)).append(',').append(q(end.z))
                     .toString();
 
-            Boolean cached = QuantifiedCacheCompat.getCached(
+            Boolean cached = QuantifiedCacheCompat.getCachedDisk(
                 "soundattract_los_raycast",
                 key,
                 () -> Boolean.valueOf(raycastIgnoringNonBlockingUncached(level, start, end, looker)),
@@ -300,13 +306,19 @@ public class FovEvents {
         boolean computed = raycastIgnoringNonBlockingUncached(level, start, end, looker);
         LOS_CACHE.put(cacheKey, new LosCacheEntry(computed, now));
         if (maxEntriesFinal > 0 && LOS_CACHE.size() > maxEntriesFinal) {
-            LOS_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime()) > ttlTicksFinal);
+            java.util.Iterator<java.util.Map.Entry<LosCacheKey, LosCacheEntry>> it = LOS_CACHE.entrySet().iterator();
+            while (it.hasNext()) {
+                java.util.Map.Entry<LosCacheKey, LosCacheEntry> e = it.next();
+                if ((now - e.getValue().gameTime()) > ttlTicksFinal) {
+                    it.remove();
+                }
+            }
             if (LOS_CACHE.size() > maxEntriesFinal) {
                 int toRemove = LOS_CACHE.size() - maxEntriesFinal;
-                java.util.List<java.util.Map.Entry<LosCacheKey, LosCacheEntry>> list = new java.util.ArrayList<>(LOS_CACHE.entrySet());
-                list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime()));
-                for (int i = 0; i < toRemove && i < list.size(); i++) {
-                    LOS_CACHE.remove(list.get(i).getKey());
+                java.util.Iterator<java.util.Map.Entry<LosCacheKey, LosCacheEntry>> it2 = LOS_CACHE.entrySet().iterator();
+                for (int i = 0; i < toRemove && it2.hasNext(); i++) {
+                    it2.next();
+                    it2.remove();
                 }
             }
         }

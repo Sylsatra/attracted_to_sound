@@ -457,7 +457,7 @@ public class SoundTracker {
                 .append(src.getX()).append(',').append(src.getY()).append(',').append(src.getZ())
                 .toString();
 
-            return QuantifiedCacheCompat.getCached(
+            return QuantifiedCacheCompat.getCachedDisk(
                 "soundattract_raycast_muffling",
                 key,
                 () -> computeBlockMuffling(level, src, dst, origRange, origWeight, soundId),
@@ -489,13 +489,19 @@ public class SoundTracker {
             RAYCAST_CACHE.put(cacheKey, new RaycastEntry(finalResult, level.getGameTime()));
             if (RAYCAST_CACHE.size() > raycastMax) {
                 long now = level.getGameTime();
-                RAYCAST_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime) > raycastTtl);
+                Iterator<Map.Entry<RaycastCacheKey, RaycastEntry>> it = RAYCAST_CACHE.entrySet().iterator();
+                while (it.hasNext()) {
+                    Map.Entry<RaycastCacheKey, RaycastEntry> e = it.next();
+                    if ((now - e.getValue().gameTime) > raycastTtl) {
+                        it.remove();
+                    }
+                }
                 if (RAYCAST_CACHE.size() > raycastMax) {
                     int toRemove = RAYCAST_CACHE.size() - raycastMax;
-                    java.util.List<java.util.Map.Entry<RaycastCacheKey, RaycastEntry>> list = new java.util.ArrayList<>(RAYCAST_CACHE.entrySet());
-                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime));
-                    for (int i = 0; i < toRemove && i < list.size(); i++) {
-                        RAYCAST_CACHE.remove(list.get(i).getKey());
+                    Iterator<Map.Entry<RaycastCacheKey, RaycastEntry>> it2 = RAYCAST_CACHE.entrySet().iterator();
+                    for (int i = 0; i < toRemove && it2.hasNext(); i++) {
+                        it2.next();
+                        it2.remove();
                     }
                 }
             }

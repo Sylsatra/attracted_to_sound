@@ -802,17 +802,9 @@ public class StealthDetectionEvents {
             );
         }
 
-        if (isVisuallyCrawling) {
+        if (isVisuallyCrawling || playerHeight <= 1.0F) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info("[DetermineStance] Player {} is CRAWLING (VisualCrawl: true, Pose: {}, Height: {})",
-                        player.getName().getString(), currentPose, String.format("%.2f", playerHeight));
-            }
-            return PlayerStance.CRAWLING;
-        }
-
-        if (currentPose == Pose.SWIMMING || currentPose == Pose.SPIN_ATTACK || currentPose == Pose.FALL_FLYING) {
-             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[DetermineStance] Player {} is CRAWLING-EQUIVALENT (Pose: {}, Height: {})",
                         player.getName().getString(), currentPose, String.format("%.2f", playerHeight));
             }
             return PlayerStance.CRAWLING;

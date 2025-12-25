@@ -38,6 +38,14 @@ public final class QuantifiedCacheCompat {
     }
 
     public static <T> T getCached(String cacheName, String key, Supplier<T> loader, long ttlTicks, long maxSize) {
+        return getCachedInternal(cacheName, key, loader, ttlTicks, maxSize, false);
+    }
+
+    public static <T> T getCachedDisk(String cacheName, String key, Supplier<T> loader, long ttlTicks, long maxSize) {
+        return getCachedInternal(cacheName, key, loader, ttlTicks, maxSize, true);
+    }
+
+    private static <T> T getCachedInternal(String cacheName, String key, Supplier<T> loader, long ttlTicks, long maxSize, boolean useDisk) {
         if (loader == null) return null;
         if (!isUsable()) {
             return loader.get();
@@ -48,7 +56,7 @@ public final class QuantifiedCacheCompat {
         long clampedMax = Math.max(0L, maxSize);
 
         try {
-            return QuantifiedAPI.getCached(cacheName, key, loader, ttl, clampedMax, false);
+            return QuantifiedAPI.getCached(cacheName, key, loader, ttl, clampedMax, useDisk);
         } catch (Throwable t) {
             return loader.get();
         }

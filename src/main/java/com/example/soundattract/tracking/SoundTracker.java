@@ -492,7 +492,7 @@ public class SoundTracker {
                 .append(src.getX()).append(',').append(src.getY()).append(',').append(src.getZ())
                 .toString();
 
-            return QuantifiedCacheCompat.getCached(
+            return QuantifiedCacheCompat.getCachedDisk(
                 "soundattract_raycast_muffling",
                 key,
                 () -> computeBlockMuffling(level, src, dst, origRange, origWeight, soundId),
