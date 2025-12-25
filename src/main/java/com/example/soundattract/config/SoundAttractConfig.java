@@ -39,28 +39,28 @@ public class SoundAttractConfig {
         COMMON_SPEC = specPair.getRight();
     }
 
-    public static Set<ResourceLocation> SOUND_ID_WHITELIST_CACHE = new HashSet<>();
-    public static Map<ResourceLocation, SoundDefaultEntry> SOUND_DEFAULT_ENTRIES_CACHE = new HashMap<>();
-    public static final Set<ResourceLocation> DP_SOUND_WHITELIST_CACHE = new HashSet<>();
-    public static final Map<ResourceLocation, SoundDefaultEntry> DP_SOUND_DEFAULTS_CACHE = new HashMap<>();
-    public static Set<ResourceLocation> CUSTOM_LIQUID_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> CUSTOM_WOOL_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> CUSTOM_SOLID_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> CUSTOM_NON_SOLID_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> CUSTOM_THIN_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> CUSTOM_AIR_BLOCKS_CACHE = new HashSet<>();
-    public static Set<ResourceLocation> NON_BLOCKING_VISION_ALLOW_CACHE = new HashSet<>();
+    public static Set<ResourceLocation> SOUND_ID_WHITELIST_CACHE = ConcurrentHashMap.newKeySet();
+    public static Map<ResourceLocation, SoundDefaultEntry> SOUND_DEFAULT_ENTRIES_CACHE = new ConcurrentHashMap<>();
+    public static final Set<ResourceLocation> DP_SOUND_WHITELIST_CACHE = ConcurrentHashMap.newKeySet();
+    public static final Map<ResourceLocation, SoundDefaultEntry> DP_SOUND_DEFAULTS_CACHE = new ConcurrentHashMap<>();
+    public static Set<ResourceLocation> CUSTOM_LIQUID_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> CUSTOM_WOOL_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> CUSTOM_SOLID_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> CUSTOM_NON_SOLID_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> CUSTOM_THIN_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> CUSTOM_AIR_BLOCKS_CACHE = ConcurrentHashMap.newKeySet();
+    public static Set<ResourceLocation> NON_BLOCKING_VISION_ALLOW_CACHE = ConcurrentHashMap.newKeySet();
     public static double TACZ_RELOAD_RANGE_CACHE = 10.0;
     public static double TACZ_RELOAD_WEIGHT_CACHE = 1.0;
     public static double TACZ_SHOOT_RANGE_CACHE = 140.0;
     public static double TACZ_SHOOT_WEIGHT_CACHE = 15;
     public static boolean TACZ_ENABLED_CACHE = false;
-    public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
-    public static final Map<String, Double> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
-    public static final Map<String, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
-    public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_GUN_SHOOT_DB_CACHE = new HashMap<>();
-    public static final Map<String, Double> DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new HashMap<>();
-    public static final Map<String, Double> DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Pair<Double, Double>> TACZ_GUN_SHOOT_DB_CACHE = new ConcurrentHashMap<>();
+    public static final Map<String, Double> TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Pair<Double, Double>> DP_TACZ_GUN_SHOOT_DB_CACHE = new ConcurrentHashMap<>();
+    public static final Map<String, Double> DP_TACZ_ATTACHMENT_REDUCTION_DB_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE = new ConcurrentHashMap<>();
     public static double TACZ_ATTACHMENT_REDUCTION_DEFAULT_CACHE = 20.0;
     public static double TACZ_ATTACHMENT_FLASH_REDUCTION_DEFAULT_CACHE = 0.0;
     public static boolean POINT_BLANK_ENABLED_CACHE = false;
@@ -68,13 +68,13 @@ public class SoundAttractConfig {
     public static double POINT_BLANK_RELOAD_WEIGHT_CACHE = 1.0;
     public static double POINT_BLANK_SHOOT_RANGE_CACHE = 140.0;
     public static double POINT_BLANK_SHOOT_WEIGHT_CACHE = 15.0;
-    public static final Map<ResourceLocation, Double> POINT_BLANK_GUN_RANGE_CACHE = new HashMap<>();
-    public static final Map<ResourceLocation, Double> POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
-    public static final Map<String, Double> POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Double> POINT_BLANK_GUN_RANGE_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new ConcurrentHashMap<>();
     public static double POINT_BLANK_ATTACHMENT_REDUCTION_DEFAULT_CACHE = 20.0;
-    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_GUN_RANGE_CACHE = new HashMap<>();
-    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new HashMap<>();
-    public static final Map<String, Double> DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new HashMap<>();
+    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_GUN_RANGE_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_ATTACHMENT_REDUCTION_CACHE = new ConcurrentHashMap<>();
+    public static final Map<ResourceLocation, Double> DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE = new ConcurrentHashMap<>();
 
     public static List<com.example.soundattract.config.MobProfile> SPECIAL_MOB_PROFILES_CACHE = Collections.emptyList();
     public static List<com.example.soundattract.config.PlayerProfile> SPECIAL_PLAYER_PROFILES_CACHE = Collections.emptyList();
@@ -82,7 +82,7 @@ public class SoundAttractConfig {
     public static List<com.example.soundattract.config.PlayerProfile> DP_PLAYER_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
     public static final Map<ResourceLocation, Integer> DP_CUSTOM_ARMOR_COLORS = new ConcurrentHashMap<>();
-    public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = new HashSet<>();
+    public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = ConcurrentHashMap.newKeySet();
 
     public static void parseAndCacheCustomArmorColors() {
         customArmorColors.clear();
@@ -2707,7 +2707,7 @@ public class SoundAttractConfig {
                 ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
                 double reductionValue = Double.parseDouble(parts[1]);
                 if (rl != null) {
-                    TACZ_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reductionValue);
+                    TACZ_MUZZLE_FLASH_REDUCTION_CACHE.put(rl, reductionValue);
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("Failed to parse muzzle flash reduction entry: {}", raw, e);
@@ -2743,7 +2743,7 @@ public class SoundAttractConfig {
                 TACZ_MUZZLE_FLASH_REDUCTION_CACHE.clear();
                 TACZ_MUZZLE_FLASH_REDUCTION_CACHE.putAll(DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE);
             } else {
-                for (Map.Entry<String, Double> e : DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
+                for (Map.Entry<ResourceLocation, Double> e : DP_TACZ_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
                     TACZ_MUZZLE_FLASH_REDUCTION_CACHE.putIfAbsent(e.getKey(), e.getValue());
                 }
             }
@@ -2796,7 +2796,7 @@ public class SoundAttractConfig {
                 ResourceLocation rl = ResourceLocation.tryParse(parts[0]);
                 double reduction = Double.parseDouble(parts[1]);
                 if (rl != null) {
-                    POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.put(rl.toString(), reduction);
+                    POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.put(rl, reduction);
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("Failed to parse Point Blank muzzle flash reduction entry: {}", raw, e);
@@ -2830,7 +2830,7 @@ public class SoundAttractConfig {
                 POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.clear();
                 POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.putAll(DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE);
             } else {
-                for (Map.Entry<String, Double> e : DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
+                for (Map.Entry<ResourceLocation, Double> e : DP_POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.entrySet()) {
                     POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.putIfAbsent(e.getKey(), e.getValue());
                 }
             }

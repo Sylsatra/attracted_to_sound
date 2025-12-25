@@ -38,11 +38,8 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
             () -> WorkerComputations.computeGroups(mobs, cfg, deadlineMs, dimension),
             timeout
         );
-        if (future.isCompletedExceptionally()) {
-            return this.fallback.submitGroupCompute(mobs, cfg, dimension);
-        }
         return future.handle((result, throwable) -> {
-            if (throwable != null) {
+            if (throwable != null || result == null) {
                 return this.fallback.submitGroupCompute(mobs, cfg, dimension);
             }
             if (result instanceof WorkerScheduler.GroupComputeResult r && r.dimension() != null) {
@@ -64,11 +61,11 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
             () -> WorkerComputations.computeSoundScores(batch, deadlineMs),
             timeout
         );
-        if (future.isCompletedExceptionally()) {
-            return this.fallback.submitSoundScore(batch);
-        }
         return future.handle((result, throwable) -> {
             if (throwable != null) {
+                return this.fallback.submitSoundScore(batch);
+            }
+            if (result == null) {
                 return this.fallback.submitSoundScore(batch);
             }
             if (result instanceof List<?> list) {

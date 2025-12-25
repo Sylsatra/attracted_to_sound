@@ -24,7 +24,9 @@ public class PointBlankIntegration {
         for (ItemStack attachmentStack : Attachments.getAttachments(gunStack)) {
             if (attachmentStack.getItem() instanceof Attachment attachment && attachment.getCategory() == AttachmentCategory.MUZZLE) {
                 ResourceLocation muzzleId = ForgeRegistries.ITEMS.getKey(attachmentStack.getItem());
-                reduction += SoundAttractConfig.POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.getOrDefault(muzzleId.toString(), 0.0);
+                if (muzzleId != null) {
+                    reduction += SoundAttractConfig.POINT_BLANK_MUZZLE_FLASH_REDUCTION_CACHE.getOrDefault(muzzleId, 0.0);
+                }
             }
         }
         double finalDetectionRange = Math.max(0, flashRange - reduction);

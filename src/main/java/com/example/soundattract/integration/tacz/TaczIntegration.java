@@ -37,7 +37,7 @@ public class TaczIntegration {
             ResourceLocation muzzleId = iGun.getAttachmentId(event.getGunItemStack(), AttachmentType.MUZZLE);
             if (muzzleId != null) {
                 reduction = SoundAttractConfig.TACZ_MUZZLE_FLASH_REDUCTION_CACHE.getOrDefault(
-                        muzzleId.toString(),
+                        muzzleId,
                         SoundAttractConfig.TACZ_ATTACHMENT_FLASH_REDUCTION_DEFAULT_CACHE
                 );
             }

@@ -25,7 +25,7 @@ public class TaczGunsReloadListener extends SimpleJsonResourceReloadListener {
     protected void apply(Map<ResourceLocation, JsonElement> elements, ResourceManager resourceManager, ProfilerFiller profiler) {
         Map<ResourceLocation, Pair<Double, Double>> guns = new HashMap<>();
         Map<String, Double> attachments = new HashMap<>();
-        Map<String, Double> muzzle = new HashMap<>();
+        Map<ResourceLocation, Double> muzzle = new HashMap<>();
 
         for (Map.Entry<ResourceLocation, JsonElement> entry : elements.entrySet()) {
             JsonElement element = entry.getValue();
@@ -98,7 +98,7 @@ public class TaczGunsReloadListener extends SimpleJsonResourceReloadListener {
                     } catch (Exception e) {
                         continue;
                     }
-                    muzzle.put(id.toString(), reduction);
+                    muzzle.put(id, reduction);
                 }
             }
         }

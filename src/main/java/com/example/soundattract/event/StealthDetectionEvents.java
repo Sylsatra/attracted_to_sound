@@ -8,13 +8,13 @@ import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.ai.MobGroupManager;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -49,15 +49,15 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class StealthDetectionEvents {
 
-    private static final Map<Mob, Integer> mobOutOfRangeTicks = new HashMap<>();
-    private static final Map<Player, net.minecraft.world.phys.Vec3> lastPlayerPositions = new HashMap<>();
-    private static final Map<java.util.UUID, net.minecraft.world.phys.Vec3> lastMobPositions = new HashMap<>();
+    private static final Map<UUID, Integer> mobOutOfRangeTicks = new ConcurrentHashMap<>();
+    private static final Map<UUID, net.minecraft.world.phys.Vec3> lastPlayerPositions = new ConcurrentHashMap<>();
+    private static final Map<java.util.UUID, net.minecraft.world.phys.Vec3> lastMobPositions = new ConcurrentHashMap<>();
     private static long lastStealthCheckTick = -1;
-    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new HashMap<>();
+    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new ConcurrentHashMap<>();
 
-    private static final Map<UUID, Double> XRAY_RANGE_CACHE = new HashMap<>();
+    private static final Map<UUID, Double> XRAY_RANGE_CACHE = new ConcurrentHashMap<>();
 
-    private static final Set<UUID> suppressedEdgeDetections = new HashSet<>();
+    private static final Set<UUID> suppressedEdgeDetections = ConcurrentHashMap.newKeySet();
 
     private static LivingEntity getAttackTargetCompat(Mob mob) {
         if (mob == null) return null;
@@ -710,25 +710,30 @@ public class StealthDetectionEvents {
 
             int scanningRadius = Math.max(32, (int) Math.ceil(SoundAttractConfig.COMMON.maxStealthDetectionRange.get()) + 16);
             Set<Mob> mobsToCheck = new HashSet<>();
+            Set<UUID> seenPlayerIds = new HashSet<>();
+            Set<UUID> seenMobIds = new HashSet<>();
             for (net.minecraft.server.level.ServerPlayer serverPlayer : level.players()) {
+                seenPlayerIds.add(serverPlayer.getUUID());
                 AABB scanArea = serverPlayer.getBoundingBox().inflate(scanningRadius);
                 mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && isTargetingPlayerCompat(entity)));
             }
             for (Mob mob : mobsToCheck) {
+                seenMobIds.add(mob.getUUID());
                 LivingEntity rawTarget = getAttackTargetCompat(mob);
+                UUID mobId = mob.getUUID();
                 if (!(rawTarget instanceof Player playerTarget)) {
-                    mobOutOfRangeTicks.remove(mob);
+                    mobOutOfRangeTicks.remove(mobId);
                     continue;
                 }
                 if (playerTarget.isCreative() || playerTarget.isSpectator()) {
-                    mobOutOfRangeTicks.remove(mob);
+                    mobOutOfRangeTicks.remove(mobId);
                     continue;
                 }
 
                 boolean canCurrentlyDetect = canMobDetectPlayer(mob, playerTarget);
 
                 if (canCurrentlyDetect) {
-                    if (mobOutOfRangeTicks.remove(mob) != null) {
+                    if (mobOutOfRangeTicks.remove(mobId) != null) {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
                                     "[TickCheck] Mob {} regained direct detection of {}. Grace period reset.",
@@ -737,7 +742,7 @@ public class StealthDetectionEvents {
                         }
                     }
                 } else {
-                    int ticks = mobOutOfRangeTicks.getOrDefault(mob, 0) + stealthCheckInterval;
+                    int ticks = mobOutOfRangeTicks.getOrDefault(mobId, 0) + stealthCheckInterval;
                     if (ticks >= SoundAttractConfig.COMMON.stealthGracePeriodTicks.get()) {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
@@ -753,9 +758,9 @@ public class StealthDetectionEvents {
                         } catch (Throwable ignored) {
                         }
                         mob.setTarget(null);
-                        mobOutOfRangeTicks.remove(mob);
+                        mobOutOfRangeTicks.remove(mobId);
                     } else {
-                        mobOutOfRangeTicks.put(mob, ticks);
+                        mobOutOfRangeTicks.put(mobId, ticks);
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
                                     "[TickCheck] Mob {} cannot detect {}. In grace period ({}/{}).",
@@ -766,6 +771,14 @@ public class StealthDetectionEvents {
                     }
                 }
             }
+            if (gameTime % Math.max(stealthCheckInterval * 5L, 20L) == 0) {
+                mobOutOfRangeTicks.keySet().removeIf(id -> !seenMobIds.contains(id));
+                XRAY_RANGE_CACHE.keySet().removeIf(id -> !seenMobIds.contains(id));
+                lastMobPositions.keySet().removeIf(id -> !seenMobIds.contains(id));
+                suppressedEdgeDetections.removeIf(id -> !seenMobIds.contains(id));
+                lastPlayerPositions.keySet().removeIf(id -> !seenPlayerIds.contains(id));
+                playerGunshotInfo.keySet().removeIf(id -> !seenPlayerIds.contains(id));
+            }
         }
     }
 
@@ -774,13 +787,13 @@ public class StealthDetectionEvents {
             return false;
         }
         net.minecraft.world.phys.Vec3 currentPos = player.position();
-        net.minecraft.world.phys.Vec3 lastPos = lastPlayerPositions.get(player);
+        net.minecraft.world.phys.Vec3 lastPos = lastPlayerPositions.get(player.getUUID());
         boolean moved = false;
         if (lastPos != null) {
             double distSq = currentPos.distanceToSqr(lastPos);
             moved = distSq > (threshold * threshold);
         }
-        lastPlayerPositions.put(player, currentPos);
+        lastPlayerPositions.put(player.getUUID(), currentPos);
         return moved;
     }
 
@@ -801,17 +814,9 @@ public class StealthDetectionEvents {
             );
         }
 
-        if (isVisuallyCrawling) {
+        if (isVisuallyCrawling || playerHeight <= 1.0F) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info("[DetermineStance] Player {} is CRAWLING (VisualCrawl: true, Pose: {}, Height: {})",
-                        player.getName().getString(), currentPose, String.format("%.2f", playerHeight));
-            }
-            return PlayerStance.CRAWLING;
-        }
-
-        if (currentPose == Pose.SWIMMING || currentPose == Pose.SPIN_ATTACK || currentPose == Pose.FALL_FLYING) {
-             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[DetermineStance] Player {} is CRAWLING-EQUIVALENT (Pose: {}, Height: {})",
                         player.getName().getString(), currentPose, String.format("%.2f", playerHeight));
             }
             return PlayerStance.CRAWLING;

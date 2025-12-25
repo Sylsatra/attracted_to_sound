@@ -8,9 +8,6 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Collections;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.network.SoundMessage;
@@ -41,30 +38,11 @@ public class VoiceChatIntegrationClient {
 
 
         double factor = 0.0;
-        List<? extends String> rawMap = SoundAttractConfig.COMMON.voiceChatDbThresholdMap.get();
-        if (rawMap != null && !rawMap.isEmpty()) {
-            List<double[]> pairs = new ArrayList<>();
-            for (String entry : rawMap) {
-                if (entry == null || entry.isEmpty()) continue;
-                String[] parts = entry.split(":", 2);
-                if (parts.length != 2) continue;
-                try {
-                    double th = Double.parseDouble(parts[0].trim());
-                    double mul = Double.parseDouble(parts[1].trim());
-                    pairs.add(new double[]{th, mul});
-                } catch (Exception ignored) {
-                }
-            }
-
-            Collections.sort(pairs, new Comparator<double[]>() {
-                @Override
-                public int compare(double[] a, double[] b) {
-                    return Double.compare(b[0], a[0]);
-                }
-            });
-            for (double[] p : pairs) {
-                if (normDb >= p[0]) {
-                    factor = p[1];
+        List<VoiceChatThresholds.Threshold> pairs = VoiceChatThresholds.getThresholds(SoundAttractConfig.COMMON.voiceChatDbThresholdMap.get());
+        if (!pairs.isEmpty()) {
+            for (VoiceChatThresholds.Threshold p : pairs) {
+                if (normDb >= p.threshold) {
+                    factor = p.multiplier;
                     break;
                 }
             }
@@ -120,13 +98,13 @@ public class VoiceChatIntegrationClient {
 
 
     private static double computePeakDb(short[] samples) {
-        short highest = 0;
+        int highest = 0;
         for (short s : samples) {
-            int a = Math.abs(s);
-            if (a > highest) highest = (short) a;
+            int a = s == Short.MIN_VALUE ? 32768 : Math.abs(s);
+            if (a > highest) highest = a;
         }
         if (highest == 0) return -127.0;
-        double norm = Math.abs(highest) / 32768.0;
+        double norm = highest / 32768.0;
         double db = 20.0 * Math.log10(norm);
         if (!Double.isFinite(db)) return -127.0;
         if (db > 0.0) db = 0.0;
