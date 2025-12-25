@@ -13,10 +13,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/**
- * A compatibility wrapper to safely interact with the EnhancedAI mod.
- * This class prevents a hard dependency and avoids crashes if EnhancedAI is not installed.
- */
 public class EnhancedAICompat {
 
     private static final boolean IS_ENHANCED_AI_LOADED = ModList.get().isLoaded("enhancedai");
@@ -116,10 +112,6 @@ public class EnhancedAICompat {
             return 0d;
         }
     }
-
-    /**
-     * Inner proxies that reference EnhancedAI classes directly. These are only loaded when EnhancedAI is present.
-     */
     private static class MinerMobsProxy {
         static int getMaxY() { return insane96mcp.enhancedai.modules.mobs.miner.MinerMobs.maxY; }
         static boolean blacklistTileEntities() { return insane96mcp.enhancedai.modules.mobs.miner.MinerMobs.blacklistTileEntities; }
@@ -128,12 +120,26 @@ public class EnhancedAICompat {
     }
 
     private static class TeleportProxy {
-        static double getChance(Level level) { return insane96mcp.enhancedai.modules.mobs.teleporttotarget.TeleportToTarget.chance.getByDifficulty(level); }
+        static double getChance(Level level) {
+            return readDifficultyScaledChance(
+                "insane96mcp.enhancedai.modules.mobs.teleporttotarget.TeleportToTarget",
+                "chance",
+                level,
+                SoundAttractConfig.COMMON.teleportChance.get()
+            );
+        }
         static int getCooldown() { return insane96mcp.enhancedai.modules.mobs.teleporttotarget.TeleportToTarget.cooldown; }
     }
 
     private static class PickUpProxy {
-        static double getChance(Level level) { return insane96mcp.enhancedai.modules.mobs.pickandthrow.PickUpAndThrow.chance.getByDifficulty(level); }
+        static double getChance(Level level) {
+            return readDifficultyScaledChance(
+                "insane96mcp.enhancedai.modules.mobs.pickandthrow.PickUpAndThrow",
+                "chance",
+                level,
+                SoundAttractConfig.COMMON.pickUpChance.get()
+            );
+        }
         static int getMinDistanceToPickUp() { return insane96mcp.enhancedai.modules.mobs.pickandthrow.PickUpAndThrow.minDistanceToPickUp; }
         static int getMaxDistanceToThrow() { return insane96mcp.enhancedai.modules.mobs.pickandthrow.PickUpAndThrow.maxDistanceToThrow; }
         static double getSpeedModifier() { return insane96mcp.enhancedai.modules.mobs.pickandthrow.PickUpAndThrow.speedModifierToPickUp; }
@@ -161,5 +167,41 @@ public class EnhancedAICompat {
             if (v <= 0d) v = inst.getValue();
             return Math.max(0d, v);
         }
+    }
+
+    private static double readDifficultyScaledChance(String className, String fieldName, Level level, double fallback) {
+        try {
+            Class<?> cls = Class.forName(className);
+            java.lang.reflect.Field field = cls.getField(fieldName);
+            Object holder = field.get(null);
+            if (holder == null) return fallback;
+            java.lang.reflect.Method method = null;
+            for (java.lang.reflect.Method m : holder.getClass().getMethods()) {
+                if (!"getByDifficulty".equals(m.getName())) continue;
+                if (m.getParameterCount() == 1) {
+                    method = m;
+                    break;
+                }
+            }
+            if (method == null) return fallback;
+            Object arg = null;
+            Class<?> param = method.getParameterTypes()[0];
+            if (param.isAssignableFrom(Level.class)) {
+                arg = level;
+            } else if ("insane96mcp.insanelib.base.config.Difficulty".equals(param.getName())) {
+                try {
+                    java.lang.reflect.Method fromLevel = param.getMethod("fromLevel", Level.class);
+                    arg = fromLevel.invoke(null, level);
+                } catch (Throwable ignored) {
+                }
+            }
+            if (arg == null) return fallback;
+            Object result = method.invoke(holder, arg);
+            if (result instanceof Number num) {
+                return num.doubleValue();
+            }
+        } catch (Throwable ignored) {
+        }
+        return fallback;
     }
 }
