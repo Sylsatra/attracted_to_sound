@@ -5,9 +5,7 @@ import org.slf4j.Logger;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -15,8 +13,13 @@ import com.example.soundattract.config.ConfigHelper;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.loot.ModLootModifiers;
-import com.example.soundattract.integration.PlasmoVoiceBootstrap;
-import com.example.soundattract.integration.VanillaIntegrationEvents;
+import com.example.soundattract.integration.voicechat.PlasmoVoiceBootstrap;
+import com.example.soundattract.integration.vanilla.VanillaIntegrationEvents;
+import com.example.soundattract.event.FovEvents;
+import com.example.soundattract.event.StealthDetectionEvents;
+import com.example.soundattract.event.client.SoundAttractClientEvents;
+import com.example.soundattract.network.SoundAttractNetwork;
+import com.example.soundattract.quantified.QuantifiedIntegration;
 import com.example.soundattract.worker.WorkSchedulerManager;
 
 @Mod(SoundAttractMod.MOD_ID)
@@ -25,6 +28,7 @@ public class SoundAttractMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public SoundAttractMod() {
+        @SuppressWarnings("removal")
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         
         ModEnchantments.register(modEventBus);
@@ -45,6 +49,7 @@ public class SoundAttractMod {
             SoundAttractConfig.bakeConfig();
             WorkSchedulerManager.refresh();
             SoundAttractNetwork.register();
+            QuantifiedIntegration.bootstrap();
         });
         event.enqueueWork(this::handleTaczIntegration);
     }
@@ -53,7 +58,7 @@ public class SoundAttractMod {
         if (ModList.get().isLoaded("tacz") && SoundAttractConfig.TACZ_ENABLED_CACHE) {
             LOGGER.info("Tacz mod found and integration is enabled. Registering event listeners.");
             try {
-                com.example.soundattract.integration.TaczIntegrationHandler.register();
+                com.example.soundattract.integration.tacz.TaczIntegrationHandler.register();
             } catch (NoClassDefFoundError e) {
                 LOGGER.error("Failed to register Tacz integration events. The Tacz API might be missing or has changed.", e);
             }

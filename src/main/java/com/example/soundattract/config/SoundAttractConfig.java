@@ -14,8 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.config.SoundAttractConfig.SoundDefaultEntry;
-import com.example.soundattract.integration.QuantifiedCacheCompat;
+import com.example.soundattract.quantified.QuantifiedCacheCompat;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.minecraft.nbt.CompoundTag;

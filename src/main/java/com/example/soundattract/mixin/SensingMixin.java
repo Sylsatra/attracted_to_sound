@@ -1,6 +1,6 @@
 package com.example.soundattract.mixin;
 
-import com.example.soundattract.FovEvents;
+import com.example.soundattract.event.FovEvents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.sensing.Sensing;

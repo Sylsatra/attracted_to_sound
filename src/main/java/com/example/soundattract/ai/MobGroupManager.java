@@ -2,7 +2,6 @@ package com.example.soundattract.ai;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.ConfigSnapshot;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 import com.example.soundattract.worker.WorkerScheduler.MobSnapshot;
@@ -131,7 +130,7 @@ public class MobGroupManager {
         data.inFlightGroupCompute = null;
       }
 
-      Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
+      Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.event.SoundAttractionEvents.getCachedAttractedEntityTypes();
       if (attractedEntityTypes == null || attractedEntityTypes.isEmpty()) return false;
       int simDistChunks = level.getServer().getPlayerList().getViewDistance();
       int simDistBlocks = simDistChunks * 16;
@@ -290,7 +289,7 @@ public class MobGroupManager {
         level.dimension().location()
       );
     }
-    int scanCooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
+    int scanCooldown = com.example.soundattract.runtime.DynamicScanCooldownManager.currentScanCooldownTicks;
     if (
       scanCooldown > 0 &&
       (
@@ -304,7 +303,7 @@ public class MobGroupManager {
     if (submitGroupComputeSnapshot(level)) {
       return;
     }
-    Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
+    Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.event.SoundAttractionEvents.getCachedAttractedEntityTypes();
     int simDistChunks = level.getServer().getPlayerList().getViewDistance();
     int simDistBlocks = simDistChunks * 16;
     Set<Mob> mobsSet = new HashSet<>();

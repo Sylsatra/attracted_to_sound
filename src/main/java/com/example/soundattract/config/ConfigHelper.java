@@ -4,7 +4,6 @@ import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
 import com.example.soundattract.SoundAttractMod;
-import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -16,6 +15,7 @@ public class ConfigHelper {
 
     private static final int CURRENT_SCHEMA_VERSION = 7;
 
+    @SuppressWarnings("removal")
     public static void register() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
 

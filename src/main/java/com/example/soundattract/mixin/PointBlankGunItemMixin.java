@@ -2,7 +2,7 @@ package com.example.soundattract.mixin;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.integration.PointBlankIntegration;
+import com.example.soundattract.integration.pointblank.PointBlankIntegration;
 import com.vicmatskiv.pointblank.item.FireModeInstance;
 import com.vicmatskiv.pointblank.item.GunItem;
 import net.minecraft.server.level.ServerPlayer;

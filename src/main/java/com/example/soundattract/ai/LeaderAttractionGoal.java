@@ -4,9 +4,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Random;
 
-import com.example.soundattract.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundTracker;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.BlockPos;
@@ -40,7 +39,7 @@ public class LeaderAttractionGoal extends Goal {
     }
 
     private boolean isMobEligible() {
-        java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
+        java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = com.example.soundattract.event.SoundAttractionEvents.getCachedAttractedEntityTypes();
         boolean byType = attractedTypes.contains(this.mob.getType());
         boolean hasProfile = com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(this.mob) != null;
         return byType || hasProfile;

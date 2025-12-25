@@ -6,7 +6,6 @@ import net.minecraft.nbt.TagParser;
 import net.minecraft.world.entity.player.Player;
 
 import javax.annotation.Nullable;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;

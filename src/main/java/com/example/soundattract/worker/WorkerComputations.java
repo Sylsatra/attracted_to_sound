@@ -165,11 +165,16 @@ public final class WorkerComputations {
 
             String bestId = null;
             double bestScore = Double.NEGATIVE_INFINITY;
+            double bestDist = Double.MAX_VALUE;
             for (WorkerScheduler.SoundCandidate c : req.candidates) {
+                double dx = req.mobX - c.x;
+                double dz = req.mobZ - c.z;
+                double dist = Math.hypot(dx, dz);
                 double s = scoreCandidate(req, c);
-                if (s > bestScore) {
+                if (s > bestScore || (Math.abs(s - bestScore) < 0.001 && dist < bestDist)) {
                     bestScore = s;
                     bestId = c.soundId;
+                    bestDist = dist;
                 }
                 if (System.currentTimeMillis() > deadlineMs) break;
             }
@@ -192,13 +197,8 @@ public final class WorkerComputations {
         double dist = Math.hypot(dx, dz);
         double effectiveRange = Math.max(0.0001, c.range);
         if (dist > effectiveRange) return Double.NEGATIVE_INFINITY;
-        double proximity = Math.max(0.0, 1.0 - (dist / effectiveRange));
 
-        double muffling = c.mufflingFactor;
-        if (muffling < 0) muffling = 0; else if (muffling > 1) muffling = 1;
-
-        double score = c.weight * proximity * (0.5 + 0.5 * muffling);
-
+        double score = c.weight;
         long ageTicks = Math.max(0L, req.gameTime - c.gameTime);
         if (ageTicks <= req.noveltyTicks) {
             score += req.noveltyBonus;

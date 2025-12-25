@@ -44,7 +44,7 @@ Also camouflage is a thing.
 [[dependencies.soundattract]]
     modId="enhancedai"
     mandatory=false
-    versionRange="[2.7.0,)"
+    versionRange="[3.3.6,)"
     ordering="NONE"
     side="BOTH"
 

@@ -21,7 +21,7 @@ public abstract class ItemStackMixin {
             if (ModEnchantments.CONCEAL != null && ModEnchantments.CONCEAL.isPresent()) {
                 Enchantment concealEnchantmentInstance = ModEnchantments.CONCEAL.get();
 
-                if (EnchantmentHelper.getItemEnchantmentLevel(concealEnchantmentInstance, thisStack) > 0) {
+                if (EnchantmentHelper.getEnchantments(thisStack).getOrDefault(concealEnchantmentInstance, 0) > 0) {
                     cir.setReturnValue(false);
                 }
             } else {

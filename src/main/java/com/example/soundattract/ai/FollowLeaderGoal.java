@@ -14,7 +14,6 @@ public class FollowLeaderGoal extends Goal {
     private Mob leader;
     private AttractionGoal leaderAttractionGoal = null;
     private Goal leaderPursuitGoal = null;
-    private static final double MAX_DISTANCE = 12.0; 
     private Vec3 lastPos = null;
     private int stuckTicks = 0;
     private int stuckThreshold = com.example.soundattract.config.SoundAttractConfig.COMMON.scanCooldownTicks.get();

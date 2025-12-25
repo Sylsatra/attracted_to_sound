@@ -1,6 +1,6 @@
 package com.example.soundattract.mixin;
 
-import com.example.soundattract.SoundAttractionEvents;
+import com.example.soundattract.event.SoundAttractionEvents;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.FollowerEdgeRelayGoal;
@@ -9,7 +9,6 @@ import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.ai.goal.Goal;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;

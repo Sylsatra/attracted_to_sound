@@ -107,12 +107,13 @@ dependencies {
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
     compileOnly "curse.maven:timeless-and-classics-zero-1028108:6654541"
     compileOnly "curse.maven:vics-point-blank-961053:6012485"
-    compileOnly files('libs/enhancedai-3.1.0-beta.jar')
+    compileOnly files('libs/enhancedai-3.3.6.jar')
     compileOnly files('libs/insanelib-1.21.21.jar')
     compileOnly "su.plo.voice.api:server:2.1.5"
     compileOnly "su.plo.voice.api:client:2.1.5"
 
     compileOnly "maven.modrinth:smartbrainlib:1.15"
+    implementation fg.deobf(files('libs/quantified-1.0.0.jar'))
 
 }
 

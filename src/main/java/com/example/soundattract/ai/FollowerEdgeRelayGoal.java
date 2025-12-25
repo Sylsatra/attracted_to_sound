@@ -1,32 +1,17 @@
 package com.example.soundattract.ai;
 
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
 
-import com.example.soundattract.DynamicScanCooldownManager;
+import com.example.soundattract.runtime.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundAttractionEvents;
-import com.example.soundattract.SoundTracker;
-import com.example.soundattract.CamoUtil;
-import com.example.soundattract.config.PlayerStance;
+import com.example.soundattract.event.SoundAttractionEvents;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.registries.ForgeRegistries;
 
 public class FollowerEdgeRelayGoal extends Goal {
 
@@ -42,9 +27,6 @@ public class FollowerEdgeRelayGoal extends Goal {
 
     private SoundTracker.SoundRecord cachedSound = null;
 
-    private int pursuingSoundTicksRemaining = 0;
-    private boolean isPursuingSound = false;
-
     private BlockBreakerPosGoal blockBreakerGoal = null;
 
     private long cacheTick = -1L;
@@ -55,7 +37,6 @@ public class FollowerEdgeRelayGoal extends Goal {
     }
     private EdgeMobState edgeMobState = null;
     private boolean foundPlayerOrHit = false;
-    private boolean relayedToLeader = false;
     private int edgeArrivalTicks = 0;
     private static final int EDGE_WAIT_TICKS = 15;
 
@@ -88,99 +69,6 @@ public class FollowerEdgeRelayGoal extends Goal {
 
     private double getArrivalDistance() {
         return SoundAttractConfig.COMMON.arrivalDistance.get();
-    }
-
-    private PlayerStance determinePlayerStance(LivingEntity player) {
-        if (player.getPose() == Pose.SWIMMING || player.getPose() == Pose.FALL_FLYING || player.getPose() == Pose.SPIN_ATTACK) {
-            if (player.getBbHeight() < 1.0F) {
-                return PlayerStance.CRAWLING;
-            }
-        }
-        if (player.isCrouching()) {
-            return PlayerStance.SNEAKING;
-        }
-        return PlayerStance.STANDING;
-    }
-
-    private double getDetectionRangeForPlayer(LivingEntity player) {
-        com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(this.mob);
-        PlayerStance currentStance = determinePlayerStance(player);
-
-        double baseRange;
-        Optional<Double> override = Optional.empty();
-
-        if (mobProfile != null) {
-            override = mobProfile.getDetectionOverride(currentStance);
-        }
-
-        if (override.isPresent()) {
-            baseRange = override.get();
-        } else {
-            switch (currentStance) {
-                case CRAWLING:
-                    baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
-                    break;
-                case SNEAKING:
-                    baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
-                    break;
-                case STANDING:
-                default:
-                    baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
-                    break;
-            }
-        }
-
-        boolean hasCamouflage = false;
-        int wornCamouflagePieces = 0;
-        if (SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
-            for (ItemStack armorItem : player.getArmorSlots()) {
-                if (!armorItem.isEmpty() && CamoUtil.isCamouflageArmorItem(armorItem.getItem())) {
-                    wornCamouflagePieces++;
-                }
-            }
-            if (SoundAttractConfig.COMMON.requireFullSetForCamouflageBonus.get()) {
-                hasCamouflage = wornCamouflagePieces == 4;
-            } else {
-                hasCamouflage = wornCamouflagePieces > 0;
-            }
-        }
-
-        if (hasCamouflage) {
-            double totalEffectiveness = 0.0;
-            List<ItemStack> armorItems = new ArrayList<>();
-            player.getArmorSlots().forEach(armorItems::add);
-            for (int i = 0; i < armorItems.size(); i++) {
-                ItemStack stack = armorItems.get(i);
-                if (stack.isEmpty()) {
-                    continue;
-                }
-                Item item = stack.getItem();
-                if (CamoUtil.isCamouflageArmorItem(item)) {
-                    switch (i) {
-                        case 3:
-                            totalEffectiveness += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get();
-                            break;
-                        case 2:
-                            totalEffectiveness += SoundAttractConfig.COMMON.chestplateCamouflageEffectiveness.get();
-                            break;
-                        case 1:
-                            totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get();
-                            break;
-                        case 0:
-                            totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get();
-                            break;
-                    }
-                }
-            }
-            baseRange *= Math.max(0.0, 1.0 - totalEffectiveness);
-        }
-
-        return Math.max(0.0, baseRange);
-    }
-
-    private boolean shouldSuppressTargeting() {
-        return SoundAttractConfig.COMMON.enableStealthMechanics.get()
-                && com.example.soundattract.StealthDetectionEvents.shouldSuppressTargeting(this.mob);
     }
 
     private SoundTracker.SoundRecord getCachedNearestSound() {
@@ -260,7 +148,6 @@ public class FollowerEdgeRelayGoal extends Goal {
         this.cachedSound = newSound;
         this.edgeMobState = EdgeMobState.GOING_TO_SOUND;
         this.foundPlayerOrHit = false;
-        this.relayedToLeader = false;
         this.edgeArrivalTicks = 0;
         this.cachedReturnLeader = null;
         this.returnLogCooldown = 0;
@@ -354,7 +241,6 @@ public class FollowerEdgeRelayGoal extends Goal {
             edgeMobState = null;
         }
         foundPlayerOrHit = false;
-        relayedToLeader = false;
         edgeArrivalTicks = 0;
         cachedReturnLeader = null;
         returnLogCooldown = 0;
@@ -415,7 +301,6 @@ public class FollowerEdgeRelayGoal extends Goal {
                         this.currentTargetWeight = fresh.weight;
                         this.edgeMobState = EdgeMobState.GOING_TO_SOUND;
                         this.foundPlayerOrHit = false;
-                        this.relayedToLeader = false;
                         this.mob.getNavigation().stop();
                         this.lastIssuedNavTarget = null;
                     }
@@ -519,7 +404,7 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (edgeMobState == EdgeMobState.GOING_TO_SOUND) {
             moveToThrottled(this.targetSoundPos, this.moveSpeed, false);
 
-            if (com.example.soundattract.StealthDetectionEvents.consumeSuppressedEdgeDetection(this.mob)) {
+            if (com.example.soundattract.event.StealthDetectionEvents.consumeSuppressedEdgeDetection(this.mob)) {
                 foundPlayerOrHit = true;
 
                 if (!MobGroupManager.isDeserter(this.mob) && !raidScheduled) {
@@ -749,3 +634,4 @@ public class FollowerEdgeRelayGoal extends Goal {
                 && Math.abs(s1.weight - s2.weight) < 0.01;
     }
 }
+

@@ -129,7 +129,6 @@ public class RaidManager {
         final BlockPos target;
         int ticksRemaining;
         boolean advancing;
-        final long scheduledAt;
 
         Raid(Mob leader, BlockPos target, long now) {
             this.leaderRef = new WeakReference<>(leader);
@@ -140,7 +139,6 @@ public class RaidManager {
                     : DEFAULT_RAID_COUNTDOWN_TICKS;
             this.ticksRemaining = configured;
             this.advancing = false;
-            this.scheduledAt = now;
         }
 
         boolean isValid() {

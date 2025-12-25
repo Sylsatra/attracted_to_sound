@@ -3,7 +3,7 @@ package com.example.soundattract.integration.sbl;
 import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
-import com.example.soundattract.StealthDetectionEvents;
+import com.example.soundattract.event.StealthDetectionEvents;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.BlockPos;

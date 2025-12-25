@@ -2,9 +2,9 @@ package com.example.soundattract.ai;
 
 import java.util.EnumSet;
 
-import com.example.soundattract.SoundTracker;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.integration.EnhancedAICompat;
+import com.example.soundattract.integration.enhancedai.EnhancedAICompat;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -13,7 +13,6 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;

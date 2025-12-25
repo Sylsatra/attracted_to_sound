@@ -1,6 +1,5 @@
 package com.example.soundattract.loot;
 
-import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.world.item.ItemStack;

@@ -3,9 +3,9 @@ package com.example.soundattract.ai;
 import java.util.EnumSet;
 import java.util.UUID;
 
-import com.example.soundattract.SoundTracker;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.integration.EnhancedAICompat;
+import com.example.soundattract.integration.enhancedai.EnhancedAICompat;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -174,7 +174,7 @@ public class TeleportToSoundGoal extends Goal {
     private void teleportSafely(LivingEntity entity, double pX, double pY, double pZ) {
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos(pX, pY, pZ);
         BlockState state = entity.level().getBlockState(mutable);
-        boolean blocksMotion = state.blocksMotion();
+        boolean blocksMotion = state.isCollisionShapeFullBlock(entity.level(), mutable);
         boolean isWater = state.getFluidState().is(FluidTags.WATER);
         if (blocksMotion && !isWater) {
             do {

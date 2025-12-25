@@ -3,7 +3,7 @@ package com.example.soundattract.integration.sbl;
 import com.mojang.datafixers.util.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
-import com.example.soundattract.SoundTracker;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.BlockPos;
@@ -34,7 +34,7 @@ public class SoundAttractSblBehaviour<E extends PathfinderMob> extends ExtendedB
         startCondition(e -> e != null
                 && !e.isVehicle()
                 && !e.isSleeping()
-                && (!SoundAttractConfig.COMMON.enableStealthMechanics.get() || !com.example.soundattract.StealthDetectionEvents.shouldSuppressTargeting(e)));
+                && (!SoundAttractConfig.COMMON.enableStealthMechanics.get() || !com.example.soundattract.event.StealthDetectionEvents.shouldSuppressTargeting(e)));
     }
 
     @Override

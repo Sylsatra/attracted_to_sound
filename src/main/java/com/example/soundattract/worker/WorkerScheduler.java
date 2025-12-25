@@ -1,64 +1,27 @@
 package com.example.soundattract.worker;
 
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.async.AsyncManager;
+import com.example.soundattract.async.AsyncManager.Priority;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import net.minecraft.resources.ResourceLocation;
 
 public final class WorkerScheduler {
     private static final BlockingQueue<GroupComputeResult> GROUP_RESULTS = new LinkedBlockingQueue<>();
     private static final BlockingQueue<SoundScoreResult> SOUND_RESULTS = new LinkedBlockingQueue<>();
-    private static volatile ExecutorService EXECUTOR;
-    private static final AtomicBoolean INIT = new AtomicBoolean(false);
 
     private WorkerScheduler() {}
 
-    private static void ensureInit() {
-        if (INIT.get()) return;
-        synchronized (WorkerScheduler.class) {
-            if (INIT.get()) return;
-            int threads = 2;
-            try {
-                Integer configured = SoundAttractConfig.COMMON.workerThreads.get();
-                if (configured != null) threads = Math.max(1, configured);
-            } catch (Throwable ignored) {}
-            EXECUTOR = new ThreadPoolExecutor(
-                    threads,
-                    threads,
-                    60L, TimeUnit.SECONDS,
-                    new LinkedBlockingQueue<Runnable>(1024),
-                    r -> {
-                        Thread t = new Thread(r, "SoundAttract-Worker");
-                        t.setDaemon(true);
-                        return t;
-                    },
-                    (r, executor) -> {
-                        new ThreadPoolExecutor.DiscardOldestPolicy().rejectedExecution(r, executor);
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.warn("[WorkerScheduler] Task dropped due to saturation (DiscardOldestPolicy)");
-                        }
-                    }
-            );
-            INIT.set(true);
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[WorkerScheduler] Initialized with {} threads", threads);
-            }
-        }
-    }
-
-        public static Future<?> submitGroupCompute(List<MobSnapshot> mobs, ConfigSnapshot cfg, ResourceLocation dimension) {
-        ensureInit();
+    public static Future<?> submitGroupCompute(List<MobSnapshot> mobs, ConfigSnapshot cfg, ResourceLocation dimension) {
         long computedDeadline = System.currentTimeMillis() + 10L;
         try {
             Integer budget = SoundAttractConfig.COMMON.workerTaskBudgetMs.get();
@@ -68,7 +31,7 @@ public final class WorkerScheduler {
             }
         } catch (Throwable ignored) {}
         final long deadlineMs = computedDeadline;
-        return EXECUTOR.submit(() -> {
+        return AsyncManager.submit("soundattract_group_compute", () -> {
             try {
                 GroupComputeResult result = computeGroups(mobs, cfg, deadlineMs, dimension);
                 if (result != null) GROUP_RESULTS.offer(result);
@@ -77,7 +40,7 @@ public final class WorkerScheduler {
                     SoundAttractMod.LOGGER.error("[WorkerScheduler] Group compute failed", t);
                 }
             }
-        });
+        }, Priority.LOW, true);
     }
 
     public static List<GroupComputeResult> drainGroupResults() {
@@ -88,7 +51,6 @@ public final class WorkerScheduler {
 
     public static Future<?> submitSoundScore(List<SoundScoreRequest> batch) {
         if (batch == null || batch.isEmpty()) return CompletableFuture.completedFuture(null);
-        ensureInit();
         long computedDeadline = System.currentTimeMillis() + 10L;
         try {
             Integer budget = SoundAttractConfig.COMMON.workerTaskBudgetMs.get();
@@ -98,7 +60,7 @@ public final class WorkerScheduler {
             }
         } catch (Throwable ignored) {}
         final long deadlineMs = computedDeadline;
-        return EXECUTOR.submit(() -> {
+        return AsyncManager.submit("soundattract_sound_score", () -> {
             try {
                 computeSoundScores(batch, deadlineMs);
             } catch (Throwable t) {
@@ -106,7 +68,7 @@ public final class WorkerScheduler {
                     SoundAttractMod.LOGGER.error("[WorkerScheduler] Sound scoring failed", t);
                 }
             }
-        });
+        }, Priority.LOW, true);
     }
 
     public static List<SoundScoreResult> drainSoundScoreResults() {

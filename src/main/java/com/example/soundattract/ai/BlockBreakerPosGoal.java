@@ -7,7 +7,7 @@ import java.util.List;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.integration.EnhancedAICompat;
+import com.example.soundattract.integration.enhancedai.EnhancedAICompat;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;

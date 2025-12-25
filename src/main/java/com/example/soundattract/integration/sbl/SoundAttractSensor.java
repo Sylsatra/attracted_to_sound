@@ -1,8 +1,8 @@
 package com.example.soundattract.integration.sbl;
 
-import com.example.soundattract.DynamicScanCooldownManager;
-import com.example.soundattract.SoundTracker;
-import com.example.soundattract.StealthDetectionEvents;
+import com.example.soundattract.runtime.DynamicScanCooldownManager;
+import com.example.soundattract.tracking.SoundTracker;
+import com.example.soundattract.event.StealthDetectionEvents;
 import com.example.soundattract.config.SoundAttractConfig;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.core.BlockPos;

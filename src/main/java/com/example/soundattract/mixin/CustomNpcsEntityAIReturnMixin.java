@@ -1,6 +1,6 @@
 package com.example.soundattract.mixin;
 
-import com.example.soundattract.SoundAttractionEvents;
+import com.example.soundattract.event.SoundAttractionEvents;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 
@@ -85,7 +85,7 @@ public abstract class CustomNpcsEntityAIReturnMixin extends Goal {
         boolean result = soundattract$isPursuingSound(mob);
         if (!result) {
             try {
-                com.example.soundattract.SoundTracker.SoundRecord sr = com.example.soundattract.SoundTracker.findNearestSound(
+                com.example.soundattract.tracking.SoundTracker.SoundRecord sr = com.example.soundattract.tracking.SoundTracker.findNearestSound(
                     mob,
                     mob.level(),
                     mob.blockPosition(),

@@ -1,6 +1,8 @@
 package com.example.soundattract.worker;
 
+import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.quantified.QuantifiedWorkScheduler;
 
 import net.minecraftforge.fml.ModList;
 
@@ -26,12 +28,13 @@ public final class WorkSchedulerManager {
     }
 
     private static SoundAttractWorkScheduler build() {
-        boolean preferQuantified = false;
-        try {
-            preferQuantified = SoundAttractConfig.COMMON.enableQuantifiedIntegration.get();
-        } catch (Throwable ignored) {}
-
-        if (preferQuantified && ModList.get().isLoaded("quantified")) {
+        boolean quantifiedLoaded = ModList.get().isLoaded("quantified");
+        if (quantifiedLoaded) {
+            try {
+                if (!SoundAttractConfig.COMMON.enableQuantifiedIntegration.get()) {
+                    SoundAttractMod.LOGGER.info("[WorkSchedulerManager] Quantified integration forced on for performance.");
+                }
+            } catch (Throwable ignored) {}
             try {
                 return new QuantifiedWorkScheduler();
             } catch (Throwable ignored) {}

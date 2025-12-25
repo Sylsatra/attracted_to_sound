@@ -1,29 +1,18 @@
 package com.example.soundattract.ai;
 
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
 
-import com.example.soundattract.DynamicScanCooldownManager;
+import com.example.soundattract.runtime.DynamicScanCooldownManager;
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.SoundAttractionEvents;
-import com.example.soundattract.SoundTracker;
-import com.example.soundattract.CamoUtil;
-import com.example.soundattract.config.PlayerStance;
+import com.example.soundattract.event.SoundAttractionEvents;
+import com.example.soundattract.tracking.SoundTracker;
 import com.example.soundattract.config.SoundAttractConfig;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.registries.ForgeRegistries;
 
 public class AttractionGoal extends Goal {
 
@@ -65,101 +54,9 @@ public class AttractionGoal extends Goal {
         return SoundAttractConfig.COMMON.arrivalDistance.get();
     }
 
-    private int getWaitTicks() {
-        return SoundAttractConfig.COMMON.scanCooldownTicks.get();
-    }
-
-    private PlayerStance determinePlayerStance(LivingEntity player) {
-        if (player.getPose() == Pose.SWIMMING || player.getPose() == Pose.FALL_FLYING || player.getPose() == Pose.SPIN_ATTACK) {
-            if (player.getBbHeight() < 1.0F) {
-                return PlayerStance.CRAWLING;
-            }
-        }
-        if (player.isCrouching()) {
-            return PlayerStance.SNEAKING;
-        }
-        return PlayerStance.STANDING;
-    }
-
-    private double getDetectionRangeForPlayer(LivingEntity player) {
-        com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(this.mob);
-        PlayerStance currentStance = determinePlayerStance(player);
-
-        double baseRange;
-        Optional<Double> override = Optional.empty();
-
-        if (mobProfile != null) {
-            override = mobProfile.getDetectionOverride(currentStance);
-        }
-
-        if (override.isPresent()) {
-            baseRange = override.get();
-        } else {
-            switch (currentStance) {
-                case CRAWLING:
-                    baseRange = SoundAttractConfig.COMMON.crawlingDetectionRangePlayer.get();
-                    break;
-                case SNEAKING:
-                    baseRange = SoundAttractConfig.COMMON.sneakingDetectionRangePlayer.get();
-                    break;
-                case STANDING:
-                default:
-                    baseRange = SoundAttractConfig.COMMON.standingDetectionRangePlayer.get();
-                    break;
-            }
-        }
-
-        boolean hasCamouflage = false;
-        int wornCamouflagePieces = 0;
-        if (SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
-            for (ItemStack armorItem : player.getArmorSlots()) {
-                if (!armorItem.isEmpty() && CamoUtil.isCamouflageArmorItem(armorItem.getItem())) {
-                    wornCamouflagePieces++;
-                }
-            }
-            if (SoundAttractConfig.COMMON.requireFullSetForCamouflageBonus.get()) {
-                hasCamouflage = wornCamouflagePieces == 4;
-            } else {
-                hasCamouflage = wornCamouflagePieces > 0;
-            }
-        }
-
-        if (hasCamouflage) {
-            double totalEffectiveness = 0.0;
-            List<ItemStack> armorItems = new ArrayList<>();
-            player.getArmorSlots().forEach(armorItems::add);
-            for (int i = 0; i < armorItems.size(); i++) {
-                ItemStack stack = armorItems.get(i);
-                if (stack.isEmpty()) {
-                    continue;
-                }
-                Item item = stack.getItem();
-                if (CamoUtil.isCamouflageArmorItem(item)) {
-                    switch (i) {
-                        case 3:
-                            totalEffectiveness += SoundAttractConfig.COMMON.helmetCamouflageEffectiveness.get();
-                            break;
-                        case 2:
-                            totalEffectiveness += SoundAttractConfig.COMMON.chestplateCamouflageEffectiveness.get();
-                            break;
-                        case 1:
-                            totalEffectiveness += SoundAttractConfig.COMMON.leggingsCamouflageEffectiveness.get();
-                            break;
-                        case 0:
-                            totalEffectiveness += SoundAttractConfig.COMMON.bootsCamouflageEffectiveness.get();
-                            break;
-                    }
-                }
-            }
-            baseRange *= Math.max(0.0, 1.0 - totalEffectiveness);
-        }
-
-        return Math.max(0.0, baseRange);
-    }
-
     private boolean shouldSuppressTargeting() {
         return SoundAttractConfig.COMMON.enableStealthMechanics.get()
-                && com.example.soundattract.StealthDetectionEvents.shouldSuppressTargeting(this.mob);
+                && com.example.soundattract.event.StealthDetectionEvents.shouldSuppressTargeting(this.mob);
     }
 
     @Override
@@ -549,11 +446,8 @@ public class AttractionGoal extends Goal {
                 && Math.abs(s1.weight - s2.weight) < 0.01;
     }
 
-    private boolean isPlayerMovementSound(double weight) {
-        return weight == 1.2 || weight == 0.6 || weight == 0.2 || weight == 0.1;
-    }
-
     public boolean isPursuingSound() {
         return isPursuingSound;
     }
 }
+
