@@ -1,21 +1,33 @@
 # Sound Attract
 
-Sound Attract makes sound a real gameplay system. Mobs respond to events with range and weight, so stealth and noise matter in survival and multiplayer.
+```
+  ____                        _      ___  _   _                 _   
+ / ___|  ___  _   _ _ __   __| |    / _ \| |_| |_ _ __ __ _  ___| |_ 
+ \___ \ / _ \| | | | '_ \ / _` |   | | | | __| __| '__/ _` |/ __| __|
+  ___) | (_) | |_| | | | | (_| |   | |_| | |_| |_| | | (_| | (__| |_ 
+ |____/ \___/ \__,_|_| |_|\__,_|    \___/ \__|\__|_|  \__,_|\___|\__|
+```
+
+Sound Attract makes sound a real gameplay system ??
+Mobs react to events with range and weight so stealth and noise matter in survival and multiplayer ??
 
 <a href="https://github.com/Admany/Quantified-API" rel="nofollow"><img src="https://i.imghippo.com/files/k1781Ug.png" alt="Quantified API Banner"></a>
 
 ## Overview
-Sound Attract builds a sound map per dimension and uses it to drive AI decisions. The result is consistent behavior that feels close to vanilla while adding depth to movement, combat, and ambient actions.
+Sound Attract builds a sound map per dimension and uses it to drive AI decisions.
+The result is consistent behavior that feels close to vanilla while adding depth to movement, combat, and ambient actions.
 
 ## Core features
-- Sound sources with range, weight, and lifetime
-- Per sound overrides and data driven tags
-- Group behavior for more natural mob response
-- Voice chat support when enabled
-- Integration hooks for popular combat and AI mods
+- ?? Sound sources with range, weight, and lifetime
+- ?? Per sound overrides and data driven tags
+- ?? Group behavior for more natural mob response
+- ??? Voice chat support when enabled
+- ?? Integration hooks for popular combat and AI mods
 
 ## Quantified API integration
-The mod uses Quantified API for scheduling and cache support. Heavy computations run off thread and results are applied on the main thread to keep Minecraft safe. This improves tick stability without changing gameplay logic.
+Sound Attract uses Quantified API for scheduling and cache support.
+Heavy computations run off thread and results are applied on the main thread to keep Minecraft safe.
+This improves tick stability without changing gameplay logic.
 
 ## Configuration
 All settings live in `config/soundattract-common.toml`.
@@ -26,7 +38,8 @@ All settings live in `config/soundattract-common.toml`.
 - Async timing and cache limits
 
 ## Compatibility
-Sound Attract is designed to work in large modpacks and alongside AI or combat mods. Integrations can be toggled in config to match your pack.
+Sound Attract is designed to work in large modpacks and alongside AI or combat mods.
+Integrations can be toggled in config to match your pack.
 
 ## Support
 If you report an issue, include your config and a recent log with clear reproduction steps.
