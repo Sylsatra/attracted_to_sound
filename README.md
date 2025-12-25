@@ -1,36 +1,42 @@
-🔊 GET LOUD! Mobs Can Hear You Now with Sound Attract! 🔊
+# Sound Attract
 
-Ever felt like you could sneak past anything in Minecraft? Think again. 🤫
-Introducing Sound Attract — the mod that cranks realism to 11 by making mobs actually listen to their environment.
+Make mobs react to sound in a way that feels fair, configurable, and intense. Sound Attract turns movement, blocks, combat, and voice into real signals that mobs can track, so stealth and noise matter again.
 
-💥 MAKE SOME NOISE! 💥
-Forget tiptoeing. Stomp around, break blocks, light TNT — go wild! Mobs aren’t deaf anymore. They’ll hear you and come investigate.
-Use it to your advantage: lure creepers into traps, distract a zombie horde, or lead that pesky skeleton away from your loot.
+<a href="https://github.com/Admany/Quantified-API" rel="nofollow"><img src="https://i.imghippo.com/files/k1781Ug.png" alt="Quantified API Banner"></a>
 
-🎤 Voice Chat Integration? Oh Yeah. 🎤
-Using Simple Voice Chat? Now your real voice can alert mobs.
-Whether you're planning an attack or screaming in panic, Sound Attract can hook into your mic and make monsters zero in.
-Adjust detection radius and sensitivity in the config — you're in control.
+## Why it is different
+- Mobs respond to a real sound map rather than a simple radius check
+- Sounds have weight, range, and lifetime so noisy actions carry risk
+- Strong config control so modpacks can tune balance without code changes
+- Performance focused with Quantified API scheduling and cache support
 
-🔫 Combat Mods? Tactical Sound Warfare Awaits. 🔫
-Running TacZ or other weapon-heavy mods? Every reload, shot, or explosion can attract attention.
-Customize sound behavior per mod, and turn your firefights into high-stakes stealth ops.
+## Core features
+- Movement, combat, block interactions, and explosions create attractors
+- Per sound tuning with overrides and data driven tags
+- Group behavior and edge mob logic for more believable reactions
+- Voice chat support so real speech can trigger attention
+- Integration hooks for popular combat and AI mods
 
-⚙️ Your World, Your Rules — Full Config Support! ⚙️
-Don’t like default settings? We’ve got you. Crack open config/soundattract-common.toml and fine-tune everything:
+## Quantified API integration
+Sound Attract uses the Quantified API for async scheduling and caching to keep ticks smooth under load. Heavy computations run off thread, then results are applied on the main thread to keep Minecraft safe. This keeps behavior consistent while improving performance and stability.
 
-🎯 Target Mobs: Choose exactly which mobs have super-hearing. Add your favorite modded ones to attractedEntities.
+## Configuration
+Everything is configurable in `config/soundattract-common.toml`. Highlights include
+- Attracted and blacklisted mobs
+- Sound ranges and weights
+- Stealth and movement tuning
+- Voice chat ranges and thresholds
+- Async timing and cache limits
 
-🎵 Sound Customization: Pick any sound ID from Minecraft or other mods using soundConfigs. Define how far the sound reaches and how “tempting” it is.
+## Getting started
+1. Install the mod and its dependencies
+2. Launch once to generate the config
+3. Tune the settings to match your pack
 
-🧍 Player Noise Control: Configure how sneaking, walking, sprinting, and falling affect how much noise you generate — even based on speed!
+## Modpack tips
+- Start with conservative ranges, then expand once you see how mobs react
+- Tune group settings to control crowd behavior in large fights
+- For multiplayer, keep voice ranges reasonable to avoid constant pulls
 
-🧠 Mob AI Behavior: Set how long sound events linger, how often mobs “scan” for noise, how far they’ll chase, and how fast they move.
-
-🔌 Integration Options: Toggle Voice Chat and TacZ support, adjust specific sound weights and detection ranges.
-
-Whether you're building sneaky mob traps, adding challenge to survival, or just want to hear your friends scream when a creeper hears them talking...
-Sound Attract lets you tune the entire sound ecosystem of your world.
-
-Drop the beat. Fine-tune the config. And let the mobs come to you. 🎶🧟‍♂️
-
+## Support
+If you hit issues, include your config and a recent log in your report. Clear repro steps help a lot.
