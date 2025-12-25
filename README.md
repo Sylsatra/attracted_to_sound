@@ -9,8 +9,8 @@
                                                                                 
 ```
 
-Attract To Sound makes sound a real gameplay system ??
-Mobs react to events with range and weight so stealth and noise matter in survival and multiplayer ??
+Attract To Sound transforms sound into a core gameplay system.
+Your actions create noise, and noise has consequences - mobs respond based on range and sound weight, making stealth critical in survival and multiplayer.
 
 <a href="https://github.com/Admany/Quantified-API" rel="nofollow"><img src="https://i.imghippo.com/files/k1781Ug.png" alt="Quantified API Banner"></a>
 
