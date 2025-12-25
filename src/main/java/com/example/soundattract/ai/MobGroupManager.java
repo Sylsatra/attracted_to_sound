@@ -6,6 +6,7 @@ import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.ConfigSnapshot;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 import com.example.soundattract.worker.WorkerScheduler.MobSnapshot;
+import com.example.soundattract.worker.WorkSchedulerManager;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -52,6 +54,8 @@ public class MobGroupManager {
     );
     long lastGroupUpdateTime = -1;
     long lastCleanupTime = -1;
+
+    volatile Future<?> inFlightGroupCompute;
   }
 
   private static PerWorldData getData(ResourceLocation dimension) {
@@ -115,6 +119,18 @@ public class MobGroupManager {
 
   private static boolean submitGroupComputeSnapshot(ServerLevel level) {
     try {
+      PerWorldData data = getData(level.dimension().location());
+      Future<?> inFlight = data.inFlightGroupCompute;
+      if (inFlight != null) {
+        try {
+          if (!inFlight.isDone()) {
+            return true;
+          }
+        } catch (Throwable ignored) {
+        }
+        data.inFlightGroupCompute = null;
+      }
+
       Set<net.minecraft.world.entity.EntityType<?>> attractedEntityTypes = com.example.soundattract.SoundAttractionEvents.getCachedAttractedEntityTypes();
       if (attractedEntityTypes == null || attractedEntityTypes.isEmpty()) return false;
       int simDistChunks = level.getServer().getPlayerList().getViewDistance();
@@ -160,7 +176,7 @@ public class MobGroupManager {
         SoundAttractConfig.COMMON.numEdgeSectors.get(),
         SoundAttractConfig.COMMON.edgeMobsPerSector.get()
       );
-      WorkerScheduler.submitGroupCompute(snapshots, cfg, level.dimension().location());
+      data.inFlightGroupCompute = WorkSchedulerManager.get().submitGroupCompute(snapshots, cfg, level.dimension().location());
       if (SoundAttractConfig.COMMON.debugLogging.get()) {
         SoundAttractMod.LOGGER.info(
           "[MobGroupManager] Submitted async group compute for {} mobs in dimension {}",

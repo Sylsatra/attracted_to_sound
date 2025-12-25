@@ -1,6 +1,7 @@
 package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.worker.WorkSchedulerManager;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
@@ -13,12 +14,16 @@ public class ConfigReloadListener {
     public static void onConfigLoad(ModConfigEvent.Loading event) {
         if (event.getConfig().getModId().equals(SoundAttractMod.MOD_ID)) {
             SoundAttractConfig.bakeConfig();
+            SoundAttractionEvents.invalidateCachedEntityTypes();
+            WorkSchedulerManager.refresh();
         }
     }
     @SubscribeEvent
     public static void onConfigReload(ModConfigEvent.Reloading event) {
         if (event.getConfig().getModId().equals(SoundAttractMod.MOD_ID)) {
             SoundAttractConfig.bakeConfig();
+            SoundAttractionEvents.invalidateCachedEntityTypes();
+            WorkSchedulerManager.refresh();
         }
     }
 }

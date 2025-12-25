@@ -16,10 +16,12 @@ import javax.annotation.Nullable;
 import java.util.concurrent.ConcurrentHashMap;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.config.SoundOverride;
+import com.example.soundattract.integration.QuantifiedCacheCompat;
 import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.SoundCandidate;
 import com.example.soundattract.worker.WorkerScheduler.SoundScoreRequest;
 import com.example.soundattract.worker.WorkerScheduler.SoundScoreResult;
+import com.example.soundattract.worker.WorkSchedulerManager;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -116,8 +118,8 @@ public class SoundTracker {
         public final UUID sourcePlayer;
         public final String animationClass;
 
-        public VirtualSoundRecord(BlockPos pos, int lifetime, String dimensionKey, double range, double weight, UUID sourcePlayer, String animationClass) {
-            super(null, null, pos, lifetime, dimensionKey, range, weight);
+        public VirtualSoundRecord(String soundId, BlockPos pos, int lifetime, String dimensionKey, double range, double weight, UUID sourcePlayer, String animationClass) {
+            super(null, soundId, pos, lifetime, dimensionKey, range, weight);
             this.sourcePlayer = sourcePlayer;
             this.animationClass = animationClass;
         }
@@ -215,9 +217,17 @@ public class SoundTracker {
             int lifetime,
             String explicitSoundId) {
 
+        if (pos == null || dimensionKey == null) {
+            return;
+        }
+
         String soundIdToUse = explicitSoundId;
         if (soundIdToUse == null && se != null && se.getLocation() != null) {
             soundIdToUse = se.getLocation().toString();
+        }
+
+        if (soundIdToUse == null || soundIdToUse.isBlank()) {
+            return;
         }
 
         ResourceLocation loc = extractBaseSoundLocation(soundIdToUse);
@@ -313,6 +323,9 @@ public class SoundTracker {
     }
 
     public static void addVirtualSound(BlockPos pos, String dimensionKey, double range, double weight, int lifetime, UUID sourcePlayer, String animationClass) {
+        if (pos == null || dimensionKey == null) {
+            return;
+        }
         writeLock.lock();
         try {
             RECENT_SOUNDS.removeIf(r -> {
@@ -326,7 +339,11 @@ public class SoundTracker {
             boolean strongerOrEqualExists = RECENT_SOUNDS.stream().anyMatch(r -> r.pos.equals(pos) && r.dimensionKey.equals(dimensionKey) && r.weight >= weight);
 
             if (!strongerOrEqualExists) {
-                VirtualSoundRecord record = new VirtualSoundRecord(pos, lifetime, dimensionKey, range, weight, sourcePlayer, animationClass);
+                String virtualId = "soundattract:virtual#"
+                    + (sourcePlayer != null ? sourcePlayer.toString() : "unknown")
+                    + "/" + (animationClass != null ? animationClass : "unknown")
+                    + "/" + pos.asLong();
+                VirtualSoundRecord record = new VirtualSoundRecord(virtualId, pos, lifetime, dimensionKey, range, weight, sourcePlayer, animationClass);
                 RECENT_SOUNDS.add(record);
                 addRecordToCollections(record);
             }
@@ -371,15 +388,15 @@ public class SoundTracker {
             if (!(o instanceof RaycastCacheKey other)) {
                 return false;
             }
-            return mobPos.equals(other.mobPos)
-                && soundPos.equals(other.soundPos)
-                && soundId.equals(other.soundId)
-                && dimensionKey.equals(other.dimensionKey);
+            return java.util.Objects.equals(mobPos, other.mobPos)
+                && java.util.Objects.equals(soundPos, other.soundPos)
+                && java.util.Objects.equals(soundId, other.soundId)
+                && java.util.Objects.equals(dimensionKey, other.dimensionKey);
         }
 
         @Override
         public int hashCode() {
-            return mobPos.hashCode() ^ soundPos.hashCode() ^ soundId.hashCode() ^ dimensionKey.hashCode();
+            return java.util.Objects.hash(mobPos, soundPos, soundId, dimensionKey);
         }
     }
     private static final class RaycastEntry {
@@ -402,7 +419,7 @@ public class SoundTracker {
 
     private static void drainAsyncSoundScores(Level level) {
         try {
-            List<SoundScoreResult> results = WorkerScheduler.drainSoundScoreResults();
+            List<SoundScoreResult> results = WorkSchedulerManager.get().drainSoundScoreResults();
             if (results == null || results.isEmpty()) return;
             long nowGameTime = level == null ? 0L : level.getGameTime();
             for (SoundScoreResult r : results) {
@@ -420,19 +437,41 @@ public class SoundTracker {
     }
 
     public static double[] applyBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
+        if (level == null || src == null || dst == null) {
+            return new double[]{origRange, origWeight};
+        }
         if (!SoundAttractConfig.COMMON.enableBlockMuffling.get()) {
             return new double[]{origRange, origWeight};
+        }
+
+        boolean useCache = SoundAttractConfig.COMMON.enableRaycastCache.get();
+        long raycastTtl = SoundAttractConfig.COMMON.raycastCacheTtlTicks.get();
+        int raycastMax = SoundAttractConfig.COMMON.raycastCacheMaxEntries.get();
+        String dimensionKey = level.dimension().location().toString();
+
+        if (useCache && QuantifiedCacheCompat.isUsable()) {
+            String key = new StringBuilder(128)
+                .append(dimensionKey).append('|')
+                .append(soundId).append('|')
+                .append(dst.getX()).append(',').append(dst.getY()).append(',').append(dst.getZ()).append('|')
+                .append(src.getX()).append(',').append(src.getY()).append(',').append(src.getZ())
+                .toString();
+
+            return QuantifiedCacheCompat.getCached(
+                "soundattract_raycast_muffling",
+                key,
+                () -> computeBlockMuffling(level, src, dst, origRange, origWeight, soundId),
+                raycastTtl,
+                raycastMax
+            );
         }
 
         RaycastCacheKey cacheKey = new RaycastCacheKey(
             dst,
             src,
             soundId,
-            level.dimension().location().toString()
+            dimensionKey
         );
-        boolean useCache = SoundAttractConfig.COMMON.enableRaycastCache.get();
-        long raycastTtl = SoundAttractConfig.COMMON.raycastCacheTtlTicks.get();
-        int raycastMax = SoundAttractConfig.COMMON.raycastCacheMaxEntries.get();
         if (useCache) {
             RaycastEntry existing = RAYCAST_CACHE.get(cacheKey);
             if (existing != null) {
@@ -445,6 +484,26 @@ public class SoundTracker {
             }
         }
 
+        double[] finalResult = computeBlockMuffling(level, src, dst, origRange, origWeight, soundId);
+        if (useCache) {
+            RAYCAST_CACHE.put(cacheKey, new RaycastEntry(finalResult, level.getGameTime()));
+            if (RAYCAST_CACHE.size() > raycastMax) {
+                long now = level.getGameTime();
+                RAYCAST_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime) > raycastTtl);
+                if (RAYCAST_CACHE.size() > raycastMax) {
+                    int toRemove = RAYCAST_CACHE.size() - raycastMax;
+                    java.util.List<java.util.Map.Entry<RaycastCacheKey, RaycastEntry>> list = new java.util.ArrayList<>(RAYCAST_CACHE.entrySet());
+                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime));
+                    for (int i = 0; i < toRemove && i < list.size(); i++) {
+                        RAYCAST_CACHE.remove(list.get(i).getKey());
+                    }
+                }
+            }
+        }
+        return finalResult;
+    }
+
+    private static double[] computeBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
         double currentRange = origRange;
         double currentWeight = origWeight;
         int blocksHit = 0;
@@ -500,23 +559,7 @@ public class SoundTracker {
                     soundId, src, dst, blocksHit, origRange, currentRange, origWeight, currentWeight);
         }
 
-        double[] finalResult = new double[]{Math.max(0, currentRange), Math.max(0, currentWeight)};
-        if (useCache) {
-            RAYCAST_CACHE.put(cacheKey, new RaycastEntry(finalResult, level.getGameTime()));
-            if (RAYCAST_CACHE.size() > raycastMax) {
-                long now = level.getGameTime();
-                RAYCAST_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime) > raycastTtl);
-                if (RAYCAST_CACHE.size() > raycastMax) {
-                    int toRemove = RAYCAST_CACHE.size() - raycastMax;
-                    java.util.List<java.util.Map.Entry<RaycastCacheKey, RaycastEntry>> list = new java.util.ArrayList<>(RAYCAST_CACHE.entrySet());
-                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime));
-                    for (int i = 0; i < toRemove && i < list.size(); i++) {
-                        RAYCAST_CACHE.remove(list.get(i).getKey());
-                    }
-                }
-            }
-        }
-        return finalResult;
+        return new double[]{Math.max(0, currentRange), Math.max(0, currentWeight)};
     }
 
     private static boolean isBlockInConfigList(BlockState state, Block block, java.util.List<String> configList) {
@@ -559,8 +602,8 @@ public class SoundTracker {
     }
 
     private static boolean isCustomWool(BlockState state, Block block, Level level, BlockPos pos) {
-        boolean inConfig = isBlockInConfigList(state, block,
-                SoundAttractConfig.COMMON.customWoolBlocks.get().stream().map(String::valueOf).toList());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        boolean inConfig = id != null && SoundAttractConfig.CUSTOM_WOOL_BLOCKS_CACHE.contains(id);
 
         boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
         boolean inTag = false;
@@ -593,8 +636,8 @@ public class SoundTracker {
     }
 
     private static boolean isCustomSolid(BlockState state, Block block, Level level, BlockPos pos) {
-        boolean inConfig = isBlockInConfigList(state, block,
-                SoundAttractConfig.COMMON.customSolidBlocks.get().stream().map(String::valueOf).toList());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        boolean inConfig = id != null && SoundAttractConfig.CUSTOM_SOLID_BLOCKS_CACHE.contains(id);
 
         boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
         boolean inTag = false;
@@ -630,8 +673,8 @@ public class SoundTracker {
     }
 
     private static boolean isCustomNonSolid(BlockState state, Block block, Level level, BlockPos pos) {
-        boolean inConfig = isBlockInConfigList(state, block,
-                SoundAttractConfig.COMMON.customNonSolidBlocks.get().stream().map(String::valueOf).toList());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        boolean inConfig = id != null && SoundAttractConfig.CUSTOM_NON_SOLID_BLOCKS_CACHE.contains(id);
 
         boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
         boolean inTag = false;
@@ -669,8 +712,8 @@ public class SoundTracker {
     }
 
     private static boolean isCustomThin(BlockState state, Block block, Level level, BlockPos pos) {
-        boolean inConfig = isBlockInConfigList(state, block,
-                SoundAttractConfig.COMMON.customThinBlocks.get().stream().map(String::valueOf).toList());
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
+        boolean inConfig = id != null && SoundAttractConfig.CUSTOM_THIN_BLOCKS_CACHE.contains(id);
 
         boolean enableDataDriven = SoundAttractConfig.COMMON.enableDataDriven.get();
         boolean inTag = false;
@@ -694,7 +737,6 @@ public class SoundTracker {
             }
         }
 
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
         if (id == null) {
             return false;
         }
@@ -734,6 +776,9 @@ public class SoundTracker {
     }
 
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 eyePos, @Nullable String currentTargetSoundId) {
+        if (mob == null || level == null || mobPos == null) {
+            return null;
+        }
         readLock.lock();
         try {
 
@@ -1001,7 +1046,7 @@ public class SoundTracker {
                             noveltyTicks
                         )
                     );
-                    WorkerScheduler.submitSoundScore(batch);
+                    WorkSchedulerManager.get().submitSoundScore(batch);
                         LAST_SUBMIT_GAME_TIME.put(mob.getUUID(), now);
                         LAST_CANDIDATE_HASH.put(mob.getUUID(), candidateHash);
                     }

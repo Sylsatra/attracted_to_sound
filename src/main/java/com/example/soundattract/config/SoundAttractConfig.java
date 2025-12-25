@@ -15,6 +15,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig.SoundDefaultEntry;
+import com.example.soundattract.integration.QuantifiedCacheCompat;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.minecraft.nbt.CompoundTag;
@@ -202,6 +203,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
         public final ForgeConfigSpec.DoubleValue arrivalDistance;
+        public final ForgeConfigSpec.DoubleValue followLeaderSpreadOutDistance;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed;
         public final ForgeConfigSpec.IntValue maxSoundsTracked;
         public final ForgeConfigSpec.DoubleValue soundSwitchRatio;
@@ -233,6 +235,16 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.IntValue workerThreads;
         public final ForgeConfigSpec.IntValue workerTaskBudgetMs;
+
+        public final ForgeConfigSpec.BooleanValue enableQuantifiedIntegration;
+        public final ForgeConfigSpec.BooleanValue enableSmartBrainLibIntegration;
+
+        public final ForgeConfigSpec.BooleanValue enableCustomNpcsIntegration;
+
+        public final ForgeConfigSpec.BooleanValue enableQuantifiedCacheIntegration;
+        public final ForgeConfigSpec.IntValue quantifiedCacheMemoryLimitMB;
+        public final ForgeConfigSpec.BooleanValue disableQuantifiedCacheOnMemoryPressure;
+        public final ForgeConfigSpec.BooleanValue triggerQuantifiedCacheCleanupOnMemoryPressure;
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
@@ -380,7 +392,7 @@ public class SoundAttractConfig {
 
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 7, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 9, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
@@ -422,6 +434,10 @@ public class SoundAttractConfig {
                     .defineInRange("soundLifetimeTicks", 1200, 20, 1000000);
             arrivalDistance = builder.comment("How close a mob needs to get to a sound source to consider it 'reached'.")
                     .defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
+            followLeaderSpreadOutDistance = builder.comment(
+                            "After a follower reaches the investigation area near a sound, it will path away from the sound position to spread out and search.",
+                            "This controls how far (in blocks) it tries to spread out.")
+                    .defineInRange("followLeaderSpreadOutDistance", 24.0, 0.0, 256.0);
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
                     .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
@@ -466,6 +482,16 @@ public class SoundAttractConfig {
                     "Higher values allow more work per batch but can increase latency to apply results."
             )
                     .defineInRange("workerTaskBudgetMs", 10, 1, 1000);
+
+            enableQuantifiedIntegration = builder.define("enableQuantifiedIntegration", true);
+            enableSmartBrainLibIntegration = builder.define("enableSmartBrainLibIntegration", true);
+
+            enableCustomNpcsIntegration = builder.define("enableCustomNpcsIntegration", false);
+
+            enableQuantifiedCacheIntegration = builder.define("enableQuantifiedCacheIntegration", true);
+            quantifiedCacheMemoryLimitMB = builder.defineInRange("quantifiedCacheMemoryLimitMB", 256, 0, 65536);
+            disableQuantifiedCacheOnMemoryPressure = builder.define("disableQuantifiedCacheOnMemoryPressure", true);
+            triggerQuantifiedCacheCleanupOnMemoryPressure = builder.define("triggerQuantifiedCacheCleanupOnMemoryPressure", true);
 
             scanCooldownTicks = builder.comment("Minimum time in ticks between mob scans for new sounds. Higher values can improve performance but reduce responsiveness.")
                     .defineInRange("scanCooldownTicks", 25, 1, 1000000);
@@ -702,6 +728,7 @@ public class SoundAttractConfig {
                             "minecraft:entity.player.sneak",
                             "tacz:gun",
                             "soundattract:voice_chat",
+                            "soundattract:virtual",
                             "musketmod:musket_fire",
                             "musketmod:blunderbuss_fire",
                             "musketmod:pistol_fire",
@@ -1322,6 +1349,7 @@ public class SoundAttractConfig {
                                     "minecraft:entity.firework_rocket.launch;10;3",
                                     "minecraft:entity.firework_rocket.blast;20;5",
                                     "minecraft:entity.firework_rocket.large_blast;30;6",
+                                    "soundattract:virtual;10;1.0",
                                     "musketmod:musket_fire;155;8",
                                     "musketmod:blunderbuss_fire;154;7",
                                     "musketmod:pistol_fire;164;5",
@@ -2529,6 +2557,21 @@ public class SoundAttractConfig {
             COMMON_SPEC.save();
         }
 
+        if (COMMON.configSchemaVersion.get() < 7) {
+            COMMON.configSchemaVersion.set(7);
+            COMMON_SPEC.save();
+        }
+
+        if (COMMON.configSchemaVersion.get() < 8) {
+            COMMON.configSchemaVersion.set(8);
+            COMMON_SPEC.save();
+        }
+
+        if (COMMON.configSchemaVersion.get() < 9) {
+            COMMON.configSchemaVersion.set(9);
+            COMMON_SPEC.save();
+        }
+
         if (COMMON == null) {
             SoundAttractMod.LOGGER.warn("SoundAttractConfig.COMMON is null during bakeConfig. Skipping cache population.");
             return;
@@ -2970,6 +3013,29 @@ public class SoundAttractConfig {
         if (SPECIAL_MOB_PROFILES_CACHE == null || SPECIAL_MOB_PROFILES_CACHE.isEmpty()) {
             return null;
         }
+
+        if (mob == null) {
+            return null;
+        }
+
+        if (QuantifiedCacheCompat.isUsable()) {
+            String key = new StringBuilder(96)
+                .append(mob.getUUID().toString()).append('|')
+                .append(SPECIAL_MOB_PROFILES_CACHE.size())
+                .toString();
+            return QuantifiedCacheCompat.getCached(
+                "soundattract_mob_profile_match",
+                key,
+                () -> getMatchingProfileUncached(mob),
+                1L,
+                8192L
+            );
+        }
+
+        return getMatchingProfileUncached(mob);
+    }
+
+    private static MobProfile getMatchingProfileUncached(Mob mob) {
         for (MobProfile profile : SPECIAL_MOB_PROFILES_CACHE) {
             if (profile.matches(mob)) {
                 return profile;
@@ -2982,6 +3048,29 @@ public class SoundAttractConfig {
         if (SPECIAL_PLAYER_PROFILES_CACHE == null || SPECIAL_PLAYER_PROFILES_CACHE.isEmpty()) {
             return null;
         }
+
+        if (player == null) {
+            return null;
+        }
+
+        if (QuantifiedCacheCompat.isUsable()) {
+            String key = new StringBuilder(96)
+                .append(player.getUUID().toString()).append('|')
+                .append(SPECIAL_PLAYER_PROFILES_CACHE.size())
+                .toString();
+            return QuantifiedCacheCompat.getCached(
+                "soundattract_player_profile_match",
+                key,
+                () -> getMatchingPlayerProfileUncached(player),
+                1L,
+                8192L
+            );
+        }
+
+        return getMatchingPlayerProfileUncached(player);
+    }
+
+    private static PlayerProfile getMatchingPlayerProfileUncached(Player player) {
         for (PlayerProfile profile : SPECIAL_PLAYER_PROFILES_CACHE) {
             if (profile.matches(player)) {
                 return profile;

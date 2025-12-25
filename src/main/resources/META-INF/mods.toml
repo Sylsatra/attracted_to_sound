@@ -1,15 +1,21 @@
 modLoader="javafml" 
-loaderVersion="[47,)"
-license="GPLv3"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
 [[mixins]]
   type = "CONFIG"
   config = "soundattract.mixins.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.customnpcs.mixins.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.tacznpcs.mixins.json"
 [[mods]]
-modId="soundattract" 
-version="4.1.9" 
+modId="${mod_id}" 
+version="${mod_version}" 
 logoFile="attract-to-sound-mod-logo.jpg"
-displayName="Sound Attract Mod" 
-authors="Sylsatra" 
+displayName="${mod_name}" 
+authors="${mod_authors}" 
 description='''
 A mod to make mobs lured into sound.
 Also camouflage is a thing.
@@ -17,26 +23,26 @@ Also camouflage is a thing.
 [[dependencies.soundattract]] 
     modId="forge"
     mandatory=true 
-    versionRange="[47,)" 
+    versionRange="${forge_version_range}" 
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.soundattract]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.20,1.21)"
+    versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.soundattract]]
     modId="voicechat"
     mandatory=false
-    versionRange="[1.20.1-2.5.27,)"
+    versionRange="[${voicechat_dependency},)"
     ordering="NONE"
     side="BOTH"
 
 [[dependencies.soundattract]]
-    modId="enhanceai"
+    modId="enhancedai"
     mandatory=false
     versionRange="[2.7.0,)"
     ordering="NONE"
@@ -68,6 +74,20 @@ Also camouflage is a thing.
     mandatory=false
     versionRange="[1.10.0.0,)"
     ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="quantified"
+    mandatory=false
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="smartbrainlib"
+    mandatory=false
+    versionRange="[1.15,)"
+    ordering="AFTER"
     side="BOTH"
 
 [[dependencies.soundattract]]

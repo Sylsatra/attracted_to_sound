@@ -21,6 +21,8 @@ public class FollowLeaderGoal extends Goal {
     private int dynamicTickCounter = 0;
     private Vec3 lastRandomDest = null;
     private boolean hasPickedDest = false;
+    private boolean isSpreadingOut = false;
+    private BlockPos lastAnchorPos = null;
 
     public FollowLeaderGoal(Mob mob, double moveSpeed) {
         this.mob = mob;
@@ -218,27 +220,66 @@ public class FollowLeaderGoal extends Goal {
 
         double arrivalDistance = com.example.soundattract.config.SoundAttractConfig.COMMON.arrivalDistance.get();
 
+        if (lastAnchorPos == null || !lastAnchorPos.equals(soundPos)) {
+            lastAnchorPos = soundPos;
+            hasPickedDest = false;
+            lastRandomDest = null;
+            isSpreadingOut = false;
+            stuckTicks = 0;
+        }
+
+        if (!isSpreadingOut && lastRandomDest != null && mob.position().distanceToSqr(lastRandomDest) <= 2.25) {
+            isSpreadingOut = true;
+            hasPickedDest = false;
+            lastRandomDest = null;
+        }
+
         if (!hasPickedDest) {
-            java.util.Random rand = new java.util.Random(
-                mob.getUUID().hashCode() ^ soundPos.hashCode()
-            );
-            double angle = rand.nextDouble() * 2 * Math.PI;
-            double radius = arrivalDistance * Math.sqrt(rand.nextDouble());
-            double offsetX = Math.cos(angle) * radius;
-            double offsetZ = Math.sin(angle) * radius;
+            if (isSpreadingOut) {
+                int dirIdx = Math.floorMod(mob.getUUID().hashCode() ^ soundPos.hashCode(), 4);
+                int dx = 0;
+                int dz = 0;
+                switch (dirIdx) {
+                    case 0: dx = 1; break;
+                    case 1: dx = -1; break;
+                    case 2: dz = 1; break;
+                    default: dz = -1; break;
+                }
+                double spreadDistance = com.example.soundattract.config.SoundAttractConfig.COMMON.followLeaderSpreadOutDistance.get();
+                if (spreadDistance <= 0.0) {
+                    spreadDistance = Math.max(8.0, arrivalDistance * 2.0);
+                }
+                int step = (int) Math.round(spreadDistance);
+                int destX = soundPos.getX() + dx * step;
+                int destZ = soundPos.getZ() + dz * step;
+                int groundY = mob.level().getHeight(
+                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    destX, destZ
+                );
+                lastRandomDest = new Vec3(destX + 0.5, groundY, destZ + 0.5);
+                hasPickedDest = true;
+            } else {
+                java.util.Random rand = new java.util.Random(
+                    mob.getUUID().hashCode() ^ soundPos.hashCode()
+                );
+                double angle = rand.nextDouble() * 2 * Math.PI;
+                double radius = arrivalDistance * Math.sqrt(rand.nextDouble());
+                double offsetX = Math.cos(angle) * radius;
+                double offsetZ = Math.sin(angle) * radius;
 
-            int destX = soundPos.getX() + (int) Math.floor(offsetX);
-            int destZ = soundPos.getZ() + (int) Math.floor(offsetZ);
-            int groundY = mob.level().getHeight(
-                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                destX, destZ
-            );
+                int destX = soundPos.getX() + (int) Math.floor(offsetX);
+                int destZ = soundPos.getZ() + (int) Math.floor(offsetZ);
+                int groundY = mob.level().getHeight(
+                    net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    destX, destZ
+                );
 
-            double finalX = destX + 0.5;
-            double finalY = groundY;
-            double finalZ = destZ + 0.5;
-            lastRandomDest = new Vec3(finalX, finalY, finalZ);
-            hasPickedDest = true;
+                double finalX = destX + 0.5;
+                double finalY = groundY;
+                double finalZ = destZ + 0.5;
+                lastRandomDest = new Vec3(finalX, finalY, finalZ);
+                hasPickedDest = true;
+            }
         }
 
         if (lastRandomDest != null) {
@@ -279,5 +320,7 @@ public class FollowLeaderGoal extends Goal {
         leader = null;
         hasPickedDest = false;
         lastRandomDest = null;
+        isSpreadingOut = false;
+        lastAnchorPos = null;
     }
 }

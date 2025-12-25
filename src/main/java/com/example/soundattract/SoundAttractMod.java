@@ -16,6 +16,8 @@ import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.loot.ModLootModifiers;
 import com.example.soundattract.integration.PlasmoVoiceBootstrap;
+import com.example.soundattract.integration.VanillaIntegrationEvents;
+import com.example.soundattract.worker.WorkSchedulerManager;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -35,11 +37,13 @@ public class SoundAttractMod {
         MinecraftForge.EVENT_BUS.register(new FovEvents());
         MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());
         MinecraftForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
+        MinecraftForge.EVENT_BUS.register(new VanillaIntegrationEvents());
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             SoundAttractConfig.bakeConfig();
+            WorkSchedulerManager.refresh();
             SoundAttractNetwork.register();
         });
         event.enqueueWork(this::handleTaczIntegration);

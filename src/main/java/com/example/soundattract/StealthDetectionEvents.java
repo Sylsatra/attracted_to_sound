@@ -22,6 +22,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import com.example.soundattract.integration.EnhancedAICompat;
+import com.example.soundattract.integration.QuantifiedCacheCompat;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -57,6 +58,21 @@ public class StealthDetectionEvents {
     private static final Map<UUID, Double> XRAY_RANGE_CACHE = new HashMap<>();
 
     private static final Set<UUID> suppressedEdgeDetections = new HashSet<>();
+
+    private static LivingEntity getAttackTargetCompat(Mob mob) {
+        if (mob == null) return null;
+        LivingEntity direct = mob.getTarget();
+        if (direct != null) return direct;
+        try {
+            return mob.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isTargetingPlayerCompat(Mob mob) {
+        return getAttackTargetCompat(mob) instanceof Player;
+    }
 
     public static void recordSuppressedEdgeDetection(Mob mob) {
         if (mob != null) suppressedEdgeDetections.add(mob.getUUID());
@@ -378,6 +394,28 @@ public class StealthDetectionEvents {
     }
 
     private static java.util.Optional<Integer> getAverageEnvironmentalColorEntity(LivingEntity entity, Level level) {
+        if (entity == null || level == null) {
+            return java.util.Optional.empty();
+        }
+        if (QuantifiedCacheCompat.isUsable()) {
+            net.minecraft.core.BlockPos base = entity.blockPosition();
+            String key = new StringBuilder(96)
+                .append(level.dimension().location().toString()).append('|')
+                .append(base.getX()).append(',').append(base.getY()).append(',').append(base.getZ())
+                .toString();
+            return QuantifiedCacheCompat.getCached(
+                "soundattract_env_color_entity",
+                key,
+                () -> soundattract$computeAverageEnvironmentalColorEntity(entity, level),
+                2L,
+                8192L
+            );
+        }
+
+        return soundattract$computeAverageEnvironmentalColorEntity(entity, level);
+    }
+
+    private static java.util.Optional<Integer> soundattract$computeAverageEnvironmentalColorEntity(LivingEntity entity, Level level) {
         java.util.List<Integer> blockColors = new java.util.ArrayList<>();
         net.minecraft.core.BlockPos base = entity.blockPosition();
         for (int y = 0; y >= -1; y--) {
@@ -388,8 +426,15 @@ public class StealthDetectionEvents {
                         net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
                         if (!state.isAir()) {
                             @SuppressWarnings("deprecation")
-                            int mapColor = state.getMapColor(level, pos).col;
-                            if (mapColor != 0) blockColors.add(mapColor);
+                            int mapColor;
+                            try {
+                                mapColor = state.getMapColor(level, pos).col;
+                            } catch (Throwable ignored) {
+                                continue;
+                            }
+                            if (mapColor != 0) {
+                                blockColors.add(mapColor);
+                            }
                         }
                     }
                 }
@@ -465,6 +510,13 @@ public class StealthDetectionEvents {
 
             if (!canMobDetectPlayer(mob, playerTarget)) {
                 event.setCanceled(true);
+                try {
+                    LivingEntity mem = mob.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
+                    if (mem == playerTarget) {
+                        mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+                    }
+                } catch (Throwable ignored) {
+                }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
                             "[LivingChangeTargetEvent] Mob {} targeting of Player {} CANCELED due to stealth rules.",
@@ -481,14 +533,37 @@ public class StealthDetectionEvents {
             }
         } else if (newTarget instanceof Mob targetMob) {
             if (!FovEvents.isTargetInFov(mob, targetMob, true)) {
-                if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info(
-                            "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). CANCELED.",
-                            mob.getName().getString(), targetMob.getName().getString()
-                    );
+                double xrayRange = getEffectiveXrayRange(mob);
+                if (xrayRange > 0) {
+                    double distSqXray = mob.distanceToSqr(targetMob);
+                    if (distSqXray <= xrayRange * xrayRange) {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info(
+                                "[XRAY] Mob {} detects Mob {} within XRAY range {} (distSq {}).",
+                                mob.getName().getString(), targetMob.getName().getString(),
+                                String.format("%.2f", xrayRange), String.format("%.2f", distSqXray)
+                            );
+                        }
+                    } else {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info(
+                                "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). CANCELED.",
+                                mob.getName().getString(), targetMob.getName().getString()
+                            );
+                        }
+                        event.setCanceled(true);
+                        return;
+                    }
+                } else {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info(
+                                "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). CANCELED.",
+                                mob.getName().getString(), targetMob.getName().getString()
+                        );
+                    }
+                    event.setCanceled(true);
+                    return;
                 }
-                event.setCanceled(true);
-                return;
             }
             double range = getRealisticStealthDetectionRange(targetMob, mob, mob.level());
             double distSq = mob.distanceToSqr(targetMob);
@@ -601,7 +676,7 @@ public class StealthDetectionEvents {
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return false;
         }
-        LivingEntity target = mob.getTarget();
+        LivingEntity target = getAttackTargetCompat(mob);
         if (target == null) {
             return false;
         }
@@ -638,10 +713,14 @@ public class StealthDetectionEvents {
             Set<Mob> mobsToCheck = new HashSet<>();
             for (net.minecraft.server.level.ServerPlayer serverPlayer : level.players()) {
                 AABB scanArea = serverPlayer.getBoundingBox().inflate(scanningRadius);
-                mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && entity.getTarget() instanceof Player));
+                mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && isTargetingPlayerCompat(entity)));
             }
             for (Mob mob : mobsToCheck) {
-                Player playerTarget = (Player) mob.getTarget();
+                LivingEntity rawTarget = getAttackTargetCompat(mob);
+                if (!(rawTarget instanceof Player playerTarget)) {
+                    mobOutOfRangeTicks.remove(mob);
+                    continue;
+                }
                 if (playerTarget.isCreative() || playerTarget.isSpectator()) {
                     mobOutOfRangeTicks.remove(mob);
                     continue;
@@ -669,6 +748,10 @@ public class StealthDetectionEvents {
                         }
                         if (mob.getBrain().hasMemoryValue(MemoryModuleType.ANGRY_AT)) {
                             mob.getBrain().eraseMemory(MemoryModuleType.ANGRY_AT);
+                        }
+                        try {
+                            mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
+                        } catch (Throwable ignored) {
                         }
                         mob.setTarget(null);
                         mobOutOfRangeTicks.remove(mob);
@@ -1247,6 +1330,28 @@ public class StealthDetectionEvents {
 
 
     private static Optional<Integer> getAverageEnvironmentalColor(Player player, Level level) {
+        if (player == null || level == null) {
+            return Optional.empty();
+        }
+        if (QuantifiedCacheCompat.isUsable()) {
+            BlockPos playerPos = player.blockPosition();
+            String key = new StringBuilder(96)
+                .append(level.dimension().location().toString()).append('|')
+                .append(playerPos.getX()).append(',').append(playerPos.getY()).append(',').append(playerPos.getZ())
+                .toString();
+            return QuantifiedCacheCompat.getCached(
+                "soundattract_env_color_player",
+                key,
+                () -> soundattract$computeAverageEnvironmentalColor(player, level),
+                2L,
+                8192L
+            );
+        }
+
+        return soundattract$computeAverageEnvironmentalColor(player, level);
+    }
+
+    private static Optional<Integer> soundattract$computeAverageEnvironmentalColor(Player player, Level level) {
         List<Integer> blockColors = new ArrayList<>();
         BlockPos playerPos = player.blockPosition();
 
@@ -1258,10 +1363,13 @@ public class StealthDetectionEvents {
                         BlockState blockState = level.getBlockState(currentPos);
                         if (!blockState.isAir()) {
                             @SuppressWarnings("deprecation")
-                            int mapColor = blockState.getMapColor(level, currentPos).col;
-                            if (mapColor != 0) {
-                                blockColors.add(mapColor);
+                            int mapColor;
+                            try {
+                                mapColor = blockState.getMapColor(level, currentPos).col;
+                            } catch (Throwable ignored) {
+                                continue;
                             }
+                            if (mapColor != 0) blockColors.add(mapColor);
                         }
                     }
                 }

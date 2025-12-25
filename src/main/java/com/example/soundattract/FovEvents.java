@@ -2,11 +2,13 @@ package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.integration.EnhancedAICompat;
+import com.example.soundattract.integration.QuantifiedCacheCompat;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -60,6 +62,21 @@ public class FovEvents {
 
     private static Map<ResourceLocation, FovData> CONFIG_FOV_CACHE = null;
     private static Set<ResourceLocation> USER_EXCLUSION_CACHE = null;
+
+    private record LosCacheKey(String dim, int sx, int sy, int sz, int ex, int ey, int ez) {
+    }
+
+    private record LosCacheEntry(boolean result, long gameTime) {
+    }
+
+    private record LosPairKey(String dim, int lookerId, int targetId) {
+    }
+
+    private record LosPairEntry(boolean result, long gameTime) {
+    }
+
+    private static final ConcurrentHashMap<LosCacheKey, LosCacheEntry> LOS_CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<LosPairKey, LosPairEntry> LOS_PAIR_CACHE = new ConcurrentHashMap<>();
 
     private static void buildCaches() {
         double defaultH = SoundAttractConfig.COMMON.defaultHorizontalFov.get();
@@ -188,17 +205,118 @@ public class FovEvents {
     public static boolean hasSmartLineOfSight(Mob looker, Entity target) {
         Level level = looker.level();
 
+        boolean useCache = false;
+        int maxEntries = 0;
+        try {
+            useCache = SoundAttractConfig.COMMON.enableRaycastCache.get();
+            maxEntries = SoundAttractConfig.COMMON.raycastCacheMaxEntries.get();
+        } catch (Throwable ignored) {
+        }
+
+        final int maxEntriesFinal = maxEntries;
+        final long now = level.getGameTime();
+        final String dim = level.dimension().location().toString();
+        if (useCache) {
+            LosPairKey pairKey = new LosPairKey(dim, looker.getId(), target.getId());
+            LosPairEntry existing = LOS_PAIR_CACHE.get(pairKey);
+            if (existing != null && (now - existing.gameTime()) <= 1L) {
+                return existing.result();
+            }
+        }
+
         Vec3 eyeToEye = target.getEyePosition();
         Vec3 center = target.position().add(0, target.getBbHeight() * 0.5, 0);
         Vec3 feet = target.position().add(0, Math.max(0.1, target.getBbHeight() * 0.15), 0);
 
         Vec3 start = looker.getEyePosition();
-        return raycastIgnoringNonBlocking(level, start, eyeToEye, looker)
-                || raycastIgnoringNonBlocking(level, start, center, looker)
-                || raycastIgnoringNonBlocking(level, start, feet, looker);
+        boolean result = raycastIgnoringNonBlockingCached(level, start, eyeToEye, looker)
+                || raycastIgnoringNonBlockingCached(level, start, center, looker)
+                || raycastIgnoringNonBlockingCached(level, start, feet, looker);
+
+        if (useCache) {
+            LosPairKey pairKey = new LosPairKey(dim, looker.getId(), target.getId());
+            LOS_PAIR_CACHE.put(pairKey, new LosPairEntry(result, now));
+            if (maxEntriesFinal > 0 && LOS_PAIR_CACHE.size() > maxEntriesFinal) {
+                LOS_PAIR_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime()) > 1L);
+                if (LOS_PAIR_CACHE.size() > maxEntriesFinal) {
+                    int toRemove = LOS_PAIR_CACHE.size() - maxEntriesFinal;
+                    java.util.List<java.util.Map.Entry<LosPairKey, LosPairEntry>> list = new java.util.ArrayList<>(LOS_PAIR_CACHE.entrySet());
+                    list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime()));
+                    for (int i = 0; i < toRemove && i < list.size(); i++) {
+                        LOS_PAIR_CACHE.remove(list.get(i).getKey());
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
-    private static boolean raycastIgnoringNonBlocking(Level level, Vec3 start, Vec3 end, Mob looker) {
+    private static boolean raycastIgnoringNonBlockingCached(Level level, Vec3 start, Vec3 end, Mob looker) {
+        boolean useCache = false;
+        long ttlTicks = 2L;
+        int maxEntries = 0;
+        try {
+            useCache = SoundAttractConfig.COMMON.enableRaycastCache.get();
+            long cfgTtl = SoundAttractConfig.COMMON.raycastCacheTtlTicks.get();
+            ttlTicks = Math.max(1L, Math.min(ttlTicks, cfgTtl));
+            maxEntries = SoundAttractConfig.COMMON.raycastCacheMaxEntries.get();
+        } catch (Throwable ignored) {
+        }
+
+        final long ttlTicksFinal = ttlTicks;
+        final int maxEntriesFinal = maxEntries;
+
+        if (!useCache || level == null || start == null || end == null) {
+            return raycastIgnoringNonBlockingUncached(level, start, end, looker);
+        }
+
+        String dim = level.dimension().location().toString();
+        if (QuantifiedCacheCompat.isUsable()) {
+            String key = new StringBuilder(96)
+                    .append(dim).append('|')
+                    .append(q(start.x)).append(',').append(q(start.y)).append(',').append(q(start.z)).append('|')
+                    .append(q(end.x)).append(',').append(q(end.y)).append(',').append(q(end.z))
+                    .toString();
+
+            Boolean cached = QuantifiedCacheCompat.getCached(
+                "soundattract_los_raycast",
+                key,
+                () -> Boolean.valueOf(raycastIgnoringNonBlockingUncached(level, start, end, looker)),
+                ttlTicksFinal,
+                maxEntriesFinal
+            );
+            return cached != null && cached.booleanValue();
+        }
+
+        long now = level.getGameTime();
+        LosCacheKey cacheKey = new LosCacheKey(dim, q(start.x), q(start.y), q(start.z), q(end.x), q(end.y), q(end.z));
+        LosCacheEntry existing = LOS_CACHE.get(cacheKey);
+        if (existing != null && (now - existing.gameTime()) <= ttlTicksFinal) {
+            return existing.result();
+        }
+
+        boolean computed = raycastIgnoringNonBlockingUncached(level, start, end, looker);
+        LOS_CACHE.put(cacheKey, new LosCacheEntry(computed, now));
+        if (maxEntriesFinal > 0 && LOS_CACHE.size() > maxEntriesFinal) {
+            LOS_CACHE.entrySet().removeIf(e -> (now - e.getValue().gameTime()) > ttlTicksFinal);
+            if (LOS_CACHE.size() > maxEntriesFinal) {
+                int toRemove = LOS_CACHE.size() - maxEntriesFinal;
+                java.util.List<java.util.Map.Entry<LosCacheKey, LosCacheEntry>> list = new java.util.ArrayList<>(LOS_CACHE.entrySet());
+                list.sort(java.util.Comparator.comparingLong(a -> a.getValue().gameTime()));
+                for (int i = 0; i < toRemove && i < list.size(); i++) {
+                    LOS_CACHE.remove(list.get(i).getKey());
+                }
+            }
+        }
+        return computed;
+    }
+
+    private static int q(double v) {
+        return (int) Math.round(v * 4.0);
+    }
+
+    private static boolean raycastIgnoringNonBlockingUncached(Level level, Vec3 start, Vec3 end, Mob looker) {
         final int maxPassThroughs = 24;
         Vec3 currStart = start;
         Vec3 dir = end.subtract(start);

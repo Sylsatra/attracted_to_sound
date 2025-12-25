@@ -14,12 +14,19 @@ public class VanillaIntegrationEvents {
     private static boolean wasCrawling = false;
     private static boolean wasOnGround = true;
     private static int tickCounter = 0;
+    private static boolean didLogInit = false;
 
     @SubscribeEvent
     public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.player.level().isClientSide) return;
+
+        if (!didLogInit && com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
+            didLogInit = true;
+            com.example.soundattract.SoundAttractMod.LOGGER.info("[VanillaIntegration] PlayerTick handler active on server");
+        }
+
         tickCounter++;
-        int cooldown = com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks;
+        int cooldown = Math.max(1, com.example.soundattract.DynamicScanCooldownManager.currentScanCooldownTicks);
         if (tickCounter % cooldown != 0) return;
         Player player = event.player;
         ResourceLocation dim = player.level().dimension().location();
@@ -89,31 +96,28 @@ public class VanillaIntegrationEvents {
             isServer = false;
         }
         if (isServer) {
-            String soundIdStr = soundId != null ? soundId : null;
-            if (!com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty() && (soundIdStr == null || !com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(soundIdStr))) {
+            net.minecraft.resources.ResourceLocation baseId = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.example.soundattract.SoundAttractMod.MOD_ID, "virtual");
+            if (!com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
+                && (baseId == null || !com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(baseId))) {
+                if (com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info(
+                        "[VanillaIntegration] Skipping virtual sound because {} is not in whitelist (whitelistSize={})",
+                        baseId,
+                        com.example.soundattract.config.SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.size()
+                    );
+                }
                 return;
             }
             net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(x, y, z);
             String dimString = dim.toString();
             int lifetime = com.example.soundattract.config.SoundAttractConfig.COMMON.soundLifetimeTicks.get();
-            if ((ResourceLocation.parse(soundId)).equals(com.example.soundattract.SoundMessage.VOICE_CHAT_SOUND_ID)) {
-                if (range > 0) {
-                    com.example.soundattract.SoundTracker.addSound(null, pos, dimString, range, weight, lifetime);
-                }
-            } else {
-                net.minecraft.sounds.SoundEvent se = net.minecraftforge.registries.ForgeRegistries.SOUND_EVENTS.getValue(ResourceLocation.parse(soundId));
-                double _range = range;
-                double _weight = weight;
-                String id = soundId != null ? soundId : "";
-                if (se != null) {
-                    com.example.soundattract.SoundAttractMod.LOGGER.info("[SoundMessage] addSound: soundId={} | range={} | weight={} | pos=({}, {}, {}) | dim={}", soundId, _range, _weight, x, y, z, dim);
-                    com.example.soundattract.SoundTracker.addSound(se, pos, dimString, _range, _weight, lifetime);
-                } else {
-                    if (animatorClass != null && !animatorClass.isEmpty()) {
-                        com.example.soundattract.SoundTracker.addVirtualSound(pos, dimString, _range, _weight, lifetime, uuid.orElse(null), animatorClass);
-                    }
-                }
+            String meta = (uuid != null && uuid.isPresent() ? uuid.get().toString() : "unknown")
+                + "/" + (animatorClass != null && !animatorClass.isEmpty() ? animatorClass : "unknown");
+            String soundIdToUse = com.example.soundattract.SoundTracker.buildIntegrationSoundId(baseId, meta);
+            if (com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
+                com.example.soundattract.SoundAttractMod.LOGGER.info("[VanillaIntegration] addSound: soundId={} | range={} | weight={} | pos=({}, {}, {}) | dim={}", soundIdToUse, range, weight, x, y, z, dim);
             }
+            com.example.soundattract.SoundTracker.addSound(null, pos, dimString, range, weight, lifetime, soundIdToUse);
             return;
         } else {
             com.example.soundattract.SoundAttractNetwork.INSTANCE.sendToServer(msg);

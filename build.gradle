@@ -35,7 +35,7 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
-            property "mixin.config", "soundattract.mixins.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json"
             mods {
                 "${project.property('mod_id')}" {
                     source sourceSets.main
@@ -44,7 +44,7 @@ minecraft {
         }
         client {
             property 'forge.enabledGameTestNamespaces', project.property('mod_id')
-            property "mixin.config", "soundattract.mixins.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json"
             jvmArgs += [
         "-Dmixin.env.remapRefMap=true",
         "-Dmixin.debug.verbose=true",
@@ -57,7 +57,7 @@ minecraft {
         }
         server {
             property 'forge.enabledGameTestNamespaces', project.property('mod_id')
-            property "mixin.config", "soundattract.mixins.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json"
             args '--nogui'
             jvmArgs += [
         "-Dmixin.env.remapRefMap=true",
@@ -112,6 +112,8 @@ dependencies {
     compileOnly "su.plo.voice.api:server:2.1.5"
     compileOnly "su.plo.voice.api:client:2.1.5"
 
+    compileOnly "maven.modrinth:smartbrainlib:1.15"
+
 }
 
 tasks.named('processResources', ProcessResources).configure {
@@ -121,6 +123,7 @@ tasks.named('processResources', ProcessResources).configure {
             forge_version: project.property('forge_version'),
             forge_version_range: project.property('forge_version_range'),
             loader_version_range: project.property('loader_version_range'),
+            voicechat_dependency: project.property('voicechat_dependency'),
             mod_id: project.property('mod_id'),
             mod_name: project.property('mod_name'),
             mod_license: project.property('mod_license'),

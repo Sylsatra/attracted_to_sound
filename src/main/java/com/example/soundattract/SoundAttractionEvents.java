@@ -19,8 +19,9 @@ import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
 import com.example.soundattract.ai.TeleportToSoundGoal;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.DataDrivenTags;
-import com.example.soundattract.worker.WorkerScheduler;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
+import com.example.soundattract.worker.WorkSchedulerManager;
+import com.example.soundattract.integration.SmartBrainLibCompat;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.Registries;
@@ -35,6 +36,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent; 
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -97,13 +99,20 @@ public class SoundAttractionEvents {
         }
 
         Set<EntityType<?>> configSet = new HashSet<>();
+        boolean shouldRetryLater = false;
         for (String idStr : SoundAttractConfig.COMMON.attractedEntities.get()) {
             try {
-                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                ResourceLocation id = ResourceLocation.parse(idStr);
+                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
                 if (type != null) {
                     configSet.add(type);
-                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown attracted entity type in config: {}", idStr);
+                } else {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown attracted entity type in config: {}", idStr);
+                    }
+                    if (id != null && !"minecraft".equals(id.getNamespace()) && ModList.get().isLoaded(id.getNamespace())) {
+                        shouldRetryLater = true;
+                    }
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for attracted entity type in config: {}", idStr, e);
@@ -127,6 +136,10 @@ public class SoundAttractionEvents {
             }
         }
 
+        if (shouldRetryLater) {
+            return result;
+        }
+
         CACHED_ATTRACTED_ENTITY_TYPES = result;
 
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -145,13 +158,20 @@ public class SoundAttractionEvents {
         }
 
         Set<EntityType<?>> configSet = new HashSet<>();
+        boolean shouldRetryLater = false;
         for (String idStr : SoundAttractConfig.COMMON.mobBlacklist.get()) {
             try {
-                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(ResourceLocation.parse(idStr));
+                ResourceLocation id = ResourceLocation.parse(idStr);
+                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
                 if (type != null) {
                     configSet.add(type);
-                } else if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown blacklisted entity type in config: {}", idStr);
+                } else {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown blacklisted entity type in config: {}", idStr);
+                    }
+                    if (id != null && !"minecraft".equals(id.getNamespace()) && ModList.get().isLoaded(id.getNamespace())) {
+                        shouldRetryLater = true;
+                    }
                 }
             } catch (Exception e) {
                 SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid ResourceLocation for blacklisted entity type in config: {}", idStr, e);
@@ -173,6 +193,10 @@ public class SoundAttractionEvents {
                 result.addAll(configSet);
                 result.addAll(tagSet);
             }
+        }
+
+        if (shouldRetryLater) {
+            return result;
         }
 
         CACHED_BLACKLISTED_ENTITY_TYPES = result;
@@ -247,7 +271,7 @@ public class SoundAttractionEvents {
             SoundTracker.tick();
             BlockBreakerManager.processPendingActions();
             try {
-                                List<GroupComputeResult> results = WorkerScheduler.drainGroupResults();
+                                List<GroupComputeResult> results = WorkSchedulerManager.get().drainGroupResults();
                 if (!results.isEmpty()) {
                     for (GroupComputeResult r : results) {
                         if (r.dimension() == null) continue;
@@ -318,6 +342,15 @@ public class SoundAttractionEvents {
         boolean hasMatchingprofile = SoundAttractConfig.getMatchingProfile(mob) != null;
         if (!isAttractedByType && !hasMatchingprofile) {
             return;
+        }
+
+        if (SoundAttractConfig.COMMON.enableSmartBrainLibIntegration.get()) {
+            if (SmartBrainLibCompat.tryAttachSoundAttractBrain(mob)) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Using SmartBrainLib integration for mob {} of type {}", mob.getName().getString(), EntityType.getKey(mob.getType()));
+                }
+                return;
+            }
         }
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
