@@ -56,7 +56,7 @@ public class VanillaIntegrationEvents {
                 sendVanillaSound("VanillaSneak", "minecraft:entity.player.sneak", x, y, z, dim, uuid, 3, 0.2, 0.4, 1.0);
             }
         }
-        boolean isCrawling = player.getPose().name().equalsIgnoreCase("SWIMMING");
+        boolean isCrawling = player.getPose() == net.minecraft.world.entity.Pose.SWIMMING && !player.isInWater();
         if (isCrawling) {
             if (player instanceof ServerPlayer) {
                 sendVanillaSound("VanillaCrawl", "minecraft:block.wool.step", x, y, z, dim, uuid, 2, 0.1, 0.2, 1.0);

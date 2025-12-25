@@ -140,7 +140,7 @@ public final class QuantifiedCacheCompat {
             if (Float.isNaN(avg) || avg <= 0.0f) return fallback;
             long ms = (long) avg;
             if (ms < 1L) return fallback;
-            return Math.max(50L, Math.min(250L, ms));
+            return Math.max(20L, Math.min(250L, ms));
         } catch (Throwable ignored) {
             return fallback;
         }
