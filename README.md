@@ -19,11 +19,11 @@ Attract To Sound builds a sound map per dimension and uses it to drive AI decisi
 The result is consistent behavior that feels close to vanilla while adding depth to movement, combat, and ambient actions.
 
 ## Core features
-- ?? Sound sources with range, weight, and lifetime
-- ?? Per sound overrides and data driven tags
-- ?? Group behavior for more natural mob response
-- ??? Voice chat support when enabled
-- ?? Integration hooks for popular combat and AI mods
+- Sound sources with range, weight, and lifetime
+- Per sound overrides and data driven tags
+- Group behavior for more natural mob response
+- Voice chat support when enabled
+- Integration hooks for popular combat and AI mods
 
 ## Quantified API integration
 Attract To Sound uses Quantified API for scheduling and cache support.
