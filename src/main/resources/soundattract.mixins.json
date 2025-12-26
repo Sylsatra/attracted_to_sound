@@ -9,7 +9,8 @@
     "HurtByTargetGoalMixin",
     "LivingEntityInvoker",
     "SensingMixin",
-    "PointBlankGunItemMixin"
+    "PointBlankGunItemMixin",
+    "CustomNpcsUpdateTasksMixin"
   ],
   "client": [
   ],

@@ -22,6 +22,8 @@ public class FollowerEdgeRelayGoal extends Goal {
     private double currentTargetWeight = -1.0;
     private int scanCooldownCounter = 0;
 
+    private long lastSeenSoundSequence = -1L;
+
     private BlockPos lastPos = null;
     private int stuckTicks = 0;
 
@@ -64,7 +66,19 @@ public class FollowerEdgeRelayGoal extends Goal {
         java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = SoundAttractionEvents.getCachedAttractedEntityTypes();
         boolean byType = attractedTypes.contains(this.mob.getType());
         boolean hasProfile = SoundAttractConfig.getMatchingProfile(this.mob) != null;
-        return byType || hasProfile;
+        boolean isCustomNpcs = SoundAttractionEvents.isCustomNpcsMob(this.mob);
+        return byType || hasProfile || isCustomNpcs;
+    }
+
+    private void refreshScanCooldownOnNewSoundForCustomNpcs() {
+        if (!SoundAttractionEvents.isCustomNpcsMob(this.mob)) {
+            return;
+        }
+        long seq = SoundTracker.getSoundSequence();
+        if (seq != this.lastSeenSoundSequence) {
+            this.lastSeenSoundSequence = seq;
+            this.scanCooldownCounter = 0;
+        }
     }
 
     private double getArrivalDistance() {
@@ -121,6 +135,9 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (!isMobEligible()) {
             return false;
         }
+
+        refreshScanCooldownOnNewSoundForCustomNpcs();
+
         boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
         if (!smartEdge) {
             return false;

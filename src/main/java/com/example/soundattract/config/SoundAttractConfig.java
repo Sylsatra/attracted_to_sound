@@ -485,7 +485,7 @@ public class SoundAttractConfig {
             enableQuantifiedIntegration = builder.define("enableQuantifiedIntegration", true);
             enableSmartBrainLibIntegration = builder.define("enableSmartBrainLibIntegration", true);
 
-            enableCustomNpcsIntegration = builder.define("enableCustomNpcsIntegration", false);
+            enableCustomNpcsIntegration = builder.define("enableCustomNpcsIntegration", true);
 
             enableQuantifiedCacheIntegration = builder.define("enableQuantifiedCacheIntegration", true);
             quantifiedCacheMemoryLimitMB = builder.defineInRange("quantifiedCacheMemoryLimitMB", 256, 0, 65536);
@@ -3018,6 +3018,8 @@ public class SoundAttractConfig {
         }
 
         if (QuantifiedCacheCompat.isUsable()) {
+            // Stagger cache checks by mob UUID to spread load when processing many mobs
+            long staggerTicks = Math.abs(mob.getUUID().getLeastSignificantBits() % 20); // 0-19 tick spread
             String key = new StringBuilder(96)
                 .append(mob.getUUID().toString()).append('|')
                 .append(SPECIAL_MOB_PROFILES_CACHE.size())
@@ -3026,7 +3028,7 @@ public class SoundAttractConfig {
                 "soundattract_mob_profile_match",
                 key,
                 () -> getMatchingProfileUncached(mob),
-                1L,
+                1200L + staggerTicks, // 1 minute base + staggered offset
                 8192L
             );
         }

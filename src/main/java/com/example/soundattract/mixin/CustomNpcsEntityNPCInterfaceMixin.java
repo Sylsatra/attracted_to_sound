@@ -1,15 +1,16 @@
 package com.example.soundattract.mixin;
 
-import com.example.soundattract.event.SoundAttractionEvents;
+import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.ai.AttractionGoal;
-import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.ai.FollowerEdgeRelayGoal;
 import com.example.soundattract.ai.LeaderAttractionGoal;
+import com.example.soundattract.ai.FollowLeaderGoal;
 import com.example.soundattract.config.SoundAttractConfig;
-
+import com.example.soundattract.event.SoundAttractionEvents;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
-
+import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -39,19 +40,26 @@ public abstract class CustomNpcsEntityNPCInterfaceMixin {
             return;
         }
 
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[CustomNPCs] updateTasks called for {}, checking goals", mob.getName().getString());
+        }
+
         Set<EntityType<?>> blacklisted = SoundAttractionEvents.getCachedBlacklistedEntityTypes();
         if (blacklisted.contains(mob.getType())) {
             return;
         }
 
-        Set<EntityType<?>> attracted = SoundAttractionEvents.getCachedAttractedEntityTypes();
-        boolean isAttractedByType = attracted.contains(mob.getType());
-        boolean hasMatchingProfile = SoundAttractConfig.getMatchingProfile(mob) != null;
-        if (!isAttractedByType && !hasMatchingProfile) {
+        if (!SoundAttractionEvents.isCustomNpcsMob(mob)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[CustomNPCs] {} is not detected as CustomNPCs mob", mob.getName().getString());
+            }
             return;
         }
 
         if (mob.goalSelector == null) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[CustomNPCs] {} has null goalSelector", mob.getName().getString());
+            }
             return;
         }
 
@@ -104,5 +112,45 @@ public abstract class CustomNpcsEntityNPCInterfaceMixin {
         if (!hasFollowLeaderGoal) {
             mob.goalSelector.addGoal(attractionPriority + 2, new FollowLeaderGoal(mob, moveSpeed));
         }
+    }
+
+    @Inject(method = "readSpawnData(Lnet/minecraft/nbt/CompoundTag;)V", at = @At("TAIL"))
+    private void soundattract$onReadSpawnData(CallbackInfo ci) {
+        if (SoundAttractConfig.COMMON == null || !SoundAttractConfig.COMMON.enableCustomNpcsIntegration.get()) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[CustomNPCs] Integration disabled, skipping readSpawnData");
+            }
+            return;
+        }
+
+        Mob mob;
+        try {
+            mob = (Mob) (Object) this;
+        } catch (Throwable t) {
+            return;
+        }
+
+        if (mob.level() == null || mob.level().isClientSide()) {
+            return;
+        }
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[CustomNPCs] readSpawnData called for {}, checking if CustomNPCs", mob.getName().getString());
+        }
+
+        if (!SoundAttractionEvents.isCustomNpcsMob(mob)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[CustomNPCs] {} is not detected as CustomNPCs mob", mob.getName().getString());
+            }
+            return;
+        }
+
+        SoundAttractionEvents.invalidateCachedEntityTypes();
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[CustomNPCs] Spawn data read for {}, forcing goal registration", mob.getName().getString());
+        }
+
+        soundattract$afterUpdateTasks(ci);
     }
 }

@@ -138,19 +138,43 @@ public class FovEvents {
             return;
         }
 
-        if (SoundAttractConfig.COMMON.enableXrayTargeting.get()
-                && target instanceof Player player
-                && EnhancedAICompat.isEnhancedAiLoaded()) {
-            double xrayRange = EnhancedAICompat.getXrayAttributeValue(looker);
+        boolean debug = com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get();
+        if (debug) {
+            com.example.soundattract.SoundAttractMod.LOGGER.info(
+                "[LivingVisibilityEvent] {} looking at {} with visibility modifier {}",
+                looker.getName().getString(), 
+                target.getName().getString(),
+                event.getVisibilityModifier()
+            );
+        }
+
+        if (SoundAttractConfig.COMMON.enableXrayTargeting.get()) {
+            double xrayRange = StealthDetectionEvents.getEffectiveXrayRange(looker);
             if (xrayRange > 0d) {
-                double distSq = looker.distanceToSqr(player);
+                double distSq = looker.distanceToSqr(target);
                 if (distSq <= xrayRange * xrayRange) {
+                    if (debug) {
+                        com.example.soundattract.SoundAttractMod.LOGGER.info(
+                            "[XRAY] {} can see {} through walls (range: {}, distSq: {})",
+                            looker.getName().getString(),
+                            target.getName().getString(),
+                            String.format("%.2f", xrayRange),
+                            String.format("%.2f", distSq)
+                        );
+                    }
                     return;
                 }
             }
         }
 
         if (!isTargetInFov(looker, target, false)) {
+            if (debug) {
+                com.example.soundattract.SoundAttractMod.LOGGER.info(
+                    "[LivingVisibilityEvent] {} cannot see {} (FOV check failed)",
+                    looker.getName().getString(),
+                    target.getName().getString()
+                );
+            }
             event.setResult(Event.Result.DENY);
         }
     }

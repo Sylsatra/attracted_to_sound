@@ -43,7 +43,7 @@ public final class CamoUtil {
         String priority = SoundAttractConfig.COMMON.datapackPriority.get();
         boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
         if (datapackOverConfig) {
-            return inTag; // tags define the set, config is ignored for items missing the tag
+            return inTag;
         } else {
             return inConfig || inTag;
         }

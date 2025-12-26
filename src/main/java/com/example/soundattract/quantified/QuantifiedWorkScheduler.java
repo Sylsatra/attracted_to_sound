@@ -7,9 +7,8 @@ import com.example.soundattract.worker.SoundAttractWorkScheduler;
 import com.example.soundattract.worker.WorkerComputations;
 import com.example.soundattract.worker.WorkerScheduler;
 import net.minecraft.resources.ResourceLocation;
-import org.admany.quantified.api.QuantifiedAPI;
-import org.admany.quantified.api.model.QuantifiedTask;
 
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +23,18 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
 
     private final LocalWorkScheduler fallback = new LocalWorkScheduler();
 
+    private final Method register;
+    private final Method submit;
+
     public QuantifiedWorkScheduler() {
-        QuantifiedAPI.register(SoundAttractMod.MOD_ID);
+        try {
+            Class<?> api = Class.forName("org.admany.quantified.api.QuantifiedAPI");
+            this.register = api.getMethod("register", String.class);
+            this.submit = api.getMethod("submit", Class.forName("org.admany.quantified.api.QuantifiedTask$Builder"));
+            this.register.invoke(null, SoundAttractMod.MOD_ID);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize QuantifiedWorkScheduler", e);
+        }
     }
 
     @Override
@@ -97,13 +106,18 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
 
     private CompletableFuture<?> submitFuture(String taskName, java.util.function.Supplier<?> work, Duration timeout) {
         try {
-            QuantifiedTask.Builder<?> builder = QuantifiedTask.builder(SoundAttractMod.MOD_ID, taskName, work)
-                .priorityBackground()
-                .threadSafe(true);
+            Class<?> taskBuilderClass = Class.forName("org.admany.quantified.api.QuantifiedTask$Builder");
+            Object builder = taskBuilderClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class)
+                .invoke(null, SoundAttractMod.MOD_ID, taskName, work);
+            
+            builder.getClass().getMethod("priorityBackground").invoke(builder);
+            builder.getClass().getMethod("threadSafe", boolean.class).invoke(builder, true);
+            
             if (timeout != null) {
-                builder.timeout(timeout);
+                builder.getClass().getMethod("timeout", Duration.class).invoke(builder, timeout);
             }
-            return QuantifiedAPI.submit(builder);
+            
+            return (CompletableFuture<?>) submit.invoke(null, builder);
         } catch (Throwable t) {
             CompletableFuture<Object> failed = new CompletableFuture<>();
             failed.completeExceptionally(t);

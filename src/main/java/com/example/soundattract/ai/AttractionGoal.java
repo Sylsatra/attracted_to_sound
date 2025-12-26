@@ -33,6 +33,10 @@ public class AttractionGoal extends Goal {
     private BlockPos lastMoveToTarget = null;
     private static final int MOVE_TO_COOLDOWN_TICKS = 20;
 
+    private long lastSeenSoundSequence = -1L;
+    private long lastScanBypassTick = -1L;
+    private static final int CUSTOM_NPCS_BYPASS_MIN_INTERVAL_TICKS = 5;
+
     public AttractionGoal(Mob mob, double moveSpeed) {
         this.mob = mob;
         this.moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
@@ -43,11 +47,28 @@ public class AttractionGoal extends Goal {
         return DynamicScanCooldownManager.currentScanCooldownTicks;
     }
 
+    private void refreshScanCooldownOnNewSoundForCustomNpcs() {
+        if (!SoundAttractionEvents.isCustomNpcsMob(this.mob)) {
+            return;
+        }
+        long nowTick = this.mob.level().getGameTime();
+        if (this.lastScanBypassTick >= 0 && (nowTick - this.lastScanBypassTick) < CUSTOM_NPCS_BYPASS_MIN_INTERVAL_TICKS) {
+            return;
+        }
+        long seq = SoundTracker.getSoundSequence();
+        if (seq != this.lastSeenSoundSequence) {
+            this.lastSeenSoundSequence = seq;
+            this.scanCooldownCounter = 0;
+            this.lastScanBypassTick = nowTick;
+        }
+    }
+
     private boolean isMobEligible() {
         java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = SoundAttractionEvents.getCachedAttractedEntityTypes();
         boolean byType = attractedTypes.contains(this.mob.getType());
         boolean hasProfile = com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(this.mob) != null;
-        return byType || hasProfile;
+        boolean isCustomNpcs = SoundAttractionEvents.isCustomNpcsMob(this.mob);
+        return byType || hasProfile || isCustomNpcs;
     }
 
     private double getArrivalDistance() {
@@ -69,6 +90,8 @@ public class AttractionGoal extends Goal {
         if (!isMobEligible()) {
             return false;
         }
+
+        refreshScanCooldownOnNewSoundForCustomNpcs();
 
         if (scanCooldownCounter > 0) {
             scanCooldownCounter--;

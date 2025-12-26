@@ -55,7 +55,7 @@ public class SoundDefinitionsReloadListener extends SimpleJsonResourceReloadList
                     String idOrTag = e.getAsString().trim();
                     if (idOrTag.isEmpty()) continue;
                     if (idOrTag.startsWith("#")) {
-                        // tag syntax: #namespace:tag
+
                         String tagIdStr = idOrTag.substring(1);
                         ResourceLocation tagId = ResourceLocation.tryParse(tagIdStr);
                         if (tagId != null) {
@@ -94,7 +94,7 @@ public class SoundDefinitionsReloadListener extends SimpleJsonResourceReloadList
                             }
                         }
                     } catch (Exception ex) {
-                        // ignore malformed entries, logging via config is noisy
+
                     }
                 }
             }

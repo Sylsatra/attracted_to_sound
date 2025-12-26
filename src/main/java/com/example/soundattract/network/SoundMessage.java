@@ -27,6 +27,7 @@ public class SoundMessage {
     private final String pointBlankType;
 
     public static final ResourceLocation VOICE_CHAT_SOUND_ID = ResourceLocation.fromNamespaceAndPath(SoundAttractMod.MOD_ID, "voice_chat");
+    public static final ResourceLocation POINT_BLANK_SOUND_ID = ResourceLocation.fromNamespaceAndPath("pointblank", "gun_action");
 
     public SoundMessage(ResourceLocation soundId, double x, double y, double z, ResourceLocation dimension, Optional<UUID> sourcePlayerUUID, int range, double weight, String animatorClass, String taczType, String pointBlankType) {
         this.soundId = soundId;
@@ -98,6 +99,7 @@ public class SoundMessage {
             if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                     && (loc == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc))
                     && !msg.soundId.equals(VOICE_CHAT_SOUND_ID)
+                    && !msg.soundId.equals(POINT_BLANK_SOUND_ID)
                     && !isIntegration) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info("[SoundMessage] Dropping sound {} because it is not in whitelist (dim={})", loc, msg.dimension);
@@ -143,6 +145,18 @@ public class SoundMessage {
                         SoundTracker.addSound(null, pos, dimString,
                                               msg.range, msg.weight, lifetime,
                                               VOICE_CHAT_SOUND_ID.toString());
+                    }
+                } else if (msg.soundId.equals(POINT_BLANK_SOUND_ID)) {
+                    if (msg.range > 0) {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info(
+                                "[SoundMessage] Adding Point Blank sound at {} dim={} range={} weight={}",
+                                pos, dimString, msg.range, msg.weight
+                            );
+                        }
+                        SoundTracker.addSound(null, pos, dimString,
+                                              msg.range, msg.weight, lifetime,
+                                              POINT_BLANK_SOUND_ID.toString());
                     }
                 } else {
                     SoundEvent se = ForgeRegistries.SOUND_EVENTS.getValue(msg.soundId);

@@ -1,6 +1,7 @@
 package com.example.soundattract;
 
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.event.SoundAttractionEvents;
 import com.example.soundattract.worker.WorkSchedulerManager;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
