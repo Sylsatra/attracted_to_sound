@@ -60,6 +60,51 @@ public class SoundAttractionEvents {
         }
     }
 
+    public static boolean isCustomNpcsMob(Mob mob) {
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] isCustomNpcsMob called for {} with class: {}", 
+                mob != null ? mob.getName().getString() : "null", 
+                mob != null ? mob.getClass().getName() : "null");
+        }
+        
+        if (mob == null) return false;
+        if (SoundAttractConfig.COMMON == null || !SoundAttractConfig.COMMON.enableCustomNpcsIntegration.get()) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs integration disabled");
+            }
+            return false;
+        }
+        try {
+
+            Class<?> c = mob.getClass();
+            while (c != null) {
+                String className = c.getName();
+                if (className.contains("EntityNPCInterface") || 
+                    className.contains("EntityCustomNpc") || 
+                    className.contains("EntityNPCFlying") ||
+                    className.contains("noppes.npcs.entity")) {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Detected CustomNPCs by class: {}", className);
+                    }
+                    return true;
+                }
+                c = c.getSuperclass();
+            }
+            
+
+            ResourceLocation entityTypeKey = EntityType.getKey(mob.getType());
+            if (entityTypeKey != null && "customnpcs".equals(entityTypeKey.getNamespace())) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Detected CustomNPCs by namespace: {}", entityTypeKey);
+                }
+                return true;
+            }
+            
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     private static void scheduleAddGoal(Mob mob, int priority, Goal goal) {
         PENDING_GOAL_ADDITIONS.computeIfAbsent(mob, k -> new ArrayList<>()).add(new GoalDefinition(priority, goal));
     }
@@ -251,7 +296,10 @@ public class SoundAttractionEvents {
                         List<Mob> mobsNearPlayer = serverLevel.getEntitiesOfClass(Mob.class, playerSimArea);
 
                         for (Mob mob : mobsNearPlayer) {
-                            if (mob.isAlive() && !mob.isRemoved() && attractedEntityTypes.contains(mob.getType())) {
+                            boolean eligible = attractedEntityTypes.contains(mob.getType())
+                                    || SoundAttractConfig.getMatchingProfile(mob) != null
+                                    || isCustomNpcsMob(mob);
+                            if (mob.isAlive() && !mob.isRemoved() && eligible) {
                                 if (countedMobsInTick.add(mob)) {
                                     currentMobCount++;
                                 }
@@ -271,7 +319,7 @@ public class SoundAttractionEvents {
             SoundTracker.tick();
             BlockBreakerManager.processPendingActions();
             try {
-                                List<GroupComputeResult> results = WorkSchedulerManager.get().drainGroupResults();
+                List<GroupComputeResult> results = WorkSchedulerManager.get().drainGroupResults();
                 if (!results.isEmpty()) {
                     for (GroupComputeResult r : results) {
                         if (r.dimension() == null) continue;
@@ -329,6 +377,18 @@ public class SoundAttractionEvents {
         if (!(event.getEntity() instanceof Mob mob)) return;
         if (event.getLevel().isClientSide()) return;
 
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs integration enabled: {}", 
+                SoundAttractConfig.COMMON.enableCustomNpcsIntegration.get());
+        }
+
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Mob joined: {} of type {}, isCustomNpcs: {}", 
+                mob.getName().getString(), EntityType.getKey(mob.getType()), isCustomNpcsMob(mob));
+        }
+
         Set<EntityType<?>> blacklistedEntityTypes = getCachedBlacklistedEntityTypes();
         if (blacklistedEntityTypes.contains(mob.getType())) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -340,7 +400,27 @@ public class SoundAttractionEvents {
         Set<EntityType<?>> attractedEntityTypes = getCachedAttractedEntityTypes();
         boolean isAttractedByType = attractedEntityTypes.contains(mob.getType());
         boolean hasMatchingprofile = SoundAttractConfig.getMatchingProfile(mob) != null;
-        if (!isAttractedByType && !hasMatchingprofile) {
+        boolean isCustomNpcs = isCustomNpcsMob(mob);
+        
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] {} eligibility - type:{}, profile:{}, customNpcs:{}", 
+                mob.getName().getString(), isAttractedByType, hasMatchingprofile, isCustomNpcs);
+        }
+        
+        if (!isAttractedByType && !hasMatchingprofile && !isCustomNpcs) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Mob {} not eligible - type:{}, profile:{}, customNpcs:{}", 
+                    mob.getName().getString(), isAttractedByType, hasMatchingprofile, isCustomNpcs);
+            }
+            return;
+        }
+
+
+        if (isCustomNpcs && SoundAttractConfig.COMMON.enableCustomNpcsIntegration.get()) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Adding CustomNPCs goals immediately for {}", mob.getName().getString());
+            }
+            addCustomNpcsGoals(mob);
             return;
         }
 
@@ -355,8 +435,6 @@ public class SoundAttractionEvents {
 
         double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
 
-        // Enhanced AI-inspired special actions
-        // Teleport to sound
         if (SoundAttractConfig.COMMON.enableTeleportToSound.get()) {
             try {
                 TagKey<EntityType<?>> canTeleportTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(SoundAttractConfig.COMMON.teleportCanTeleportTag.get()));
@@ -370,7 +448,6 @@ public class SoundAttractionEvents {
             }
         }
 
-        // Pick up and throw to sound
         if (SoundAttractConfig.COMMON.enablePickUpAndThrowToSound.get()) {
             try {
                 TagKey<EntityType<?>> canPickUpTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(SoundAttractConfig.COMMON.pickUpCanPickUpTag.get()));
@@ -385,13 +462,9 @@ public class SoundAttractionEvents {
         }
 
         if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
-
-
-
             scheduleAddGoal(mob, 3, new LeaderAttractionGoal(mob, moveSpeed));
             scheduleAddGoal(mob, 1, new FollowerEdgeRelayGoal(mob, moveSpeed));
         } else {
-
             scheduleAddGoal(mob, 3, new AttractionGoal(mob, moveSpeed));
         }
         scheduleAddGoal(mob, 4, new FollowLeaderGoal(mob, moveSpeed));
@@ -406,4 +479,90 @@ public class SoundAttractionEvents {
             }
         }
     }
+
+    private static void addCustomNpcsGoals(Mob mob) {
+        if (mob.goalSelector == null) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs {} has null goalSelector", mob.getName().getString());
+            }
+            return;
+        }
+
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs {} existing goals:", mob.getName().getString());
+            mob.goalSelector.getAvailableGoals().forEach(wrapped -> {
+                SoundAttractMod.LOGGER.info("  - Priority {}: {}", wrapped.getPriority(), wrapped.getGoal().getClass().getSimpleName());
+            });
+        }
+
+        double moveSpeed = SoundAttractConfig.COMMON.mobMoveSpeed.get();
+
+        boolean hasAttractionGoal = mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(wrappedGoal -> wrappedGoal.getGoal() instanceof AttractionGoal);
+        boolean hasLeaderAttractionGoal = mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(wrappedGoal -> wrappedGoal.getGoal() instanceof LeaderAttractionGoal);
+        boolean hasFollowerEdgeRelayGoal = mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(wrappedGoal -> wrappedGoal.getGoal() instanceof FollowerEdgeRelayGoal);
+        boolean hasFollowLeaderGoal = mob.goalSelector.getAvailableGoals().stream()
+                .anyMatch(wrappedGoal -> wrappedGoal.getGoal() instanceof FollowLeaderGoal);
+
+        boolean smartEdge = SoundAttractConfig.COMMON.edgeMobSmartBehavior.get();
+        int attractionPriority = 0;
+
+        if (smartEdge) {
+            if (!hasFollowerEdgeRelayGoal) {
+                mob.goalSelector.addGoal(attractionPriority, new FollowerEdgeRelayGoal(mob, moveSpeed));
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Added FollowerEdgeRelayGoal to CustomNPCs {}", mob.getName().getString());
+                }
+            }
+            if (!hasLeaderAttractionGoal) {
+                mob.goalSelector.addGoal(attractionPriority + 1, new LeaderAttractionGoal(mob, moveSpeed));
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Added LeaderAttractionGoal to CustomNPCs {}", mob.getName().getString());
+                }
+            }
+        } else {
+            if (!hasAttractionGoal) {
+                mob.goalSelector.addGoal(attractionPriority, new AttractionGoal(mob, moveSpeed) {
+                    @Override
+                    public boolean canUse() {
+                        boolean result = (mob.getTarget() == null || !mob.getTarget().isAlive()) && super.canUse();
+                        if (SoundAttractConfig.COMMON.debugLogging.get() && result) {
+                            SoundAttractMod.LOGGER.info("[CustomNPCs] AttractionGoal.canUse() returning true for {}", mob.getName().getString());
+                        }
+                        return result;
+                    }
+
+                    @Override
+                    public boolean canContinueToUse() {
+                        boolean result = (mob.getTarget() == null || !mob.getTarget().isAlive()) && super.canContinueToUse();
+                        if (SoundAttractConfig.COMMON.debugLogging.get() && result) {
+                            SoundAttractMod.LOGGER.info("[CustomNPCs] AttractionGoal.canContinueToUse() returning true for {}", mob.getName().getString());
+                        }
+                        return result;
+                    }
+                });
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Added AttractionGoal to CustomNPCs {} at priority {}", mob.getName().getString(), attractionPriority);
+                }
+            }
+
+        if (!hasFollowLeaderGoal) {
+            mob.goalSelector.addGoal(attractionPriority + 2, new FollowLeaderGoal(mob, moveSpeed));
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Added FollowLeaderGoal to CustomNPCs {}", mob.getName().getString());
+            }
+        }
+
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs {} goals after adding:", mob.getName().getString());
+            mob.goalSelector.getAvailableGoals().forEach(wrapped -> {
+                SoundAttractMod.LOGGER.info("  - Priority {}: {}", wrapped.getPriority(), wrapped.getGoal().getClass().getSimpleName());
+            });
+        }
+    }
+}
 }

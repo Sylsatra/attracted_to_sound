@@ -14,6 +14,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.network.SoundAttractNetwork;
 import com.example.soundattract.network.SoundMessage;
 import net.minecraftforge.client.event.sound.PlaySoundEvent;
@@ -42,6 +43,10 @@ public class SoundAttractClientEvents {
         if (event.getSound() instanceof AbstractSoundInstance soundInstance) {
             ResourceLocation soundRL = soundInstance.getLocation();
             if (soundRL == null || soundRL.equals(SoundMessage.VOICE_CHAT_SOUND_ID)) {
+                return;
+            }
+
+            if (SoundAttractConfig.POINT_BLANK_ENABLED_CACHE && "pointblank".equals(soundRL.getNamespace())) {
                 return;
             }
 

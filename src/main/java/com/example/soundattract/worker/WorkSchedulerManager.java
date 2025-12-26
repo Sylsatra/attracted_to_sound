@@ -37,7 +37,9 @@ public final class WorkSchedulerManager {
             } catch (Throwable ignored) {}
             try {
                 return new QuantifiedWorkScheduler();
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                SoundAttractMod.LOGGER.warn("[WorkSchedulerManager] Failed to initialize QuantifiedWorkScheduler, falling back to LocalWorkScheduler: {}", t.getMessage());
+            }
         }
 
         return new LocalWorkScheduler();

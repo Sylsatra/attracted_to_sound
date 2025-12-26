@@ -111,10 +111,8 @@ dependencies {
     compileOnly files('libs/insanelib-1.21.21.jar')
     compileOnly "su.plo.voice.api:server:2.1.5"
     compileOnly "su.plo.voice.api:client:2.1.5"
-
     compileOnly "maven.modrinth:smartbrainlib:1.15"
-    implementation fg.deobf(files('libs/quantified-1.0.0.jar'))
-
+    compileOnly files('libs/quantified-1.0.0.jar')
 }
 
 tasks.named('processResources', ProcessResources).configure {

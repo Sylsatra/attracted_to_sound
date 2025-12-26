@@ -42,7 +42,8 @@ public class LeaderAttractionGoal extends Goal {
         java.util.Set<net.minecraft.world.entity.EntityType<?>> attractedTypes = com.example.soundattract.event.SoundAttractionEvents.getCachedAttractedEntityTypes();
         boolean byType = attractedTypes.contains(this.mob.getType());
         boolean hasProfile = com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(this.mob) != null;
-        return byType || hasProfile;
+        boolean isCustomNpcs = com.example.soundattract.event.SoundAttractionEvents.isCustomNpcsMob(this.mob);
+        return byType || hasProfile || isCustomNpcs;
     }
 
     private double getArrivalDistance() {

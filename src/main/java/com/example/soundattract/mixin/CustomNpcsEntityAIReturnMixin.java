@@ -51,6 +51,10 @@ public abstract class CustomNpcsEntityAIReturnMixin extends Goal {
             return false;
         }
 
+        if (SoundAttractionEvents.isCustomNpcsMob(mob)) {
+            return true;
+        }
+
         Set<EntityType<?>> attracted = SoundAttractionEvents.getCachedAttractedEntityTypes();
         boolean isAttractedByType = attracted.contains(mob.getType());
         boolean hasMatchingProfile = SoundAttractConfig.getMatchingProfile(mob) != null;

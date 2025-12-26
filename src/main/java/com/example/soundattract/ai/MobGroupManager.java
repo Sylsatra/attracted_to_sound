@@ -145,10 +145,8 @@ public class MobGroupManager {
             !m.isRemoved() &&
             (
               attractedEntityTypes.contains(m.getType()) ||
-              com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(
-                m
-              ) !=
-              null
+              com.example.soundattract.config.SoundAttractConfig.getMatchingProfile(m) != null ||
+              com.example.soundattract.event.SoundAttractionEvents.isCustomNpcsMob(m)
             )
         );
         mobsSet.addAll(nearbyMobs);
@@ -316,7 +314,8 @@ public class MobGroupManager {
     for (Mob mob : mobsSet) {
       boolean byType = attractedEntityTypes.contains(mob.getType());
       boolean hasProfile = SoundAttractConfig.getMatchingProfile(mob) != null;
-      if (byType || hasProfile) {
+      boolean isCustomNpcs = com.example.soundattract.event.SoundAttractionEvents.isCustomNpcsMob(mob);
+      if (byType || hasProfile || isCustomNpcs) {
         attractedMobs.add(mob);
       }
     }

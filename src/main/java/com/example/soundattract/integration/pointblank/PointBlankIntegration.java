@@ -15,9 +15,11 @@ import java.util.Optional;
 
 public class PointBlankIntegration {
 
-    public static final ResourceLocation PB_GUN_SOUND_ID = ResourceLocation.fromNamespaceAndPath("pointblank", "gun_action");
-
     public static void onGunShoot(ServerPlayer player, ItemStack gunStack) {
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[PointBlankIntegration] onGunShoot called for player: {}", player.getName().getString());
+        }
+        
         double flashRange = SoundAttractConfig.COMMON.gunshotBaseDetectionRange.get();
         double reduction = 0.0;
 
@@ -35,7 +37,7 @@ public class PointBlankIntegration {
         double[] rangeAndWeight = calculateShootRangeWeight(gunStack);
 
         SoundMessage msg = new SoundMessage(
-                PB_GUN_SOUND_ID,
+                SoundMessage.POINT_BLANK_SOUND_ID,
                 player.getX(), player.getY(), player.getZ(),
                 player.level().dimension().location(),
                 Optional.of(player.getUUID()),
@@ -54,7 +56,7 @@ public class PointBlankIntegration {
         double[] rangeAndWeight = calculateReloadRangeWeight(gunStack);
 
         SoundMessage msg = new SoundMessage(
-                PB_GUN_SOUND_ID,
+                SoundMessage.POINT_BLANK_SOUND_ID,
                 player.getX(), player.getY(), player.getZ(),
                 player.level().dimension().location(),
                 Optional.of(player.getUUID()),

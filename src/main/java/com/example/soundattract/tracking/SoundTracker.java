@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -39,6 +40,12 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
 public class SoundTracker {
+
+    private static final AtomicLong SOUND_SEQUENCE = new AtomicLong(0L);
+
+    public static long getSoundSequence() {
+        return SOUND_SEQUENCE.get();
+    }
 
     public static class SoundRecord {
 
@@ -252,13 +259,20 @@ public class SoundTracker {
             return;
         }
 
+        if (se == null && soundIdToUse.startsWith("pointblank:")) {
+            weight *= 2.0; 
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[SoundTracker] Boosting Point Blank fallback sound: {} weight -> {}", soundIdToUse, weight);
+            }
+        }
+
         ResourceLocation loc = extractBaseSoundLocation(soundIdToUse);
 
         if (!SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.isEmpty()
                 && (loc == null || !SoundAttractConfig.SOUND_ID_WHITELIST_CACHE.contains(loc))) {
 
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.debug("Sound {} not in whitelist, ignoring.", soundIdToUse);
+            if (SoundAttractConfig.COMMON.debugLogging.get() && !soundIdToUse.startsWith("pointblank:")) {
+                SoundAttractMod.LOGGER.info("[SoundTracker] Sound {} not in whitelist, ignoring.", soundIdToUse);
             }
             return;
         }
@@ -311,6 +325,12 @@ public class SoundTracker {
             SoundRecord record = new SoundRecord(se, soundIdToUse, pos, lifetime, dimensionKey, range, weight);
             RECENT_SOUNDS.add(record);
             addRecordToCollections(record);
+            SOUND_SEQUENCE.incrementAndGet();
+            
+            if (SoundAttractConfig.COMMON.debugLogging.get() && !soundIdToUse.startsWith("pointblank:")) {
+                SoundAttractMod.LOGGER.info("[SoundTracker] Successfully added sound: {} at {} (range={}, weight={}, lifetime={})", 
+                    soundIdToUse, pos, range, weight, lifetime);
+            }
         } finally {
             writeLock.unlock();
         }

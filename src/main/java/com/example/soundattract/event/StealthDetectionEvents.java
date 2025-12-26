@@ -301,13 +301,17 @@ public class StealthDetectionEvents {
         return moved;
     }
 
-    private static double getEffectiveXrayRange(Mob mob) {
+    public static double getEffectiveXrayRange(Mob mob) {
         if (mob == null) return 0d;
         if (!SoundAttractConfig.COMMON.enableXrayTargeting.get()) return 0d;
 
         if (EnhancedAICompat.isEnhancedAiLoaded()) {
             double v = EnhancedAICompat.getXrayAttributeValue(mob);
             if (v > 0d) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[XRAY] {} has EnhancedAI X-ray range: {}", 
+                        mob.getName().getString(), String.format("%.2f", v));
+                }
                 return v;
             }
             return 0d;
@@ -315,15 +319,44 @@ public class StealthDetectionEvents {
 
         try {
             String applyTagStr = SoundAttractConfig.COMMON.xrayApplyTag.get();
-            if (applyTagStr == null || applyTagStr.isBlank()) return 0d;
+            if (applyTagStr == null || applyTagStr.isBlank()) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.warn("[XRAY] xrayApplyTag is blank or null");
+                }
+                return 0d;
+            }
             TagKey<EntityType<?>> applyTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(applyTagStr));
-            if (!mob.getType().is(applyTag)) return 0d;
+            boolean inApplyTag = mob.getType().is(applyTag);
+            if (!inApplyTag) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[XRAY] {} not in apply_xray tag: {}", 
+                        mob.getName().getString(), applyTagStr);
+                }
+                return 0d;
+            }
 
             if (SoundAttractConfig.COMMON.xrayRequireBetterNearby.get()) {
                 String betterTagStr = SoundAttractConfig.COMMON.xrayBetterNearbyTag.get();
-                if (betterTagStr == null || betterTagStr.isBlank()) return 0d;
+                if (betterTagStr == null || betterTagStr.isBlank()) {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.warn("[XRAY] xrayBetterNearbyTag is blank or null");
+                    }
+                    return 0d;
+                }
                 TagKey<EntityType<?>> betterTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(betterTagStr));
-                if (!mob.getType().is(betterTag)) return 0d;
+                boolean inBetterTag = mob.getType().is(betterTag);
+                if (!inBetterTag) {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info("[XRAY] {} not in better_nearby tag: {}", 
+                            mob.getName().getString(), betterTagStr);
+                    }
+                    return 0d;
+                }
+            }
+            
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[XRAY] {} passed tag checks, checking chance...", 
+                    mob.getName().getString());
             }
         } catch (Exception e) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -333,24 +366,38 @@ public class StealthDetectionEvents {
         }
 
         Double cached = XRAY_RANGE_CACHE.get(mob.getUUID());
-        if (cached != null) return cached;
+        if (cached != null) {
+            if (SoundAttractConfig.COMMON.debugLogging.get() && cached > 0d) {
+                SoundAttractMod.LOGGER.info("[XRAY] {} has cached X-ray range: {}", 
+                    mob.getName().getString(), String.format("%.2f", cached));
+            }
+            return cached;
+        }
 
         int max = SoundAttractConfig.COMMON.xrayMaxRange.get();
         if (max <= 0) {
             XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
-            return 0d;
+            return 0;
         }
         int min = SoundAttractConfig.COMMON.xrayMinRange.get();
         min = Math.max(0, Math.min(min, max));
         double chance = SoundAttractConfig.COMMON.xrayChance.get();
         if (mob.getRandom().nextDouble() >= chance) {
             XRAY_RANGE_CACHE.put(mob.getUUID(), 0d);
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[XRAY] {} failed X-ray chance check ({}%), cached as 0", 
+                    mob.getName().getString(), (int)(chance * 100));
+            }
             return 0d;
         }
         int spread = max - min;
         int chosen = spread <= 0 ? max : (min + mob.getRandom().nextInt(spread + 1));
         double result = (double) chosen;
         XRAY_RANGE_CACHE.put(mob.getUUID(), result);
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[XRAY] {} gained X-ray range: {} (chance passed)", 
+                mob.getName().getString(), String.format("%.2f", result));
+        }
         return result;
     }
 
@@ -531,8 +578,23 @@ public class StealthDetectionEvents {
                 }
             }
         } else if (newTarget instanceof Mob targetMob) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info(
+                    "[LivingChangeTargetEvent] Mob {} attempting to target Mob {}",
+                    mob.getName().getString(), targetMob.getName().getString()
+                );
+            }
+            
             if (!FovEvents.isTargetInFov(mob, targetMob, true)) {
                 double xrayRange = getEffectiveXrayRange(mob);
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[LivingChangeTargetEvent] FOV check failed for {} targeting {}. X-ray range: {}",
+                        mob.getName().getString(), targetMob.getName().getString(),
+                        String.format("%.2f", xrayRange)
+                    );
+                }
+                
                 if (xrayRange > 0) {
                     double distSqXray = mob.distanceToSqr(targetMob);
                     if (distSqXray <= xrayRange * xrayRange) {
@@ -546,8 +608,9 @@ public class StealthDetectionEvents {
                     } else {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
-                                "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). CANCELED.",
-                                mob.getName().getString(), targetMob.getName().getString()
+                                "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). X-ray range too small: {} vs dist {}.",
+                                mob.getName().getString(), targetMob.getName().getString(),
+                                String.format("%.2f", xrayRange), String.format("%.2f", Math.sqrt(distSqXray))
                             );
                         }
                         event.setCanceled(true);
@@ -556,12 +619,19 @@ public class StealthDetectionEvents {
                 } else {
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info(
-                                "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). CANCELED.",
-                                mob.getName().getString(), targetMob.getName().getString()
+                            "[LivingChangeTargetEvent] Mob {} cannot see Mob {} (FOV). No X-ray capability.",
+                            mob.getName().getString(), targetMob.getName().getString()
                         );
                     }
                     event.setCanceled(true);
                     return;
+                }
+            } else {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info(
+                        "[LivingChangeTargetEvent] Mob {} can see Mob {} (FOV passed).",
+                        mob.getName().getString(), targetMob.getName().getString()
+                    );
                 }
             }
             double range = getRealisticStealthDetectionRange(targetMob, mob, mob.level());

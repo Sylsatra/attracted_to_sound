@@ -101,7 +101,6 @@ public class FollowLeaderGoal extends Goal {
 
         if (leaderPursuitGoal == null) return false;
         if (leaderPursuitGoal instanceof AttractionGoal ag && !ag.isPursuingSound()) return false;
-        if (leader.getNavigation().isDone()) return false;
         return true;
     }
 
@@ -227,6 +226,20 @@ public class FollowLeaderGoal extends Goal {
             stuckTicks = 0;
         }
 
+        if (!isSpreadingOut && soundPos != null) {
+            double distToSound = mob.distanceToSqr(soundPos.getX() + 0.5, soundPos.getY(), soundPos.getZ() + 0.5);
+            if (distToSound <= (arrivalDistance + 2.0) * (arrivalDistance + 2.0)) {
+                isSpreadingOut = true;
+                hasPickedDest = false;
+                lastRandomDest = null;
+                if (debug) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info(
+                        "[FollowLeaderGoal] Mob {} reached sound location at {}, starting to spread",
+                        mob.getName().getString(), soundPos);
+                }
+            }
+        }
+
         if (!isSpreadingOut && lastRandomDest != null && mob.position().distanceToSqr(lastRandomDest) <= 2.25) {
             isSpreadingOut = true;
             hasPickedDest = false;
@@ -301,11 +314,7 @@ public class FollowLeaderGoal extends Goal {
             lastPos = curPos;
         }
 
-        if (leader.getNavigation().isDone()) {
-            hasPickedDest = false;
-            lastRandomDest = null;
-        }
-
+        
 
         if (!RaidManager.isRaidTicking(leader) && !RaidManager.isRaidAdvancing(leader) && mob.isSprinting()) {
             mob.setSprinting(false);

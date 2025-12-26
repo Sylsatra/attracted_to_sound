@@ -3,9 +3,8 @@ package com.example.soundattract.quantified;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
 import net.minecraftforge.fml.ModList;
-import org.admany.quantified.api.QuantifiedAPI;
-import org.admany.quantified.core.common.async.task.ModPriorityManager;
 
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -25,9 +24,14 @@ public final class QuantifiedIntegration {
         }
 
         try {
-            QuantifiedAPI.register(SoundAttractMod.MOD_ID);
+            Class<?> api = Class.forName("org.admany.quantified.api.QuantifiedAPI");
+            Method register = api.getMethod("register", String.class);
+            register.invoke(null, SoundAttractMod.MOD_ID);
+            
             try {
-                ModPriorityManager.setMaxTasksForMod(SoundAttractMod.MOD_ID, 1_000_000L);
+                Class<?> priorityManager = Class.forName("org.admany.quantified.core.common.async.task.ModPriorityManager");
+                Method setMaxTasks = priorityManager.getMethod("setMaxTasksForMod", String.class, long.class);
+                setMaxTasks.invoke(null, SoundAttractMod.MOD_ID, 1_000_000L);
             } catch (Throwable ignored) {
             }
             redirectJulLogging();

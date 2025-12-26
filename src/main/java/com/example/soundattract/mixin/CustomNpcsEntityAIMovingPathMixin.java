@@ -27,6 +27,8 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
     private static final Map<Mob, Long> SOUND_YIELD_TICK = Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<Mob, Boolean> SOUND_YIELD_RESULT = Collections.synchronizedMap(new WeakHashMap<>());
 
+    private static final Map<Mob, Long> SOUND_PATH_DECREMENT_TICK = Collections.synchronizedMap(new WeakHashMap<>());
+
     private static Mob soundattract$getNpcMob(Object self) {
         try {
             Field f = self.getClass().getDeclaredField("npc");
@@ -58,6 +60,10 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
         Set<EntityType<?>> blacklisted = SoundAttractionEvents.getCachedBlacklistedEntityTypes();
         if (blacklisted.contains(mob.getType())) {
             return false;
+        }
+
+        if (SoundAttractionEvents.isCustomNpcsMob(mob)) {
+            return true;
         }
 
         Set<EntityType<?>> attracted = SoundAttractionEvents.getCachedAttractedEntityTypes();
@@ -101,6 +107,10 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
                     mob.getEyePosition()
                 );
                 result = sr != null;
+                if (result && SoundAttractConfig.COMMON.debugLogging.get()) {
+                    com.example.soundattract.SoundAttractMod.LOGGER.info("[CustomNPCs] Interrupting Return To Start for {} due to sound at {}", 
+                        mob.getName().getString(), sr != null ? sr.pos : "unknown");
+                }
             } catch (Throwable ignored) {
                 result = false;
             }
@@ -111,13 +121,37 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
         return result;
     }
 
+    private static void soundattract$restoreMovingPathIndexIfPossible(Mob mob) {
+        if (mob == null || mob.level() == null) return;
+        long tick = mob.level().getGameTime();
+        Long last = SOUND_PATH_DECREMENT_TICK.get(mob);
+        if (last != null && last.longValue() == tick) {
+            return;
+        }
+        SOUND_PATH_DECREMENT_TICK.put(mob, tick);
+
+        try {
+            java.lang.reflect.Field aisField = mob.getClass().getField("ais");
+            Object ais = aisField.get(mob);
+            if (ais == null) return;
+
+            java.lang.reflect.Method dec = ais.getClass().getMethod("decreaseMovingPath");
+            dec.invoke(ais);
+        } catch (Throwable ignored) {
+        }
+    }
+
     @Inject(method = "m_8036_()Z", at = @At("HEAD"), cancellable = true)
     private void soundattract$canUse(CallbackInfoReturnable<Boolean> cir) {
         Mob mob = soundattract$getNpcMob(this);
         if (!soundattract$isEligible(mob)) return;
+        
         if (soundattract$shouldYieldToSound(mob)) {
             try {
                 mob.getNavigation().stop();
+                if (mob.getTarget() != null && !mob.getTarget().isAlive()) {
+                    mob.setTarget(null);
+                }
             } catch (Throwable ignored) {
             }
             cir.setReturnValue(false);
@@ -128,11 +162,16 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
     private void soundattract$canContinue(CallbackInfoReturnable<Boolean> cir) {
         Mob mob = soundattract$getNpcMob(this);
         if (!soundattract$isEligible(mob)) return;
+        
         if (soundattract$shouldYieldToSound(mob)) {
             try {
                 mob.getNavigation().stop();
+                if (mob.getTarget() != null && !mob.getTarget().isAlive()) {
+                    mob.setTarget(null);
+                }
             } catch (Throwable ignored) {
             }
+            soundattract$restoreMovingPathIndexIfPossible(mob);
             cir.setReturnValue(false);
         }
     }
