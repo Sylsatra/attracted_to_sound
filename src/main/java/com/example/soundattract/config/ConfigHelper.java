@@ -12,16 +12,13 @@ import java.nio.file.Path;
 
 public class ConfigHelper {
 
-
-    private static final int CURRENT_SCHEMA_VERSION = 7;
+    private static final int CURRENT_SCHEMA_VERSION = 10;
 
     @SuppressWarnings("removal")
     public static void register() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
 
-
         updateAndMigrateConfig(configPath);
-
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SoundAttractConfig.COMMON_SPEC, SoundAttractMod.MOD_ID + "-common.toml");
     }

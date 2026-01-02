@@ -8,6 +8,7 @@
     "ItemStackMixin",
     "HurtByTargetGoalMixin",
     "LivingEntityInvoker",
+    "LivingEntityLosMixin",
     "SensingMixin",
     "PointBlankGunItemMixin",
     "CustomNpcsUpdateTasksMixin"

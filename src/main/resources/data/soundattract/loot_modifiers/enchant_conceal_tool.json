@@ -6,8 +6,8 @@
       "chance": 0.05
     },
     {
-      "condition": "forge:or",
-      "predicates": [
+      "condition": "minecraft:alternative",
+      "terms": [
         {
           "condition": "forge:loot_table_id",
           "loot_table_id": "minecraft:chests/ancient_city"
