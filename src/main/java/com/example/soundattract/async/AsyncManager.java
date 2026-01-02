@@ -2,6 +2,7 @@ package com.example.soundattract.async;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
+import java.lang.reflect.Method;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -18,8 +19,6 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
-import org.admany.quantified.api.QuantifiedAPI;
-import org.admany.quantified.api.model.QuantifiedTask;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class AsyncManager {
@@ -59,18 +58,11 @@ public final class AsyncManager {
             return CompletableFuture.completedFuture(null);
         }
         if (isQuantifiedAvailable()) {
-            try {
-                QuantifiedTask.Builder<T> builder = QuantifiedTask.builder(SoundAttractMod.MOD_ID, taskName, supplier)
-                    .threadSafe(threadSafe);
-                if (priority == Priority.HIGH) {
-                    builder.priorityForeground();
-                } else {
-                    builder.priorityBackground();
-                }
-                return QuantifiedAPI.submit(builder);
-            } catch (Throwable t) {
-                SoundAttractMod.LOGGER.debug("[AsyncManager] Quantified submit failed for '{}': {}", taskName, t.getMessage());
+            CompletableFuture<T> quantifiedFuture = QuantifiedAsyncBridge.trySubmit(taskName, supplier, priority, threadSafe);
+            if (quantifiedFuture != null) {
+                return quantifiedFuture;
             }
+            SoundAttractMod.LOGGER.debug("[AsyncManager] Quantified submit bridge unavailable or failed for '{}'", taskName);
         }
         return CompletableFuture.supplyAsync(supplier, FALLBACK_EXECUTOR);
     }
@@ -177,5 +169,61 @@ public final class AsyncManager {
             thread.setDaemon(true);
             return thread;
         };
+    }
+
+    private static final class QuantifiedAsyncBridge {
+        private static final Object INIT_LOCK = new Object();
+        private static boolean initialized = false;
+        private static Class<?> taskClass;
+        private static Class<?> builderClass;
+        private static Method builderFactory;
+        private static Method submitMethod;
+        private static Method threadSafeMethod;
+        private static Method priorityForegroundMethod;
+        private static Method priorityBackgroundMethod;
+
+        private static boolean ensureInit() {
+            if (initialized) {
+                return submitMethod != null;
+            }
+            synchronized (INIT_LOCK) {
+                if (initialized) {
+                    return submitMethod != null;
+                }
+                try {
+                    Class<?> apiClass = Class.forName("org.admany.quantified.api.QuantifiedAPI");
+                    taskClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask");
+                    builderClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask$Builder");
+                    builderFactory = taskClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class);
+                    submitMethod = apiClass.getMethod("submit", builderClass);
+                    threadSafeMethod = builderClass.getMethod("threadSafe", boolean.class);
+                    priorityForegroundMethod = builderClass.getMethod("priorityForeground");
+                    priorityBackgroundMethod = builderClass.getMethod("priorityBackground");
+                } catch (Throwable t) {
+                    submitMethod = null;
+                }
+                initialized = true;
+                return submitMethod != null;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <T> CompletableFuture<T> trySubmit(String taskName, Supplier<T> supplier, Priority priority, boolean threadSafe) {
+            if (!ensureInit()) {
+                return null;
+            }
+            try {
+                Object builder = builderFactory.invoke(null, SoundAttractMod.MOD_ID, taskName, supplier);
+                threadSafeMethod.invoke(builder, threadSafe);
+                if (priority == Priority.HIGH) {
+                    priorityForegroundMethod.invoke(builder);
+                } else {
+                    priorityBackgroundMethod.invoke(builder);
+                }
+                return (CompletableFuture<T>) submitMethod.invoke(null, builder);
+            } catch (Throwable t) {
+                return null;
+            }
+        }
     }
 }

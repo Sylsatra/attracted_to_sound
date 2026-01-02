@@ -203,6 +203,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
         public final ForgeConfigSpec.DoubleValue arrivalDistance;
         public final ForgeConfigSpec.DoubleValue followLeaderSpreadOutDistance;
+        public final ForgeConfigSpec.DoubleValue followLeaderMinSoundWeightToSpreadOut;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed;
         public final ForgeConfigSpec.IntValue maxSoundsTracked;
         public final ForgeConfigSpec.DoubleValue soundSwitchRatio;
@@ -216,6 +217,12 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue cooldownTicksPerMob;
         public final ForgeConfigSpec.DoubleValue minTpsForScanCooldown;
         public final ForgeConfigSpec.DoubleValue maxTpsForScanCooldown;
+        public final ForgeConfigSpec.BooleanValue enableTieredStealthPerformance;
+        public final ForgeConfigSpec.DoubleValue stealthTierSkipExpensiveChecksTps;
+        public final ForgeConfigSpec.DoubleValue stealthTierCurrentTargetsOnlyTps;
+        public final ForgeConfigSpec.DoubleValue stealthTierSharedRangeTps;
+        public final ForgeConfigSpec.DoubleValue stealthTierVanillaTps;
+        public final ForgeConfigSpec.DoubleValue stealthShareTargetToNearbyMobsRadius;
         public final ForgeConfigSpec.IntValue soundScoringSubmitCooldownTicks;
         public final ForgeConfigSpec.IntValue asyncResultTtlTicks;
 
@@ -389,9 +396,20 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.IntValue configSchemaVersion;
 
+        public final ForgeConfigSpec.BooleanValue enableOptimizedLos;
+        public final ForgeConfigSpec.BooleanValue enableOptimizedLosPairCache;
+        public final ForgeConfigSpec.IntValue optimizedLosPairCacheMaxEntries;
+        public final ForgeConfigSpec.BooleanValue enableOptimizedLosVanillaFallback;
+
+        public final ForgeConfigSpec.BooleanValue enableLosBatching;
+        public final ForgeConfigSpec.IntValue losBatchBudgetPerTick;
+        public final ForgeConfigSpec.IntValue losBatchQueueMaxSize;
+
+        public final ForgeConfigSpec.BooleanValue enableLivingEntityLosOverride;
+
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 9, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 10, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
@@ -437,6 +455,8 @@ public class SoundAttractConfig {
                             "After a follower reaches the investigation area near a sound, it will path away from the sound position to spread out and search.",
                             "This controls how far (in blocks) it tries to spread out.")
                     .defineInRange("followLeaderSpreadOutDistance", 24.0, 0.0, 256.0);
+            followLeaderMinSoundWeightToSpreadOut = builder
+                    .defineInRange("followLeaderMinSoundWeightToSpreadOut", 10.0, 0.0, 1000000.0);
             mobMoveSpeed = builder.comment("Base speed multiplier for mobs moving towards a sound.")
                     .defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
             maxGroupSize = builder.comment("Maximum number of mobs allowed in a group for group AI behavior. Default: 64")
@@ -504,6 +524,13 @@ public class SoundAttractConfig {
             maxTpsForScanCooldown = builder.comment("TPS above which scanCooldownTicks is dynamically decreased (down to its minimum defined value). Set to 21 to disable.")
                     .defineInRange("maxTpsForScanCooldown", 19.0, 0.0, 21.0);
 
+            enableTieredStealthPerformance = builder.define("enableTieredStealthPerformance", true);
+            stealthTierSkipExpensiveChecksTps = builder.defineInRange("stealthTierSkipExpensiveChecksTps", 19.0, 0.0, 21.0);
+            stealthTierCurrentTargetsOnlyTps = builder.defineInRange("stealthTierCurrentTargetsOnlyTps", 18.0, 0.0, 21.0);
+            stealthTierSharedRangeTps = builder.defineInRange("stealthTierSharedRangeTps", 17.0, 0.0, 21.0);
+            stealthTierVanillaTps = builder.defineInRange("stealthTierVanillaTps", 15.0, 0.0, 21.0);
+            stealthShareTargetToNearbyMobsRadius = builder.defineInRange("stealthShareTargetToNearbyMobsRadius", 16.0, 0.0, 256.0);
+
             soundScoringSubmitCooldownTicks = builder.comment(
                     "Cooldown (in ticks) per mob between async sound scoring submissions when candidates/target are unchanged.")
                     .defineInRange("soundScoringSubmitCooldownTicks", 1, 0, 10000);
@@ -519,6 +546,17 @@ public class SoundAttractConfig {
             raycastCacheMaxEntries = builder.comment(
                     "Maximum number of entries stored in the raycast cache. Oldest entries are evicted when exceeded.")
                     .defineInRange("raycastCacheMaxEntries", 5000, 100, 1000000);
+
+            enableOptimizedLos = builder.define("enableOptimizedLos", true);
+            enableOptimizedLosPairCache = builder.define("enableOptimizedLosPairCache", true);
+            optimizedLosPairCacheMaxEntries = builder.defineInRange("optimizedLosPairCacheMaxEntries", 8192, 256, 1000000);
+            enableOptimizedLosVanillaFallback = builder.define("enableOptimizedLosVanillaFallback", true);
+
+            enableLosBatching = builder.define("enableLosBatching", true);
+            losBatchBudgetPerTick = builder.defineInRange("losBatchBudgetPerTick", 64, 1, 1000000);
+            losBatchQueueMaxSize = builder.defineInRange("losBatchQueueMaxSize", 4096, 64, 1000000);
+
+            enableLivingEntityLosOverride = builder.define("enableLivingEntityLosOverride", true);
 
             builder.pop();
 
@@ -2571,9 +2609,9 @@ public class SoundAttractConfig {
             COMMON_SPEC.save();
         }
 
-        if (COMMON == null) {
-            SoundAttractMod.LOGGER.warn("SoundAttractConfig.COMMON is null during bakeConfig. Skipping cache population.");
-            return;
+        if (COMMON.configSchemaVersion.get() < 10) {
+            COMMON.configSchemaVersion.set(10);
+            COMMON_SPEC.save();
         }
 
         SOUND_ID_WHITELIST_CACHE.clear();

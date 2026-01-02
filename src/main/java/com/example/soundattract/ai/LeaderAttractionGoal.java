@@ -77,6 +77,9 @@ public class LeaderAttractionGoal extends Goal {
         if (this.mob.isVehicle() || this.mob.isSleeping()) {
             return false;
         }
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            return false;
+        }
         if (!isMobEligible()) {
             return false;
         }
@@ -112,6 +115,9 @@ public class LeaderAttractionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            return false;
+        }
         if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping()) {
             return false;
         }

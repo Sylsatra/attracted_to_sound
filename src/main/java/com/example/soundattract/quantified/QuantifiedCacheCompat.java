@@ -2,19 +2,17 @@ package com.example.soundattract.quantified;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import net.minecraft.server.MinecraftServer;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.server.ServerLifecycleHooks;
-import org.admany.quantified.api.QuantifiedAPI;
-import org.admany.quantified.api.interfaces.ModCacheManager;
-
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.server.ServerLifecycleHooks;
 
 public final class QuantifiedCacheCompat {
     private static final AtomicBoolean INIT_ATTEMPTED = new AtomicBoolean(false);
-    private static volatile ModCacheManager cacheManager;
+    private static volatile Object cacheManager;
     private static volatile long lastAppliedLimitMb = Long.MIN_VALUE;
     private static volatile long lastCleanupTick = Long.MIN_VALUE;
 
@@ -55,11 +53,11 @@ public final class QuantifiedCacheCompat {
         Duration ttl = Duration.ofMillis(clampedTtlTicks * estimateMillisPerTick());
         long clampedMax = Math.max(0L, maxSize);
 
-        try {
-            return QuantifiedAPI.getCached(cacheName, key, loader, ttl, clampedMax, useDisk);
-        } catch (Throwable t) {
-            return loader.get();
+        T value = CacheBridge.invokeGetCached(cacheName, key, loader, ttl, clampedMax, useDisk);
+        if (value != null) {
+            return value;
         }
+        return loader.get();
     }
 
     private static boolean ensureInit() {
@@ -67,17 +65,12 @@ public final class QuantifiedCacheCompat {
         if (!INIT_ATTEMPTED.compareAndSet(false, true)) {
             return cacheManager != null;
         }
-        try {
-            QuantifiedAPI.register(SoundAttractMod.MOD_ID);
-            cacheManager = QuantifiedAPI.getCacheManager();
-            return cacheManager != null;
-        } catch (Throwable ignored) {
-            return false;
-        }
+        cacheManager = CacheBridge.fetchManager();
+        return cacheManager != null;
     }
 
     private static void configureCacheManager() {
-        ModCacheManager manager = cacheManager;
+        Object manager = cacheManager;
         if (manager == null) return;
 
         long limitMb = 0L;
@@ -88,10 +81,8 @@ public final class QuantifiedCacheCompat {
         limitMb = Math.max(0L, limitMb);
 
         if (limitMb != lastAppliedLimitMb) {
-            try {
-                manager.setMemoryLimitMB(limitMb);
+            if (CacheBridge.setMemoryLimit(manager, limitMb)) {
                 lastAppliedLimitMb = limitMb;
-            } catch (Throwable ignored) {
             }
         }
 
@@ -102,16 +93,13 @@ public final class QuantifiedCacheCompat {
         }
         if (!triggerCleanup) return;
 
-        try {
-            if (!manager.isMemoryPressureHigh()) return;
-            long tick = System.currentTimeMillis() / 50L;
-            if ((tick - lastCleanupTick) < 20L) {
-                return;
-            }
-            lastCleanupTick = tick;
-            manager.triggerMemoryPressureCleanup();
-        } catch (Throwable ignored) {
+        if (!CacheBridge.isMemoryPressureHigh(manager)) return;
+        long tick = System.currentTimeMillis() / 50L;
+        if ((tick - lastCleanupTick) < 20L) {
+            return;
         }
+        lastCleanupTick = tick;
+        CacheBridge.triggerCleanup(manager);
     }
 
     private static boolean isMemoryPressureHigh() {
@@ -122,13 +110,9 @@ public final class QuantifiedCacheCompat {
         }
         if (!bypass) return false;
 
-        ModCacheManager manager = cacheManager;
+        Object manager = cacheManager;
         if (manager == null) return false;
-        try {
-            return manager.isMemoryPressureHigh();
-        } catch (Throwable ignored) {
-            return false;
-        }
+        return CacheBridge.isMemoryPressureHigh(manager);
     }
 
     private static long estimateMillisPerTick() {
@@ -143,6 +127,101 @@ public final class QuantifiedCacheCompat {
             return Math.max(20L, Math.min(250L, ms));
         } catch (Throwable ignored) {
             return fallback;
+        }
+    }
+
+    private static final class CacheBridge {
+        private static final Object LOCK = new Object();
+        private static boolean initialized = false;
+        private static Class<?> apiClass;
+        private static Class<?> managerInterface;
+        private static Method registerMethod;
+        private static Method getCacheManagerMethod;
+        private static Method getCachedMethod;
+        private static Method setMemoryLimitMethod;
+        private static Method isMemoryPressureHighMethod;
+        private static Method triggerCleanupMethod;
+
+        private static boolean ensureInit() {
+            if (initialized) {
+                return getCacheManagerMethod != null;
+            }
+            synchronized (LOCK) {
+                if (initialized) {
+                    return getCacheManagerMethod != null;
+                }
+                try {
+                    apiClass = Class.forName("org.admany.quantified.api.QuantifiedAPI");
+                    managerInterface = Class.forName("org.admany.quantified.api.interfaces.ModCacheManager");
+                    registerMethod = apiClass.getMethod("register", String.class);
+                    getCacheManagerMethod = apiClass.getMethod("getCacheManager");
+                    getCachedMethod = apiClass.getMethod("getCached", String.class, String.class, java.util.function.Supplier.class, Duration.class, long.class, boolean.class);
+                    setMemoryLimitMethod = managerInterface.getMethod("setMemoryLimitMB", long.class);
+                    isMemoryPressureHighMethod = managerInterface.getMethod("isMemoryPressureHigh");
+                    triggerCleanupMethod = managerInterface.getMethod("triggerMemoryPressureCleanup");
+                } catch (Throwable t) {
+                    getCacheManagerMethod = null;
+                }
+                initialized = true;
+                return getCacheManagerMethod != null;
+            }
+        }
+
+        private static Object fetchManager() {
+            if (!ensureInit()) {
+                return null;
+            }
+            try {
+                registerMethod.invoke(null, SoundAttractMod.MOD_ID);
+                return getCacheManagerMethod.invoke(null);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <T> T invokeGetCached(String cacheName, String key, Supplier<T> loader, Duration ttl, long maxSize, boolean useDisk) {
+            if (!ensureInit()) {
+                return null;
+            }
+            try {
+                return (T) getCachedMethod.invoke(null, cacheName, key, loader, ttl, maxSize, useDisk);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        private static boolean setMemoryLimit(Object manager, long limitMb) {
+            if (!ensureInit()) {
+                return false;
+            }
+            try {
+                setMemoryLimitMethod.invoke(manager, limitMb);
+                return true;
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+
+        private static boolean isMemoryPressureHigh(Object manager) {
+            if (!ensureInit()) {
+                return false;
+            }
+            try {
+                return (Boolean) isMemoryPressureHighMethod.invoke(manager);
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+
+        private static void triggerCleanup(Object manager) {
+            if (!ensureInit()) {
+                return;
+            }
+            try {
+                triggerCleanupMethod.invoke(manager);
+            } catch (Throwable ignored) {
+            }
         }
     }
 }

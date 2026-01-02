@@ -206,12 +206,23 @@ public class FollowLeaderGoal extends Goal {
         if (dynamicTickCounter != 0) return;
 
         BlockPos soundPos = null;
+        double soundWeight = -1.0;
         try {
             Object pursuit = (leaderPursuitGoal != null) ? leaderPursuitGoal : leaderAttractionGoal;
             if (pursuit == null) return;
             java.lang.reflect.Field f = pursuit.getClass().getDeclaredField("targetSoundPos");
             f.setAccessible(true);
             soundPos = (BlockPos) f.get(pursuit);
+
+            try {
+                java.lang.reflect.Field w = pursuit.getClass().getDeclaredField("currentTargetWeight");
+                w.setAccessible(true);
+                Object val = w.get(pursuit);
+                if (val instanceof Number n) {
+                    soundWeight = n.doubleValue();
+                }
+            } catch (Exception ignored) {
+            }
         } catch (Exception e) {
         }
         if (soundPos == null) return;
@@ -226,24 +237,30 @@ public class FollowLeaderGoal extends Goal {
             stuckTicks = 0;
         }
 
+        double minWeightToSpreadOut = com.example.soundattract.config.SoundAttractConfig.COMMON.followLeaderMinSoundWeightToSpreadOut.get();
+
         if (!isSpreadingOut && soundPos != null) {
             double distToSound = mob.distanceToSqr(soundPos.getX() + 0.5, soundPos.getY(), soundPos.getZ() + 0.5);
             if (distToSound <= (arrivalDistance + 2.0) * (arrivalDistance + 2.0)) {
-                isSpreadingOut = true;
-                hasPickedDest = false;
-                lastRandomDest = null;
-                if (debug) {
-                    com.example.soundattract.SoundAttractMod.LOGGER.info(
-                        "[FollowLeaderGoal] Mob {} reached sound location at {}, starting to spread",
-                        mob.getName().getString(), soundPos);
+                if (soundWeight >= minWeightToSpreadOut) {
+                    isSpreadingOut = true;
+                    hasPickedDest = false;
+                    lastRandomDest = null;
+                    if (debug) {
+                        com.example.soundattract.SoundAttractMod.LOGGER.info(
+                            "[FollowLeaderGoal] Mob {} reached sound location at {}, starting to spread",
+                            mob.getName().getString(), soundPos);
+                    }
                 }
             }
         }
 
         if (!isSpreadingOut && lastRandomDest != null && mob.position().distanceToSqr(lastRandomDest) <= 2.25) {
-            isSpreadingOut = true;
-            hasPickedDest = false;
-            lastRandomDest = null;
+            if (soundWeight >= minWeightToSpreadOut) {
+                isSpreadingOut = true;
+                hasPickedDest = false;
+                lastRandomDest = null;
+            }
         }
 
         if (!hasPickedDest) {

@@ -8,6 +8,7 @@ import net.minecraftforge.fml.ModList;
 
 public final class WorkSchedulerManager {
     private static volatile SoundAttractWorkScheduler INSTANCE;
+    private static volatile boolean QUANTIFIED_INIT_FAILED = false;
 
     private WorkSchedulerManager() {}
 
@@ -23,22 +24,25 @@ public final class WorkSchedulerManager {
 
     public static void refresh() {
         synchronized (WorkSchedulerManager.class) {
+            QUANTIFIED_INIT_FAILED = false;
             INSTANCE = build();
         }
     }
 
     private static SoundAttractWorkScheduler build() {
         boolean quantifiedLoaded = ModList.get().isLoaded("quantified");
-        if (quantifiedLoaded) {
-            try {
-                if (!SoundAttractConfig.COMMON.enableQuantifiedIntegration.get()) {
-                    SoundAttractMod.LOGGER.info("[WorkSchedulerManager] Quantified integration forced on for performance.");
-                }
-            } catch (Throwable ignored) {}
+        boolean enableQuantifiedIntegration = true;
+        try {
+            enableQuantifiedIntegration = SoundAttractConfig.COMMON.enableQuantifiedIntegration.get();
+        } catch (Throwable ignored) {
+        }
+
+        if (quantifiedLoaded && enableQuantifiedIntegration && !QUANTIFIED_INIT_FAILED) {
             try {
                 return new QuantifiedWorkScheduler();
             } catch (Throwable t) {
-                SoundAttractMod.LOGGER.warn("[WorkSchedulerManager] Failed to initialize QuantifiedWorkScheduler, falling back to LocalWorkScheduler: {}", t.getMessage());
+                QUANTIFIED_INIT_FAILED = true;
+                SoundAttractMod.LOGGER.warn("[WorkSchedulerManager] Failed to initialize QuantifiedWorkScheduler, falling back to LocalWorkScheduler", t);
             }
         }
 

@@ -4,6 +4,7 @@ import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.data.DataDrivenTags;
 import com.example.soundattract.integration.enhancedai.EnhancedAICompat;
+import com.example.soundattract.los.OptimizedLOS;
 import com.example.soundattract.quantified.QuantifiedCacheCompat;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,7 +20,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
@@ -28,8 +28,6 @@ import net.minecraft.world.level.block.IceBlock;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -228,6 +226,18 @@ public class FovEvents {
     }
 
     public static boolean hasSmartLineOfSight(Mob looker, Entity target) {
+        boolean enableOptimized = true;
+        try {
+            enableOptimized = SoundAttractConfig.COMMON.enableOptimizedLos.get();
+        } catch (Throwable ignored) {
+        }
+        if (enableOptimized) {
+            return OptimizedLOS.canSee(looker, target);
+        }
+        return hasSmartLineOfSightLegacy(looker, target);
+    }
+
+    private static boolean hasSmartLineOfSightLegacy(Mob looker, Entity target) {
         Level level = looker.level();
 
         boolean useCache = false;
@@ -353,38 +363,15 @@ public class FovEvents {
         return (int) Math.round(v * 4.0);
     }
 
+    public static boolean isNonBlockingVisionForLos(BlockState state, Level level, BlockPos pos) {
+        return isNonBlockingVision(state, level, pos);
+    }
+
     private static boolean raycastIgnoringNonBlockingUncached(Level level, Vec3 start, Vec3 end, Mob looker) {
-        final int maxPassThroughs = 24;
-        Vec3 currStart = start;
-        Vec3 dir = end.subtract(start);
-        double totalDist = dir.length();
-        if (totalDist < 1.0e-4) return true;
-        dir = dir.normalize();
-
-        for (int i = 0; i < maxPassThroughs; i++) {
-            ClipContext ctx = new ClipContext(
-                    currStart,
-                    end,
-                    ClipContext.Block.COLLIDER,
-                    ClipContext.Fluid.NONE,
-                    looker
-            );
-            BlockHitResult hit = level.clip(ctx);
-            if (hit.getType() == HitResult.Type.MISS) {
-                return true;
-            }
-
-            BlockPos pos = hit.getBlockPos();
-            BlockState state = level.getBlockState(pos);
-            if (isNonBlockingVision(state, level, pos)) {
-                Vec3 step = dir.scale(0.6);
-                currStart = hit.getLocation().add(step);
-                continue;
-            }
+        if (level == null || start == null || end == null) {
             return false;
         }
-
-        return false;
+        return OptimizedLOS.hasLineOfSight(level, start, end, looker);
     }
 
     private static boolean isNonBlockingVision(BlockState state, Level level, BlockPos pos) {

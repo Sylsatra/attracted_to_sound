@@ -30,7 +30,7 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
         try {
             Class<?> api = Class.forName("org.admany.quantified.api.QuantifiedAPI");
             this.register = api.getMethod("register", String.class);
-            this.submit = api.getMethod("submit", Class.forName("org.admany.quantified.api.QuantifiedTask$Builder"));
+            this.submit = api.getMethod("submit", Class.forName("org.admany.quantified.api.model.QuantifiedTask$Builder"));
             this.register.invoke(null, SoundAttractMod.MOD_ID);
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize QuantifiedWorkScheduler", e);
@@ -106,9 +106,9 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
 
     private CompletableFuture<?> submitFuture(String taskName, java.util.function.Supplier<?> work, Duration timeout) {
         try {
-            Class<?> taskBuilderClass = Class.forName("org.admany.quantified.api.QuantifiedTask$Builder");
-            Object builder = taskBuilderClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class)
-                .invoke(null, SoundAttractMod.MOD_ID, taskName, work);
+            Class<?> taskClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask");
+            Object builder = taskClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class)
+                    .invoke(null, SoundAttractMod.MOD_ID, taskName, work);
             
             builder.getClass().getMethod("priorityBackground").invoke(builder);
             builder.getClass().getMethod("threadSafe", boolean.class).invoke(builder, true);
