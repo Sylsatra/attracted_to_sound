@@ -148,47 +148,54 @@ public final class WorkerComputations {
         List<WorkerScheduler.SoundScoreResult> out = new ArrayList<>(batch.size());
         for (WorkerScheduler.SoundScoreRequest req : batch) {
             if (System.currentTimeMillis() > deadlineMs) break;
-            if (req == null || req.candidates == null || req.candidates.isEmpty()) {
-                out.add(new WorkerScheduler.SoundScoreResult(req == null ? null : req.mobUuid, null, 0.0));
-                continue;
-            }
+            out.add(computeSoundScore(req, deadlineMs));
+        }
+        return out;
+    }
 
-            Double currentScore = null;
-            if (req.currentTargetSoundId != null) {
-                for (WorkerScheduler.SoundCandidate c : req.candidates) {
-                    if (req.currentTargetSoundId.equals(c.soundId)) {
-                        currentScore = scoreCandidate(req, c);
-                        break;
-                    }
-                }
-            }
+    public static WorkerScheduler.SoundScoreResult computeSoundScore(WorkerScheduler.SoundScoreRequest req, long deadlineMs) {
+        if (req == null) {
+            return new WorkerScheduler.SoundScoreResult(null, null, 0.0);
+        }
+        if (req.candidates == null || req.candidates.isEmpty()) {
+            return new WorkerScheduler.SoundScoreResult(req.mobUuid, null, 0.0);
+        }
 
-            String bestId = null;
-            double bestScore = Double.NEGATIVE_INFINITY;
-            double bestDist = Double.MAX_VALUE;
+        Double currentScore = null;
+        if (req.currentTargetSoundId != null) {
             for (WorkerScheduler.SoundCandidate c : req.candidates) {
-                double dx = req.mobX - c.x;
-                double dz = req.mobZ - c.z;
-                double dist = Math.hypot(dx, dz);
-                double s = scoreCandidate(req, c);
-                if (s > bestScore || (Math.abs(s - bestScore) < 0.001 && dist < bestDist)) {
-                    bestScore = s;
-                    bestId = c.soundId;
-                    bestDist = dist;
+                if (req.currentTargetSoundId.equals(c.soundId)) {
+                    currentScore = scoreCandidate(req, c);
+                    break;
                 }
                 if (System.currentTimeMillis() > deadlineMs) break;
             }
-
-            if (currentScore != null && req.currentTargetSoundId != null && bestId != null && !req.currentTargetSoundId.equals(bestId)) {
-                if (bestScore < currentScore * req.switchRatio) {
-                    bestId = req.currentTargetSoundId;
-                    bestScore = currentScore;
-                }
-            }
-
-            out.add(new WorkerScheduler.SoundScoreResult(req.mobUuid, bestId, bestScore == Double.NEGATIVE_INFINITY ? 0.0 : bestScore));
         }
-        return out;
+
+        String bestId = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        double bestDist = Double.MAX_VALUE;
+        for (WorkerScheduler.SoundCandidate c : req.candidates) {
+            double dx = req.mobX - c.x;
+            double dz = req.mobZ - c.z;
+            double dist = Math.hypot(dx, dz);
+            double s = scoreCandidate(req, c);
+            if (s > bestScore || (Math.abs(s - bestScore) < 0.001 && dist < bestDist)) {
+                bestScore = s;
+                bestId = c.soundId;
+                bestDist = dist;
+            }
+            if (System.currentTimeMillis() > deadlineMs) break;
+        }
+
+        if (currentScore != null && req.currentTargetSoundId != null && bestId != null && !req.currentTargetSoundId.equals(bestId)) {
+            if (bestScore < currentScore * req.switchRatio) {
+                bestId = req.currentTargetSoundId;
+                bestScore = currentScore;
+            }
+        }
+
+        return new WorkerScheduler.SoundScoreResult(req.mobUuid, bestId, bestScore == Double.NEGATIVE_INFINITY ? 0.0 : bestScore);
     }
 
     private static double scoreCandidate(WorkerScheduler.SoundScoreRequest req, WorkerScheduler.SoundCandidate c) {

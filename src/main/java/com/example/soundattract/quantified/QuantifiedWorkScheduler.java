@@ -16,6 +16,9 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler {
     private final BlockingQueue<WorkerScheduler.GroupComputeResult> groupResults = new LinkedBlockingQueue<>();
@@ -65,11 +68,17 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
         long deadlineMs = computeDeadlineMs();
         Duration timeout = computeTimeout();
 
-        CompletableFuture<?> future = submitFuture(
-            "soundattract_sound_score",
-            () -> WorkerComputations.computeSoundScores(batch, deadlineMs),
-            timeout
-        );
+        CompletableFuture<?> future;
+        CompletableFuture<List<WorkerScheduler.SoundScoreResult>> parallel = ParallelComputeBridge.trySubmitSoundScores(batch, deadlineMs, timeout);
+        if (parallel != null) {
+            future = parallel;
+        } else {
+            future = submitFuture(
+                "soundattract_sound_score",
+                () -> WorkerComputations.computeSoundScores(batch, deadlineMs),
+                timeout
+            );
+        }
         return future.handle((result, throwable) -> {
             if (throwable != null) {
                 return this.fallback.submitSoundScore(batch);
@@ -146,5 +155,108 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
             }
         } catch (Throwable ignored) {}
         return null;
+    }
+
+    private static final class ParallelComputeBridge {
+        private static final Object INIT_LOCK = new Object();
+        private static boolean initialized = false;
+
+        private static Method parallelBuilderFactory;
+        private static Method slicesMethod;
+        private static Method sliceExecutorMethod;
+        private static Method maxParallelismMethod;
+        private static Method failurePolicyMethod;
+        private static Object failurePolicyBestEffort;
+        private static Method submitParallelMethod;
+
+        private static boolean ensureInit() {
+            if (initialized) {
+                return submitParallelMethod != null;
+            }
+            synchronized (INIT_LOCK) {
+                if (initialized) {
+                    return submitParallelMethod != null;
+                }
+                try {
+                    Class<?> parallelComputeClass = Class.forName("org.admany.quantified.api.parallel.ParallelCompute");
+                    parallelBuilderFactory = parallelComputeClass.getMethod("builder", String.class, String.class, long.class);
+
+                    Class<?> builderClass = Class.forName("org.admany.quantified.api.parallel.ParallelCompute$Builder");
+                    slicesMethod = builderClass.getMethod("slices", Supplier.class);
+                    sliceExecutorMethod = builderClass.getMethod("sliceExecutor", Function.class);
+                    maxParallelismMethod = builderClass.getMethod("maxParallelism", int.class);
+
+                    try {
+                        Class<?> failurePolicyClass = Class.forName("org.admany.quantified.core.common.parallel.policy.ParallelFailurePolicy");
+                        failurePolicyBestEffort = Enum.valueOf((Class<? extends Enum>) failurePolicyClass.asSubclass(Enum.class), "BEST_EFFORT");
+                        failurePolicyMethod = builderClass.getMethod("failurePolicy", failurePolicyClass);
+                    } catch (Throwable ignored) {
+                        failurePolicyBestEffort = null;
+                        failurePolicyMethod = null;
+                    }
+
+                    submitParallelMethod = builderClass.getMethod("submit");
+                } catch (Throwable t) {
+                    submitParallelMethod = null;
+                }
+                initialized = true;
+                return submitParallelMethod != null;
+            }
+        }
+
+        private static CompletableFuture<List<WorkerScheduler.SoundScoreResult>> trySubmitSoundScores(
+            List<WorkerScheduler.SoundScoreRequest> batch,
+            long deadlineMs,
+            Duration timeout
+        ) {
+            if (batch == null || batch.isEmpty()) {
+                return CompletableFuture.completedFuture(java.util.Collections.emptyList());
+            }
+            if (!ensureInit()) {
+                return null;
+            }
+            try {
+                long taskKey = System.nanoTime();
+                Object builder = parallelBuilderFactory.invoke(null, SoundAttractMod.MOD_ID, "soundattract_sound_score_parallel", taskKey);
+
+                Supplier<List<WorkerScheduler.SoundScoreRequest>> supplier = () -> batch;
+                slicesMethod.invoke(builder, supplier);
+
+                Function<WorkerScheduler.SoundScoreRequest, WorkerScheduler.SoundScoreResult> scorer = req -> {
+                    try {
+                        return WorkerComputations.computeSoundScore(req, deadlineMs);
+                    } catch (Throwable t) {
+                        return new WorkerScheduler.SoundScoreResult(req == null ? null : req.mobUuid, null, 0.0);
+                    }
+                };
+                sliceExecutorMethod.invoke(builder, scorer);
+
+                int maxParallelism = 0;
+                try {
+                    maxParallelism = SoundAttractConfig.COMMON.workerThreads.get();
+                } catch (Throwable ignored) {
+                }
+                if (maxParallelism > 0) {
+                    maxParallelismMethod.invoke(builder, maxParallelism);
+                }
+
+                if (failurePolicyMethod != null && failurePolicyBestEffort != null) {
+                    failurePolicyMethod.invoke(builder, failurePolicyBestEffort);
+                }
+
+                @SuppressWarnings("unchecked")
+                CompletableFuture<List<WorkerScheduler.SoundScoreResult>> future = (CompletableFuture<List<WorkerScheduler.SoundScoreResult>>) submitParallelMethod.invoke(builder);
+                if (future == null) {
+                    return null;
+                }
+                if (timeout != null) {
+                    long ms = Math.max(1L, timeout.toMillis());
+                    return future.orTimeout(ms, TimeUnit.MILLISECONDS);
+                }
+                return future;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
     }
 }
