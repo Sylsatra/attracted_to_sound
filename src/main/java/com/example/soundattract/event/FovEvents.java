@@ -320,7 +320,7 @@ public class FovEvents {
                     .append(q(end.x)).append(',').append(q(end.y)).append(',').append(q(end.z))
                     .toString();
 
-            Boolean cached = QuantifiedCacheCompat.getCachedDisk(
+            Boolean cached = QuantifiedCacheCompat.getCached(
                 "soundattract_los_raycast",
                 key,
                 () -> Boolean.valueOf(raycastIgnoringNonBlockingUncached(level, start, end, looker)),

@@ -79,7 +79,7 @@ Also camouflage is a thing.
 [[dependencies.soundattract]]
     modId="quantified"
     mandatory=false
-    versionRange="[1.0.0,)"
+    versionRange="[1.0.5,)"
     ordering="AFTER"
     side="BOTH"
 
