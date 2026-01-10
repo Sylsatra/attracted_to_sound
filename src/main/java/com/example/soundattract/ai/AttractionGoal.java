@@ -472,5 +472,9 @@ public class AttractionGoal extends Goal {
     public boolean isPursuingSound() {
         return isPursuingSound;
     }
+
+    public BlockPos getTargetSoundPos() {
+        return this.targetSoundPos;
+    }
 }
 

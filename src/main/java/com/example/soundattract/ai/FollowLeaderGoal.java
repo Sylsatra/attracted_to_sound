@@ -348,4 +348,7 @@ public class FollowLeaderGoal extends Goal {
         isSpreadingOut = false;
         lastAnchorPos = null;
     }
+    public BlockPos getTargetSoundPos() {
+        return this.lastAnchorPos;
+    }
 }
