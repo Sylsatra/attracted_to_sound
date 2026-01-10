@@ -369,4 +369,7 @@ public class LeaderAttractionGoal extends Goal {
             }
         }
     }
+    public BlockPos getTargetSoundPos() {
+        return this.targetSoundPos;
+    }
 }

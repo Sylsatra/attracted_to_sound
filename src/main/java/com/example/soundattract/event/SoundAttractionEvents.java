@@ -23,6 +23,7 @@ import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 import com.example.soundattract.worker.WorkSchedulerManager;
 import com.example.soundattract.integration.smartbrainlib.SmartBrainLibCompat;
 import com.example.soundattract.tracking.SoundTracker;
+import com.example.soundattract.integration.RelentlessUndeadIntegration;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.Registries;
@@ -459,6 +460,13 @@ public class SoundAttractionEvents {
                     SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Failed to apply PickUpAndThrowToSoundGoal tag check for mob {}: {}", EntityType.getKey(mob.getType()), e.getMessage());
                 }
             }
+        }
+        
+        if (RelentlessUndeadIntegration.isMobEligibleForClimbing(mob)) {
+             scheduleAddGoal(mob, 0, new com.example.soundattract.ai.SoundClimbGoal(mob));
+             if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                  SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Scheduled SoundClimbGoal for mob {}", mob.getName().getString());
+             }
         }
 
         if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {

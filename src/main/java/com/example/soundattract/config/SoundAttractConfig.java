@@ -407,6 +407,13 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.BooleanValue enableLivingEntityLosOverride;
 
+        // Relentless Undead Integration
+        public final ForgeConfigSpec.BooleanValue enableRelentlessClimbing;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> relentlessEligibleMobs;
+        public final ForgeConfigSpec.BooleanValue zombiesIgnoreHeight;
+        public final ForgeConfigSpec.BooleanValue zombiesCanStack;
+        public final ForgeConfigSpec.DoubleValue zombieFallDamageMultiplier;
+        
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
             configSchemaVersion = builder.defineInRange("configSchemaVersion", 10, 0, Integer.MAX_VALUE);
@@ -557,6 +564,29 @@ public class SoundAttractConfig {
             losBatchQueueMaxSize = builder.defineInRange("losBatchQueueMaxSize", 4096, 64, 1000000);
 
             enableLivingEntityLosOverride = builder.define("enableLivingEntityLosOverride", true);
+
+            builder.pop();
+
+            builder.push("Relentless Undead Integration");
+            
+            enableRelentlessClimbing = builder.comment("Enable or disable the Relentless Undead climbing mechanics integration. Default: false.")
+                    .define("enableRelentlessClimbing", false);
+
+            relentlessEligibleMobs = builder.comment("List of mobs eligible for the climbing goal if Relentless Undead is NOT installed.",
+                    "If Relentless Undead is installed, its HORDE_TAG (forge:hordes) is used instead.")
+                    .defineList("relentlessEligibleMobs", Arrays.asList("minecraft:zombie", "minecraft:husk", "minecraft:drowned"), obj -> obj instanceof String);
+
+            zombiesIgnoreHeight = builder.comment("If true, zombies will ignore height differences when stacking/climbing.",
+                    "Used if Relentless Undead is NOT installed or if using Sound Attract's config.")
+                    .define("zombiesIgnoreHeight", false);
+            
+            zombiesCanStack = builder.comment("If true, zombies can stack on top of each other.",
+                    "Used if Relentless Undead is NOT installed or if using Sound Attract's config.")
+                    .define("zombiesCanStack", true);
+            
+            zombieFallDamageMultiplier = builder.comment("Multiplier for fall damage when using climbing mechanics.",
+                    "Used if Relentless Undead is NOT installed or if using Sound Attract's config.")
+                    .defineInRange("zombieFallDamageMultiplier", 0.5, 0.0, 10.0);
 
             builder.pop();
 

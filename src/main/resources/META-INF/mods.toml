@@ -96,3 +96,10 @@ Also camouflage is a thing.
     versionRange="[1.0.2,)"
     ordering="NONE"
     side="BOTH"
+    
+[[dependencies.soundattract]]
+    modId="relentlessundead"
+    mandatory=false
+    versionRange="[0.0.2-ALPHA,)"
+    ordering="NONE"
+    side="BOTH"

@@ -113,6 +113,7 @@ dependencies {
     compileOnly "su.plo.voice.api:client:2.1.5"
     compileOnly "maven.modrinth:smartbrainlib:1.15"
     compileOnly files('libs/quantified-1.0.5.jar')
+    compileOnly files('libs/relentlessundead-1.20.1-0.0.2-ALPHA.jar')
 }
 
 tasks.named('processResources', ProcessResources).configure {
