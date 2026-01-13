@@ -276,6 +276,17 @@ public class AttractionGoal extends Goal {
             scanCooldownCounter--;
         }
 
+        double arrivalDist = SoundAttractConfig.COMMON.arrivalDistance.get();
+        if (mob.position().distanceToSqr(Vec3.atCenterOf(targetSoundPos)) < arrivalDist * arrivalDist) {
+            this.mob.getLookControl().setLookAt(
+                    targetSoundPos.getX() + 0.5,
+                    targetSoundPos.getY() + 0.5,
+                    targetSoundPos.getZ() + 0.5,
+                    (float)this.mob.getMaxHeadYRot(),
+                    (float)this.mob.getMaxHeadXRot()
+            );
+        }
+
 
 
         if (lastPos != null && mob.position().distanceToSqr(Vec3.atCenterOf(lastPos)) < 1.0) {

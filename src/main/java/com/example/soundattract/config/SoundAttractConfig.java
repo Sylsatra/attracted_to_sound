@@ -82,7 +82,52 @@ public class SoundAttractConfig {
     public static List<com.example.soundattract.config.PlayerProfile> DP_PLAYER_PROFILES_CACHE = Collections.emptyList();
     public static final Map<ResourceLocation, Integer> customArmorColors = new ConcurrentHashMap<>();
     public static final Map<ResourceLocation, Integer> DP_CUSTOM_ARMOR_COLORS = new ConcurrentHashMap<>();
+
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = ConcurrentHashMap.newKeySet();
+    
+    public static boolean PLAYER_ACTION_SOUNDS_ENABLED_CACHE = true;
+    public static final Map<String, Integer> PLAYER_ACTION_RANGES_CACHE = new HashMap<>();
+    public static final Map<String, Double> PLAYER_ACTION_WEIGHTS_CACHE = new HashMap<>();
+
+
+
+    public static void parseAndCachePlayerActionConfig() {
+        if (COMMON == null) return;
+        PLAYER_ACTION_SOUNDS_ENABLED_CACHE = COMMON.enablePlayerActionSounds.get();
+        PLAYER_ACTION_RANGES_CACHE.clear();
+        PLAYER_ACTION_WEIGHTS_CACHE.clear();
+        
+        List<? extends String> ranges = COMMON.playerActionRanges.get();
+        if (ranges != null) {
+            for (String entry : ranges) {
+                String[] parts = entry.split(";");
+                if (parts.length == 2) {
+                    try {
+                        PLAYER_ACTION_RANGES_CACHE.put(parts[0].trim(), Integer.parseInt(parts[1].trim()));
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+        List<? extends String> weights = COMMON.playerActionWeights.get();
+        if (weights != null) {
+            for (String entry : weights) {
+                String[] parts = entry.split(";");
+                if (parts.length == 2) {
+                    try {
+                        PLAYER_ACTION_WEIGHTS_CACHE.put(parts[0].trim(), Double.parseDouble(parts[1].trim()));
+                    } catch (Exception e) {}
+                }
+            }
+        }
+        
+         // Ensure virtual sound IDs are in the whitelist
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.crawling"));
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.sneaking"));
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.walking"));
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.sprinting"));
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.sprint_jumping"));
+    }
 
     public static void parseAndCacheCustomArmorColors() {
         customArmorColors.clear();
@@ -140,7 +185,10 @@ public class SoundAttractConfig {
 
         boolean enableDataDriven = COMMON != null && COMMON.enableDataDriven != null && COMMON.enableDataDriven.get();
         String priority = COMMON != null && COMMON.datapackPriority != null ? COMMON.datapackPriority.get() : "datapack_over_config";
+
         boolean datapackOverConfig = "datapack_over_config".equalsIgnoreCase(priority);
+        
+
 
         if (enableDataDriven && !DP_CUSTOM_ARMOR_COLORS.isEmpty()) {
             if (datapackOverConfig) {
@@ -198,6 +246,11 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue debugLogging;
         public final ForgeConfigSpec.BooleanValue enableDataDriven;
         public final ForgeConfigSpec.ConfigValue<String> datapackPriority;
+        public final ForgeConfigSpec.BooleanValue enablePlayerActionSounds;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerActionRanges;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerActionWeights;
+        public final ForgeConfigSpec.DoubleValue playerActionCheckRadius;
+
         public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior;
         public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks;
@@ -448,6 +501,35 @@ public class SoundAttractConfig {
             soundNoveltyTimeTicks = builder.comment("How long (in ticks) a sound is considered 'new' for the novelty bonus to apply.",
                     "20 ticks = 1 second.")
                     .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
+
+            builder.pop();
+
+            builder.comment("Player Action Sounds").push("player_action_sounds");
+            enablePlayerActionSounds = builder
+                    .comment("Enable generation of virtual sounds based on player actions (walking, sprinting, sneaking, etc.).",
+                            "This runs even if Fear of Sound is not installed. If Fear of Sound is installed, this is effectively ignored to save performance.")
+                    .define("enablePlayerActionSounds", true);
+
+            playerActionRanges = builder.comment("Ranges for player actions. Format: 'ACTION_NAME;range'. Actions: CRAWLING, SNEAKING, WALKING, SPRINTING, SPRINT_JUMPING.")
+                    .defineList("playerActionRanges", Arrays.asList(
+                            "CRAWLING;3",
+                            "SNEAKING;5",
+                            "WALKING;10",
+                            "SPRINTING;16",
+                            "SPRINT_JUMPING;20"
+                    ), obj -> obj instanceof String);
+
+            playerActionWeights = builder.comment("Weights for player actions. Format: 'ACTION_NAME;weight'.")
+                    .defineList("playerActionWeights", Arrays.asList(
+                            "CRAWLING;1.0",
+                            "SNEAKING;1.0",
+                            "WALKING;1.0",
+                            "SPRINTING;1.0",
+                            "SPRINT_JUMPING;1.0"
+                    ), obj -> obj instanceof String);
+            
+            playerActionCheckRadius = builder.comment("Radius for player action sounds.")
+                    .defineInRange("playerActionCheckRadius", 24.0, 0.0, Double.MAX_VALUE);
 
             builder.pop();
 
@@ -796,6 +878,11 @@ public class SoundAttractConfig {
                             "tacz:gun",
                             "soundattract:voice_chat",
                             "soundattract:virtual",
+                            "soundattract:player_action.crawling",
+                            "soundattract:player_action.sneaking",
+                            "soundattract:player_action.walking",
+                            "soundattract:player_action.sprinting",
+                            "soundattract:player_action.sprint_jumping",
                             "musketmod:musket_fire",
                             "musketmod:blunderbuss_fire",
                             "musketmod:pistol_fire",
@@ -2618,7 +2705,6 @@ public class SoundAttractConfig {
 
         if (COMMON.configSchemaVersion.get() < 6) {
             SoundAttractMod.LOGGER.info("Migrating config from version 5 to 6 (adding Enhanced AI integration keys).");
-            // No values to move; new keys will be created with defaults on save.
             COMMON.configSchemaVersion.set(6);
             SoundAttractMod.LOGGER.info("Config migration complete. New schema version: 6. Saving config...");
             COMMON_SPEC.save();
@@ -3065,6 +3151,8 @@ public class SoundAttractConfig {
             SPECIAL_PLAYER_PROFILES_CACHE = tmpPlayerProfiles;
         }
 
+        parseAndCachePlayerActionConfig();
+
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
                     "SoundAttractConfig: Baked config. {} special mob profiles loaded. {} special player profiles loaded. {} sound defaults. {} whitelist.",
@@ -3086,8 +3174,7 @@ public class SoundAttractConfig {
         }
 
         if (QuantifiedCacheCompat.isUsable()) {
-            // Stagger cache checks by mob UUID to spread load when processing many mobs
-            long staggerTicks = Math.abs(mob.getUUID().getLeastSignificantBits() % 20); // 0-19 tick spread
+            long staggerTicks = Math.abs(mob.getUUID().getLeastSignificantBits() % 20); 
             String key = new StringBuilder(96)
                 .append(mob.getUUID().toString()).append('|')
                 .append(SPECIAL_MOB_PROFILES_CACHE.size())
@@ -3096,7 +3183,7 @@ public class SoundAttractConfig {
                 "soundattract_mob_profile_match",
                 key,
                 () -> getMatchingProfileUncached(mob),
-                1200L + staggerTicks, // 1 minute base + staggered offset
+                1200L + staggerTicks,
                 8192L
             );
         }
