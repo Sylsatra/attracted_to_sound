@@ -48,9 +48,13 @@ public class SoundClimbGoal extends Goal {
 
 
     private boolean isStandingOnHorde() {
+        int loadFactor = Math.max(1, com.example.soundattract.runtime.DynamicScanCooldownManager.currentScanCooldownTicks / 5);
+        int interval = 5 * loadFactor;
+        
+        long ttl = interval;
+
         Level world = this.mob.level();
         Vec3 selfPos = this.mob.position();
-        // Tightened box to 0.6D depth and reduced Y-inflation to decrease the 'floating' gap.
         AABB searchBoxUnder = (new AABB(selfPos.x, selfPos.y - 0.6D, selfPos.z, selfPos.x, selfPos.y - 0.2D, selfPos.z)).inflate(0.4D, 0.05D, 0.4D);
         
         List<Entity> mobsUnder;
@@ -59,7 +63,7 @@ public class SoundClimbGoal extends Goal {
                "SoundClimbGoal",
                "standing_on_" + this.mob.getId(),
                () -> world.getEntitiesOfClass(Entity.class, searchBoxUnder, this::isMobEligible),
-               1, 
+               ttl, 
                10
            );
         } else {
@@ -81,7 +85,6 @@ public class SoundClimbGoal extends Goal {
             } else {
                 BlockPos endPos = path.getTarget();
                 double pathEndToTargetDist = endPos != null ? endPos.distSqr(targetPos) : Double.MAX_VALUE;
-                // Reduced threshold to 1.0D to be more sensitive to clumping at walls
                 return pathEndToTargetDist > 1.0D; 
             }
         }
@@ -118,7 +121,6 @@ public class SoundClimbGoal extends Goal {
             return false;
         }
 
-        // If we are ALREADY on a horde, just continue if there is any sound target above us
         if (this.isStandingOnHorde()) {
             this.targetSoundPos = foundTarget;
             this.lastKnownTargetPos = foundTarget;
@@ -134,7 +136,6 @@ public class SoundClimbGoal extends Goal {
             if (!this.isStuckHorizontally(foundTarget) && !this.mob.horizontalCollision) {
                 return false;
             }
-            // non-elevated case usually just ignores height
             this.nextPathCheckTick = currentTick + 15 + this.mob.getRandom().nextInt(15);
             return false;
         } else {
@@ -215,16 +216,10 @@ public class SoundClimbGoal extends Goal {
     public void tick() {
         if (this.targetSoundPos == null) return;
 
-        // Check for better sound targets periodically to avoid getting stuck on stale sounds
         if (this.checkBestSoundTicker++ > 10) {
             this.checkBestSoundTicker = 0;
-            // Only check if we are NOT in the middle of a critical climb (e.g. standing on horde)
-            // or maybe we SHOULD check even then?
-            // If we are climbind, we probably want to finish climbing?
-            // User complained they ignore new sounds. So we should probably check.
             com.example.soundattract.tracking.SoundTracker.SoundRecord best = com.example.soundattract.tracking.SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
             if (best != null && !best.pos.equals(this.targetSoundPos)) {
-                 // Found a different (and presumably better) sound. Abort to let AttractionGoal re-assess.
                  if (SoundAttractConfig.COMMON.debugLogging.get()) {
                      com.example.soundattract.SoundAttractMod.LOGGER.info("SoundClimbGoal aborting: found better sound at {}", best.pos);
                  }
@@ -263,7 +258,6 @@ public class SoundClimbGoal extends Goal {
               this.mob.addEffect(new MobEffectInstance(MobEffects.JUMP, 2, 0, false, false));
            }
         } else {
-           // If we are touching a wall and not already on top of someone, try to jump if there are friends nearby
            if (this.mob.horizontalCollision && !this.mob.isInWater()) {
                Level world = this.mob.level();
                Vec3 selfPos = this.mob.position();
@@ -290,7 +284,6 @@ public class SoundClimbGoal extends Goal {
            if (horizontalDistanceSq > HORIZONTAL_STOP_DISTANCE_SQ) {
                this.mob.getNavigation().moveTo(climbTargetPos.x, climbTargetPos.y, climbTargetPos.z, SoundAttractConfig.COMMON.mobMoveSpeed.get());
            } else {
-               // Emulate RU's random stop behavior to help mobs bunch up at the wall base
                if (this.mob.getRandom().nextFloat() < 0.2F) {
                    this.mob.getNavigation().stop();
                }
