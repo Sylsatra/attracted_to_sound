@@ -20,10 +20,12 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.registries.ForgeRegistries;
 
 public class SoundAttractConfig {
 
@@ -84,6 +86,8 @@ public class SoundAttractConfig {
     public static final Map<ResourceLocation, Integer> DP_CUSTOM_ARMOR_COLORS = new ConcurrentHashMap<>();
 
     public static final Set<String> ATTRACTED_ENTITY_TYPES_CACHE = ConcurrentHashMap.newKeySet();
+    public static final Set<ResourceLocation> STEALTH_BYPASS_ENTITY_TYPES_CACHE = ConcurrentHashMap.newKeySet();
+    public static final Set<String> STEALTH_BYPASS_MOD_NAMESPACES_CACHE = ConcurrentHashMap.newKeySet();
     
     public static boolean PLAYER_ACTION_SOUNDS_ENABLED_CACHE = true;
     public static final Map<String, Integer> PLAYER_ACTION_RANGES_CACHE = new HashMap<>();
@@ -241,6 +245,21 @@ public class SoundAttractConfig {
         }
     }
 
+    public static boolean isStealthBypassed(Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        ResourceLocation typeId = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());
+        if (typeId == null) {
+            return false;
+        }
+        if (STEALTH_BYPASS_ENTITY_TYPES_CACHE.contains(typeId)) {
+            return true;
+        }
+        String namespace = typeId.getNamespace();
+        return namespace != null && STEALTH_BYPASS_MOD_NAMESPACES_CACHE.contains(namespace.toLowerCase(Locale.ROOT));
+    }
+
     public static class Common {
 
         public final ForgeConfigSpec.BooleanValue debugLogging;
@@ -306,6 +325,8 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue triggerQuantifiedCacheCleanupOnMemoryPressure;
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> stealthBypassMobIds;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> stealthBypassModNamespaces;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialMobProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> specialPlayerProfilesRaw;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> mobBlacklist;
@@ -469,7 +490,7 @@ public class SoundAttractConfig {
         
         public Common(ForgeConfigSpec.Builder builder) {
             builder.comment("Internal schema version for config migrations. Do not change.").push("internal");
-            configSchemaVersion = builder.defineInRange("configSchemaVersion", 10, 0, Integer.MAX_VALUE);
+            configSchemaVersion = builder.defineInRange("configSchemaVersion", 11, 0, Integer.MAX_VALUE);
             builder.pop();
 
             builder.comment("Sound Attract Mod Configuration").push("general");
@@ -793,6 +814,16 @@ public class SoundAttractConfig {
                             "sculkhorde:sculk_ghast", "sculkhorde:sculk_enderman", "sculkhorde:sculk_creeper", "sculkhorde:sculk_broodling", "sculkhorde:sculk_brood_hatcher", "sculkhorde:sculk_bee_infector",
                             "sculkhorde:sculk_bee_harvester", "sculkhorde:golem_of_wrath"
                     ), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
+
+            stealthBypassMobIds = builder.comment(
+                    "List of mob IDs that should bypass Sound Attract's stealth/FOV overrides entirely and fall back to their native targeting.",
+                    "Format: ['modid:entity_id']"
+            ).defineList("stealthBypassMobIds", Collections.emptyList(), obj -> obj instanceof String && ResourceLocation.tryParse((String) obj) != null);
+
+            stealthBypassModNamespaces = builder.comment(
+                    "List of mod IDs whose mobs should bypass Sound Attract's stealth/FOV overrides. Example: ['minecraft', 'mymobpack'].",
+                    "Entries are compared case-insensitively."
+            ).defineList("stealthBypassModNamespaces", Collections.emptyList(), obj -> obj instanceof String && !((String) obj).isBlank());
 
             mobBlacklist = builder.comment("A list of entity resource IDs to PREVENT from receiving the attraction AI goals.",
                     "This acts as a blacklist. Mobs on this list will never be attracted to sounds, regardless of other settings.",
@@ -2729,6 +2760,10 @@ public class SoundAttractConfig {
             COMMON.configSchemaVersion.set(10);
             COMMON_SPEC.save();
         }
+        if (COMMON.configSchemaVersion.get() < 11) {
+            COMMON.configSchemaVersion.set(11);
+            COMMON_SPEC.save();
+        }
 
         SOUND_ID_WHITELIST_CACHE.clear();
         COMMON.soundIdWhitelist.get().forEach(idStr -> {
@@ -2742,6 +2777,28 @@ public class SoundAttractConfig {
         ATTRACTED_ENTITY_TYPES_CACHE.clear();
         if (COMMON.attractedEntities != null) {
             COMMON.attractedEntities.get().forEach(id -> ATTRACTED_ENTITY_TYPES_CACHE.add(id.toString()));
+        }
+
+        STEALTH_BYPASS_ENTITY_TYPES_CACHE.clear();
+        if (COMMON.stealthBypassMobIds != null) {
+            for (String entry : COMMON.stealthBypassMobIds.get()) {
+                if (entry == null || entry.trim().isEmpty()) continue;
+                ResourceLocation loc = ResourceLocation.tryParse(entry.trim());
+                if (loc != null) {
+                    STEALTH_BYPASS_ENTITY_TYPES_CACHE.add(loc);
+                } else {
+                    SoundAttractMod.LOGGER.warn("Invalid ResourceLocation in stealthBypassMobIds: {}", entry);
+                }
+            }
+        }
+        STEALTH_BYPASS_MOD_NAMESPACES_CACHE.clear();
+        if (COMMON.stealthBypassModNamespaces != null) {
+            for (String entry : COMMON.stealthBypassModNamespaces.get()) {
+                if (entry == null) continue;
+                String cleaned = entry.trim().toLowerCase(Locale.ROOT);
+                if (cleaned.isEmpty()) continue;
+                STEALTH_BYPASS_MOD_NAMESPACES_CACHE.add(cleaned);
+            }
         }
 
         SOUND_DEFAULT_ENTRIES_CACHE.clear();

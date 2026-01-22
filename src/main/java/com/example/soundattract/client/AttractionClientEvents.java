@@ -82,7 +82,7 @@ public class AttractionClientEvents {
              if (range == null || weight == null) return;
         }
 
-        ResourceLocation virtualSoundId = new ResourceLocation("soundattract", "player_action." + action.toLowerCase());
+        ResourceLocation virtualSoundId = ResourceLocation.fromNamespaceAndPath("soundattract", "player_action." + action.toLowerCase());
 
         SoundAttractNetwork.INSTANCE.sendToServer(new SoundMessage(
                 virtualSoundId,

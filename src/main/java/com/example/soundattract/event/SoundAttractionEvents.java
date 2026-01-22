@@ -23,7 +23,7 @@ import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
 import com.example.soundattract.worker.WorkSchedulerManager;
 import com.example.soundattract.integration.smartbrainlib.SmartBrainLibCompat;
 import com.example.soundattract.tracking.SoundTracker;
-import com.example.soundattract.integration.RelentlessUndeadIntegration;
+import com.example.soundattract.integration.relentlessundead.RelentlessUndeadIntegration;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.registries.Registries;

@@ -20,6 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.tags.TagKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import com.example.soundattract.integration.enhancedai.EnhancedAICompat;
 import com.example.soundattract.quantified.QuantifiedCacheCompat;
@@ -39,6 +40,11 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.phys.Vec3;
+import com.example.soundattract.los.OptimizedLOS; 
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingChangeTargetEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -618,6 +624,10 @@ public class StealthDetectionEvents {
             return;
         }
 
+        if (SoundAttractConfig.isStealthBypassed(mob)) {
+            return;
+        }
+
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return;
         }
@@ -737,6 +747,36 @@ public class StealthDetectionEvents {
                 );
             }
         }
+
+        if (!event.isCanceled()) {
+            LivingEntity target = event.getNewTarget();             
+            boolean friendlyFireCheckEnabled = true; 
+            try {
+            } catch (Throwable t) {}
+
+            if (friendlyFireCheckEnabled && newTarget != null) {
+                Vec3 start = mob.getEyePosition();
+                Vec3 targetEye = newTarget.getEyePosition();
+                Vec3 targetCenter = newTarget.position().add(0, newTarget.getBbHeight() * 0.5, 0);
+                Vec3 targetFeet = newTarget.position().add(0, Math.max(0.1, newTarget.getBbHeight() * 0.15), 0);
+
+                boolean ignoreEntityBlockers = hasActiveXrayOnTarget(mob, newTarget);
+                boolean eyeClear = isPathClear(mob, newTarget, start, targetEye, ignoreEntityBlockers);
+                boolean centerClear = isPathClear(mob, newTarget, start, targetCenter, ignoreEntityBlockers);
+                boolean feetClear = isPathClear(mob, newTarget, start, targetFeet, ignoreEntityBlockers);
+
+                if (!eyeClear && !centerClear && !feetClear) {
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info(
+                            "[LivingChangeTargetEvent] Mob {} targeting of {} CANCELED. All line of sights blocked by entities/walls.",
+                            mob.getName().getString(), newTarget.getName().getString()
+                        );
+                    }
+                    event.setCanceled(true);
+                    return;
+                }
+            }
+        }
     }
 
 
@@ -745,6 +785,10 @@ public class StealthDetectionEvents {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Called with null mob or player. Defaulting to detectable.");
             }
+            return true;
+        }
+
+        if (SoundAttractConfig.isStealthBypassed(mob)) {
             return true;
         }
 
@@ -832,6 +876,9 @@ public class StealthDetectionEvents {
 
     private static boolean canMobDetectPlayerNoEdgeSuppression(Mob mob, Player player) {
         if (mob == null || player == null) {
+            return true;
+        }
+        if (SoundAttractConfig.isStealthBypassed(mob)) {
             return true;
         }
         if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
@@ -1656,5 +1703,54 @@ public class StealthDetectionEvents {
                     String.format("%06X", finalAvgColor), numColors);
         }
         return Optional.of(finalAvgColor);
+    }
+
+    private static boolean isPathClear(Mob looker, LivingEntity target, Vec3 start, Vec3 end, boolean ignoreEntityBlockers) {
+        Level level = looker.level();
+        if (!OptimizedLOS.hasLineOfSight(level, start, end, looker)) {
+            return false; 
+        }
+        if (ignoreEntityBlockers) {
+            return true;
+        }
+        return !isViewBlockedByEntity(level, looker, target, start, end);
+    }
+
+    private static boolean hasActiveXrayOnTarget(Mob looker, LivingEntity target) {
+        if (looker == null || target == null || !SoundAttractConfig.COMMON.enableXrayTargeting.get()) {
+            return false;
+        }
+        double xrayRange = getEffectiveXrayRange(looker);
+        if (xrayRange <= 0d) {
+            return false;
+        }
+        double distSq = looker.distanceToSqr(target);
+        return distSq <= xrayRange * xrayRange;
+    }
+
+    private static boolean isViewBlockedByEntity(Level level, Mob looker, LivingEntity target, Vec3 start, Vec3 end) {
+        Vec3 viewVector = end.subtract(start);
+        double dist = viewVector.length();
+        if (dist < 1.0e-7) return false; 
+
+        AABB searchBox = looker.getBoundingBox().expandTowards(viewVector).inflate(1.0);
+        EntityHitResult hit = ProjectileUtil.getEntityHitResult(
+            looker, 
+            start, 
+            end, 
+            searchBox, 
+            (e) -> e instanceof LivingEntity && !e.isSpectator() && e != target && e.isPickable(), 
+            dist * dist
+        );
+        
+        if (hit != null) {
+             if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                 Entity blocker = hit.getEntity();
+                 SoundAttractMod.LOGGER.info("[FriendlyFire] Path from {} to {} blocked by {}", 
+                     looker.getName().getString(), target.getName().getString(), blocker.getName().getString());
+             }
+             return true;
+        }
+        return false;
     }
 }
