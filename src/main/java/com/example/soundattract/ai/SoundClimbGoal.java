@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.integration.RelentlessUndeadIntegration;
+import com.example.soundattract.integration.relentlessundead.RelentlessUndeadIntegration;
 import com.example.soundattract.quantified.QuantifiedCacheCompat;
 
 import net.minecraft.core.BlockPos;

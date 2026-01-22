@@ -131,6 +131,10 @@ public class FovEvents {
         if (!(event.getEntity() instanceof Mob looker)) {
             return;
         }
+
+        if (SoundAttractConfig.isStealthBypassed(looker)) {
+            return;
+        }
         Entity target = event.getLookingEntity();
         if (target == null) {
             return;
@@ -202,6 +206,10 @@ public class FovEvents {
     public static boolean isTargetInFov(Mob looker, Entity target, boolean checkObstructions) {
         if (CONFIG_FOV_CACHE == null) {
             buildCaches();
+        }
+
+        if (SoundAttractConfig.isStealthBypassed(looker)) {
+            return true;
         }
 
         ResourceLocation lookerId = EntityType.getKey(looker.getType());
