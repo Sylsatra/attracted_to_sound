@@ -49,14 +49,21 @@ public final class SmartBrainLibCompat {
             net.tslat.smartbrainlib.util.BrainUtils.addMemories(pathfinder.getBrain(),
                 net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET,
                 net.minecraft.world.entity.ai.memory.MemoryModuleType.LOOK_TARGET,
-                com.example.soundattract.integration.sbl.SoundAttractSensor.SOUND_ATTRACT_TARGET);
+                com.example.soundattract.integration.sbl.SoundAttractSensor.SOUND_ATTRACT_TARGET,
+                com.example.soundattract.integration.sbl.ScentSensor.SCENT_TARGET);
 
             addSensor(brain, new com.example.soundattract.integration.sbl.SoundAttractSensor<>());
+            addSensor(brain, new com.example.soundattract.integration.sbl.ScentSensor<>());
 
-            com.example.soundattract.integration.sbl.MoveToSoundBehaviour<net.minecraft.world.entity.PathfinderMob> behaviour = new com.example.soundattract.integration.sbl.MoveToSoundBehaviour<>();
-            behaviour.cooldownFor(e -> Math.max(1, DynamicScanCooldownManager.currentScanCooldownTicks));
 
-            addBehaviour(brain, 1, net.minecraft.world.entity.schedule.Activity.IDLE, behaviour);
+            com.example.soundattract.integration.sbl.MoveToSoundBehaviour<net.minecraft.world.entity.PathfinderMob> soundBehaviour = new com.example.soundattract.integration.sbl.MoveToSoundBehaviour<>();
+            soundBehaviour.cooldownFor(e -> Math.max(1, DynamicScanCooldownManager.currentScanCooldownTicks));
+            addBehaviour(brain, 3, net.minecraft.world.entity.schedule.Activity.IDLE, soundBehaviour);
+
+
+            com.example.soundattract.integration.sbl.MoveToScentBehaviour<net.minecraft.world.entity.PathfinderMob> scentBehaviour = new com.example.soundattract.integration.sbl.MoveToScentBehaviour<>();
+            addBehaviour(brain, 5, net.minecraft.world.entity.schedule.Activity.IDLE, scentBehaviour);
+
             return true;
         }
 

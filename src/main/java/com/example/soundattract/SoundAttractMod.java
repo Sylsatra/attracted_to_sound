@@ -11,6 +11,7 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import com.example.soundattract.config.ConfigHelper;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.config.separate.*;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.loot.ModLootModifiers;
 import com.example.soundattract.integration.voicechat.PlasmoVoiceBootstrap;
@@ -28,7 +29,6 @@ public class SoundAttractMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public SoundAttractMod() {
-        @SuppressWarnings("removal")
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
         
         ModEnchantments.register(modEventBus);
@@ -42,6 +42,39 @@ public class SoundAttractMod {
         MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());
         MinecraftForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
         MinecraftForge.EVENT_BUS.register(new VanillaIntegrationEvents());
+        MinecraftForge.EVENT_BUS.register(new com.example.soundattract.event.ScentEvents());
+
+        modEventBus.addListener(this::registerCapabilities);
+        modEventBus.addListener(this::onConfigLoading);
+        modEventBus.addListener(this::onConfigReloading);
+    }
+
+    private void registerCapabilities(net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent event) {
+        event.register(com.example.soundattract.scents.ScentManager.class);
+    }
+
+    public void onConfigLoading(final net.minecraftforge.fml.event.config.ModConfigEvent.Loading event) {
+        if (event.getConfig().getSpec() == GeneralConfig.SPEC || 
+            event.getConfig().getSpec() == StealthConfig.SPEC ||
+            event.getConfig().getSpec() == GunsConfig.SPEC ||
+            event.getConfig().getSpec() == VoiceConfig.SPEC ||
+            event.getConfig().getSpec() == IntegrationConfig.SPEC ||
+            event.getConfig().getSpec() == ScentConfig.SPEC ||
+            event.getConfig().getSpec() == PerformanceConfig.SPEC) {
+            SoundAttractConfig.bakeConfig();
+        }
+    }
+
+    public void onConfigReloading(final net.minecraftforge.fml.event.config.ModConfigEvent.Reloading event) {
+        if (event.getConfig().getSpec() == GeneralConfig.SPEC || 
+            event.getConfig().getSpec() == StealthConfig.SPEC ||
+            event.getConfig().getSpec() == GunsConfig.SPEC ||
+            event.getConfig().getSpec() == VoiceConfig.SPEC ||
+            event.getConfig().getSpec() == IntegrationConfig.SPEC ||
+            event.getConfig().getSpec() == ScentConfig.SPEC ||
+            event.getConfig().getSpec() == PerformanceConfig.SPEC) {
+            SoundAttractConfig.bakeConfig();
+        }
     }
 
     private void onCommonSetup(final FMLCommonSetupEvent event) {

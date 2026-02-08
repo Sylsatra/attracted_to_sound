@@ -5,8 +5,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import net.minecraft.util.StringRepresentable;
 
-public enum PlayerStance {
+public enum PlayerStance implements net.minecraft.util.StringRepresentable {
     STANDING("standing"),
     SNEAKING("sneaking"),
     CRAWLING("crawling");
@@ -21,6 +22,13 @@ public enum PlayerStance {
     }
 
     public String getConfigName() {
+        return configName;
+    }
+
+    public static final StringRepresentable.EnumCodec<PlayerStance> CODEC = StringRepresentable.fromEnum(PlayerStance::values);
+    
+    @Override
+    public String getSerializedName() {
         return configName;
     }
 

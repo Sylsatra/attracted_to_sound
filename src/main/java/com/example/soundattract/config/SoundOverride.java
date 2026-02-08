@@ -94,4 +94,9 @@ public class SoundOverride {
 
         return new SoundOverride(soundId, range, weight);
     }
+    public static final com.mojang.serialization.Codec<SoundOverride> CODEC = com.mojang.serialization.codecs.RecordCodecBuilder.create(instance -> instance.group(
+            net.minecraft.resources.ResourceLocation.CODEC.fieldOf("sound").forGetter(SoundOverride::getSoundId),
+            com.mojang.serialization.Codec.DOUBLE.optionalFieldOf("range", 32.0).forGetter(SoundOverride::getRange),
+            com.mojang.serialization.Codec.DOUBLE.optionalFieldOf("weight", 1.0).forGetter(SoundOverride::getWeight)
+    ).apply(instance, SoundOverride::new));
 }

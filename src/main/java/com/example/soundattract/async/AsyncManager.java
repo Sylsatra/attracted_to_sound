@@ -207,7 +207,6 @@ public final class AsyncManager {
             }
         }
 
-        @SuppressWarnings("unchecked")
         private static <T> CompletableFuture<T> trySubmit(String taskName, Supplier<T> supplier, Priority priority, boolean threadSafe) {
             if (!ensureInit()) {
                 return null;

@@ -179,7 +179,6 @@ public final class QuantifiedCacheCompat {
             }
         }
 
-        @SuppressWarnings("unchecked")
         private static <T> T invokeGetCached(String cacheName, String key, Supplier<T> loader, Duration ttl, long maxSize, boolean useDisk) {
             if (!ensureInit()) {
                 return null;

@@ -797,7 +797,6 @@ public class SoundTracker {
         return findNearestSound(mob, level, mobPos, mobEyePos, null);
     }
 
-    @SuppressWarnings("unused")
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 eyePos, @Nullable String currentTargetSoundId) {
         if (mob == null || level == null || mobPos == null) {
             return null;
@@ -855,7 +854,7 @@ public class SoundTracker {
         if (snapshotSounds.isEmpty()) {
             return null;
         }
-        com.example.soundattract.config.MobProfile profile = SoundAttractConfig.getMatchingProfile(mob);
+        com.example.soundattract.config.MobProfile2 profile = SoundAttractConfig.getMatchingProfile(mob);
         SoundSnapshot bestSound = null;
         double highestWeight = -1.0;
         double closestDistSqr = Double.MAX_VALUE;

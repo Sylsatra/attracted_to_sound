@@ -1165,25 +1165,25 @@ public class StealthDetectionEvents {
                 );
             }
         } else {
-            com.example.soundattract.config.MobProfile mobProfile = SoundAttractConfig.getMatchingProfile(mob);
+            com.example.soundattract.config.MobProfile2 mobProfile = SoundAttractConfig.getMatchingProfile(mob);
             Optional<Double> override = (mobProfile != null) ? mobProfile.getDetectionOverride(currentStance) : Optional.empty();
             if (override.isPresent()) {
                 baseRange = override.get();
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
                     "[GRSDR_Update] Mob {} using profile '{}' detection range for stance {}: {}",
-                    mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                    mob.getName().getString(), mobProfile.id(), currentStance, baseRange
                     );
                 }
             } else {
-                com.example.soundattract.config.PlayerProfile playerProfile = SoundAttractConfig.getMatchingPlayerProfile(player);
+                com.example.soundattract.config.PlayerProfile2 playerProfile = SoundAttractConfig.getMatchingPlayerProfile(player);
                 Optional<Double> playerOverride = (playerProfile != null) ? playerProfile.getDetectionOverride(currentStance) : Optional.empty();
                 if (playerOverride.isPresent()) {
                     baseRange = playerOverride.get();
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info(
                                 "[GRSDR_Update] Player {} matched player profile '{}' for stance {}: {}",
-                                player.getName().getString(), playerProfile.getProfileName(), currentStance, baseRange
+                                player.getName().getString(), playerProfile.id(), currentStance, baseRange
                         );
                     }
                 } else {
@@ -1203,7 +1203,7 @@ public class StealthDetectionEvents {
                         if (mobProfile != null) {
                             SoundAttractMod.LOGGER.info(
                                     "[GRSDR_Update] Mob {} profile '{}' has no override for stance {}. No matching player profile override. Using default: {}",
-                                    mob.getName().getString(), mobProfile.getProfileName(), currentStance, baseRange
+                                    mob.getName().getString(), mobProfile.id(), currentStance, baseRange
                             );
                         } else {
                             SoundAttractMod.LOGGER.info(
