@@ -1,0 +1,44 @@
+{
+    "id": "blind_tracker_zombie",
+    "condition": {
+        "nbt": "{BlindTracker:1b}"
+    },
+    "sound_overrides": [
+        {
+            "sound_id": "soundattract:player_action.walking",
+            "range": 35.0,
+            "weight": 2.0
+        },
+        {
+            "sound_id": "soundattract:player_action.sneaking",
+            "range": 25.0,
+            "weight": 1.5
+        },
+        {
+            "sound_id": "soundattract:player_action.crawling",
+            "range": 15.0,
+            "weight": 1.0
+        },
+        {
+            "sound_id": "soundattract:player_action.sprinting",
+            "range": 50.0,
+            "weight": 3.0
+        },
+        {
+            "sound_id": "soundattract:player_action.sprint_jumping",
+            "range": 55.0,
+            "weight": 3.5
+        }
+    ],
+    "detection_overrides": {
+        "standing": 3.0,
+        "sneaking": 3.0,
+        "crawling": 3.0
+    },
+    "scent_config": {
+        "enabled": true,
+        "detection_range": 32.0,
+        "node_duration_ticks": 2400,
+        "ambush_duration_ticks": 600
+    }
+}

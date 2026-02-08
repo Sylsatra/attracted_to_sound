@@ -1,0 +1,16 @@
+{
+    "id": "feline_origin_player",
+    "condition": {
+        "nbt": "{ForgeCaps:{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:feline\"}}}}"
+    },
+    "detection_overrides": {
+        "standing": 24.0,
+        "sneaking": 10.0,
+        "crawling": 3.0
+    },
+    "scent_emission": {
+        "enabled": true,
+        "scent_strength_multiplier": 0.5,
+        "creation_interval_blocks": 8.0
+    }
+}

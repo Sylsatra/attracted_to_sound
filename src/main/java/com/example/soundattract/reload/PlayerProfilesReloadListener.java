@@ -1,91 +1,54 @@
 package com.example.soundattract.reload;
 
 import com.example.soundattract.SoundAttractMod;
-import com.example.soundattract.config.PlayerProfile;
-import com.example.soundattract.config.PlayerStance;
+import com.example.soundattract.config.PlayerProfile2;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.TagParser;
+import com.mojang.logging.LogUtils;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
 public class PlayerProfilesReloadListener extends SimpleJsonResourceReloadListener {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private final RegistryOps<JsonElement> ops;
 
-    public PlayerProfilesReloadListener() {
-        super(new Gson(), "profiles/players");
+    public PlayerProfilesReloadListener(RegistryAccess registryAccess) {
+
+        super(new Gson(), "player_profiles");
+        this.ops = RegistryOps.create(JsonOps.INSTANCE, registryAccess);
     }
 
     @Override
-    protected void apply(Map<ResourceLocation, JsonElement> elements, ResourceManager resourceManager, ProfilerFiller profiler) {
-        List<PlayerProfile> profiles = new ArrayList<>();
+    protected void apply(Map<ResourceLocation, JsonElement> objects, ResourceManager resourceManager, ProfilerFiller profiler) {
+        List<PlayerProfile2> profiles = new ArrayList<>();
 
-        for (Map.Entry<ResourceLocation, JsonElement> entry : elements.entrySet()) {
+        for (Map.Entry<ResourceLocation, JsonElement> entry : objects.entrySet()) {
+            ResourceLocation location = entry.getKey();
             JsonElement element = entry.getValue();
-            if (!element.isJsonObject()) {
-                continue;
-            }
-            JsonObject obj = element.getAsJsonObject();
 
-            boolean replace = obj.has("replace") && obj.get("replace").isJsonPrimitive()
-                    && obj.get("replace").getAsJsonPrimitive().isBoolean()
-                    && obj.get("replace").getAsBoolean();
-            if (replace) {
-                profiles.clear();
-            }
 
-            if (!obj.has("profiles") || !obj.get("profiles").isJsonArray()) {
-                continue;
-            }
 
-            JsonArray arr = obj.getAsJsonArray("profiles");
-            for (JsonElement profileEl : arr) {
-                if (!profileEl.isJsonObject()) continue;
-                JsonObject pObj = profileEl.getAsJsonObject();
 
-                String name = pObj.has("name") ? pObj.get("name").getAsString().trim() : "";
-                if (name.isEmpty()) {
-                    continue;
+            
+            PlayerProfile2.CODEC.parse(ops, element).resultOrPartial(error -> {
+                LOGGER.error("Failed to parse player profile '{}': {}", location, error);
+            }).ifPresent(profile -> {
+                profiles.add(profile.withId(location.toString()));
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    LOGGER.info("Loaded player profile: {}", location);
                 }
-
-                String nbtStr = pObj.has("nbt") ? pObj.get("nbt").getAsString().trim() : null;
-                CompoundTag matcher = null;
-                if (nbtStr != null && !nbtStr.isEmpty()) {
-                    try {
-                        matcher = TagParser.parseTag(nbtStr);
-                    } catch (Exception e) {
-                        SoundAttractMod.LOGGER.warn("[PlayerProfilesReloadListener] Failed to parse NBT matcher for player profile '{}': {}", name, e.getMessage());
-                    }
-                }
-
-                Map<PlayerStance, Double> detectionOverrides = new EnumMap<>(PlayerStance.class);
-                if (pObj.has("detection_overrides") && pObj.get("detection_overrides").isJsonObject()) {
-                    JsonObject detObj = pObj.getAsJsonObject("detection_overrides");
-                    for (PlayerStance stance : PlayerStance.values()) {
-                        String key = stance.getConfigName();
-                        if (detObj.has(key)) {
-                            try {
-                                double val = detObj.get(key).getAsDouble();
-                                detectionOverrides.put(stance, val);
-                            } catch (Exception ignored) {}
-                        }
-                    }
-                }
-
-                String nbtMatcherStr = matcher != null ? matcher.toString() : null;
-                PlayerProfile profile = new PlayerProfile(name, nbtMatcherStr, detectionOverrides);
-                profiles.add(profile);
-            }
+            });
         }
 
         SoundAttractConfig.DP_PLAYER_PROFILES_CACHE = profiles;
@@ -93,7 +56,7 @@ public class PlayerProfilesReloadListener extends SimpleJsonResourceReloadListen
         try {
             SoundAttractConfig.bakeConfig();
         } catch (Throwable t) {
-            SoundAttractMod.LOGGER.warn("[PlayerProfilesReloadListener] Failed to re-bake config after datapack reload", t);
+            LOGGER.warn("[PlayerProfilesReloadListener] Failed to re-bake config after datapack reload", t);
         }
     }
 }

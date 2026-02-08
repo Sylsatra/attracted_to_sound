@@ -244,7 +244,6 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
                     failurePolicyMethod.invoke(builder, failurePolicyBestEffort);
                 }
 
-                @SuppressWarnings("unchecked")
                 CompletableFuture<List<WorkerScheduler.SoundScoreResult>> future = (CompletableFuture<List<WorkerScheduler.SoundScoreResult>>) submitParallelMethod.invoke(builder);
                 if (future == null) {
                     return null;
