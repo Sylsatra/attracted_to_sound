@@ -8,6 +8,7 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import com.example.soundattract.config.ConfigHelper;
 import com.example.soundattract.config.SoundAttractConfig;
@@ -22,6 +23,10 @@ import com.example.soundattract.event.client.SoundAttractClientEvents;
 import com.example.soundattract.network.SoundAttractNetwork;
 import com.example.soundattract.quantified.QuantifiedIntegration;
 import com.example.soundattract.worker.WorkSchedulerManager;
+import com.example.soundattract.camo.CamouflageCapability;
+import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.event.AttachCapabilitiesEvent;
+import net.minecraft.resources.ResourceLocation;
 
 @Mod(SoundAttractMod.MOD_ID)
 public class SoundAttractMod {
@@ -36,13 +41,14 @@ public class SoundAttractMod {
         modEventBus.addListener(this::onCommonSetup);
         modEventBus.addListener(SoundAttractMod::onClientSetup);
 
-                ConfigHelper.register();
+        ConfigHelper.register(ModLoadingContext.get());
         
         MinecraftForge.EVENT_BUS.register(new FovEvents());
         MinecraftForge.EVENT_BUS.register(new StealthDetectionEvents());
         MinecraftForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
         MinecraftForge.EVENT_BUS.register(new VanillaIntegrationEvents());
         MinecraftForge.EVENT_BUS.register(new com.example.soundattract.event.ScentEvents());
+        MinecraftForge.EVENT_BUS.addGenericListener(net.minecraft.world.entity.Entity.class, this::attachPlayerCapabilities);
 
         modEventBus.addListener(this::registerCapabilities);
         modEventBus.addListener(this::onConfigLoading);
@@ -51,6 +57,14 @@ public class SoundAttractMod {
 
     private void registerCapabilities(net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent event) {
         event.register(com.example.soundattract.scents.ScentManager.class);
+        event.register(CamouflageCapability.class);
+    }
+
+    private void attachPlayerCapabilities(AttachCapabilitiesEvent<net.minecraft.world.entity.Entity> event) {
+        if (event.getObject() instanceof net.minecraft.world.entity.LivingEntity) {
+            ResourceLocation id = ResourceLocation.tryBuild(MOD_ID, "camouflage");
+            event.addCapability(id, new CamouflageCapability.Provider());
+        }
     }
 
     public void onConfigLoading(final net.minecraftforge.fml.event.config.ModConfigEvent.Loading event) {

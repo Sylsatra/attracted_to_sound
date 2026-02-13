@@ -14,13 +14,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.particles.DustParticleOptions;
+import com.example.soundattract.scents.ScentParticleColorManager;
+import org.joml.Vector3f;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
@@ -71,6 +75,20 @@ public class ScentEvents {
             float baseStrength = 1.0f;
             
 
+            double blockFactor = player.getCapability(com.example.soundattract.camo.CamouflageCapability.INSTANCE)
+                    .map(com.example.soundattract.camo.CamouflageCapability::getScentBlockFactor)
+                    .orElse(0.0);
+            
+            baseStrength *= (float) (1.0 - blockFactor);
+
+            if (baseStrength <= 0.05f) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[ScentEvents] Scent for player {} fully blocked by camouflage.", player.getName().getString());
+                }
+                lastScentPos.put(playerId, currentPos);
+                return;
+            }
+
 
             ScentNode node = new ScentNode(currentPos, currentTime, baseStrength, playerId);
             
@@ -96,10 +114,95 @@ public class ScentEvents {
         if (event.phase != TickEvent.Phase.END || event.level.isClientSide) return;
         if (!SoundAttractConfig.COMMON.enableScentSystem.get()) return;
         
+
         if (event.level.getGameTime() % 200 == 0) {
 
-
         }
+
+
+        if (!SoundAttractConfig.COMMON.enableGameplayScentParticles.get()) return;
+
+        int spawnInterval = SoundAttractConfig.COMMON.scentParticleSpawnInterval.get();
+        if (event.level.getGameTime() % spawnInterval != 0) return;
+
+        ServerLevel serverLevel = (ServerLevel) event.level;
+        long currentTime = serverLevel.getGameTime();
+        long maxDuration = SoundAttractConfig.COMMON.scentNodeDurationTicks.get();
+        double baseRenderDist = SoundAttractConfig.COMMON.scentParticleRenderDistance.get();
+        final double renderDistSq = baseRenderDist * baseRenderDist;
+
+        serverLevel.getCapability(ScentManager.INSTANCE).ifPresent(manager -> {
+
+            net.minecraft.server.MinecraftServer server = serverLevel.getServer();
+            if (server == null) return;
+
+            List<ScentNode> allNodes = manager.getAllNodes();
+
+
+            Map<UUID, Boolean> particleEnabledCache = new java.util.HashMap<>();
+            Map<UUID, org.joml.Vector3f> colorCache = new java.util.HashMap<>();
+
+            for (ScentNode node : allNodes) {
+                long age = currentTime - node.getTimestamp();
+                if (age > maxDuration || age < 0) continue;
+
+                UUID ownerUUID = node.getOwnerUUID();
+                if (ownerUUID == null) continue;
+
+
+                Boolean enabled = particleEnabledCache.get(ownerUUID);
+                if (enabled == null) {
+                    enabled = true;
+                    net.minecraft.server.level.ServerPlayer ownerPlayer = server.getPlayerList().getPlayer(ownerUUID);
+                    if (ownerPlayer != null) {
+                        com.example.soundattract.config.PlayerProfile2 profile = SoundAttractConfig.getMatchingPlayerProfile(ownerPlayer);
+                        if (profile != null && profile.scentEmission().isPresent()) {
+                            enabled = profile.scentEmission().get().showScentParticles();
+                        }
+                    }
+                    particleEnabledCache.put(ownerUUID, enabled);
+                }
+                if (!enabled) continue;
+
+
+                org.joml.Vector3f color = colorCache.get(ownerUUID);
+                if (color == null) {
+                    net.minecraft.server.level.ServerPlayer ownerPlayer = server.getPlayerList().getPlayer(ownerUUID);
+                    if (ownerPlayer != null) {
+                        color = ScentParticleColorManager.getColorForPlayer(ownerUUID, ownerPlayer);
+                    } else {
+                        color = ScentParticleColorManager.getColorForPlayer(ownerUUID);
+                    }
+                    colorCache.put(ownerUUID, color);
+                }
+
+
+                float lifeRatio = 1.0f - ((float) age / maxDuration);
+                float particleScale = 0.4f + (lifeRatio * 0.6f);
+                int particleCount = lifeRatio > 0.5f ? 2 : 1;
+
+                Vec3 pos = node.getPosition();
+
+
+                net.minecraft.core.particles.DustParticleOptions dustParticle =
+                        new net.minecraft.core.particles.DustParticleOptions(color, particleScale);
+
+                for (ServerPlayer nearbyPlayer : serverLevel.players()) {
+                    if (nearbyPlayer.position().distanceToSqr(pos) <= renderDistSq) {
+                        serverLevel.sendParticles(nearbyPlayer, dustParticle, true,
+                                pos.x, pos.y + 0.3, pos.z,
+                                particleCount, 0.1, 0.05, 0.1, 0.0);
+                    }
+                }
+            }
+        });
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        UUID playerId = event.getEntity().getUUID();
+        lastScentPos.remove(playerId);
+        lastScentTime.remove(playerId);
     }
 
     @SubscribeEvent
@@ -112,7 +215,7 @@ public class ScentEvents {
             java.util.List<? extends String> whitelist = SoundAttractConfig.COMMON.scentEligibleMobs.get();
             
             if (whitelist.contains(id)) {
-                // Try SBL integration first
+
                 if (SoundAttractConfig.COMMON.enableSmartBrainLibIntegration.get()) {
                     if (com.example.soundattract.integration.smartbrainlib.SmartBrainLibCompat.tryAttachSoundAttractBrain(mob)) {
                         return;
