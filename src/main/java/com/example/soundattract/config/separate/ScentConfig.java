@@ -11,6 +11,9 @@ public class ScentConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_SCENT_SYSTEM;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SCENT_ELIGIBLE_MOBS;
     public static final ForgeConfigSpec.BooleanValue ENABLE_SCENT_PARTICLES;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_GAMEPLAY_SCENT_PARTICLES;
+    public static final ForgeConfigSpec.IntValue SCENT_PARTICLE_SPAWN_INTERVAL;
+    public static final ForgeConfigSpec.DoubleValue SCENT_PARTICLE_RENDER_DISTANCE;
     public static final ForgeConfigSpec.IntValue SCENT_NODE_DURATION_TICKS;
     public static final ForgeConfigSpec.DoubleValue SCENT_CREATION_INTERVAL_BLOCKS;
     
@@ -35,8 +38,17 @@ public class ScentConfig {
         SCENT_ELIGIBLE_MOBS = BUILDER.comment("List of mobs that can smell and track scent trails.")
                 .defineList("scentEligibleMobs", Arrays.asList("minecraft:zombie", "minecraft:husk", "minecraft:drowned", "minecraft:wolf"), obj -> obj instanceof String);
 
-        ENABLE_SCENT_PARTICLES = BUILDER.comment("Render debug particles for scent nodes.")
+        ENABLE_SCENT_PARTICLES = BUILDER.comment("Render debug particles for scent nodes (debug only, one-shot).")
                 .define("enableScentParticles", false);
+
+        ENABLE_GAMEPLAY_SCENT_PARTICLES = BUILDER.comment("Enable persistent gameplay scent particles that last as long as the scent node. Per-player colored.")
+                .define("enableGameplayScentParticles", false);
+
+        SCENT_PARTICLE_SPAWN_INTERVAL = BUILDER.comment("Ticks between re-spawning particles at each living scent node (lower = more frequent, higher = better performance).")
+                .defineInRange("scentParticleSpawnInterval", 40, 5, 200);
+
+        SCENT_PARTICLE_RENDER_DISTANCE = BUILDER.comment("Maximum distance from a player to render scent particles.")
+                .defineInRange("scentParticleRenderDistance", 32.0, 8.0, 128.0);
 
         SCENT_NODE_DURATION_TICKS = BUILDER.comment("How long a scent node lasts in ticks (default 6000 = 5 minutes).")
                 .defineInRange("scentNodeDurationTicks", 6000, 100, 72000);

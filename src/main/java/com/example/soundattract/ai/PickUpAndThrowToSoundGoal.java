@@ -42,26 +42,26 @@ public class PickUpAndThrowToSoundGoal extends Goal {
         if (this.mob.isVehicle()) return false;
         if (--this.cooldown > 0) return false;
 
-        // Chance gate: prefer EnhancedAI chance if loaded, else config fallback
+
         double chance = EnhancedAICompat.getPickUpAndThrowChance(this.mob.level());
         if (this.mob.getRandom().nextDouble() >= chance) return false;
 
-        // Need an active sound to throw towards
+
         this.targetSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
         if (this.targetSound == null) return false;
 
-        // Check performer tag (can pick up)
+
         String canPickUpTagStr = SoundAttractConfig.COMMON.pickUpCanPickUpTag.get();
         if (canPickUpTagStr == null || canPickUpTagStr.isBlank()) return false;
         TagKey<EntityType<?>> canPickUpTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(canPickUpTagStr));
         if (!this.mob.getType().is(canPickUpTag)) return false;
 
-        // Respect min distance: don't bother if already very close to sound
+
         int minDist = EnhancedAICompat.getPickUpMinDistanceToPickUp();
         double distToSound = Math.sqrt(this.mob.blockPosition().distSqr(this.targetSound.pos));
         if (distToSound < minDist) return false;
 
-        // Find a valid mob to pick up based on tag
+
         String canBePickedUpTagStr = SoundAttractConfig.COMMON.pickUpCanBePickedUpTag.get();
         if (canBePickedUpTagStr == null || canBePickedUpTagStr.isBlank()) return false;
         TagKey<EntityType<?>> canBePickedUpTag = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.parse(canBePickedUpTagStr));
@@ -105,7 +105,7 @@ public class PickUpAndThrowToSoundGoal extends Goal {
 
     @Override
     public void tick() {
-        // Re-acquire sound if it changed
+
         if (this.targetSound == null || this.targetSound.ticksRemaining <= 0) {
             this.targetSound = SoundTracker.findNearestSound(this.mob, this.mob.level(), this.mob.blockPosition(), this.mob.getEyePosition());
             if (this.targetSound == null) {
@@ -120,7 +120,7 @@ public class PickUpAndThrowToSoundGoal extends Goal {
                 this.mob.getNavigation().moveTo(this.pickUp, EnhancedAICompat.getPickUpSpeedModifier());
             if (this.mob.distanceToSqr(this.pickUp) <= 4f) {
                 this.pickUp.startRiding(this.mob, false);
-                this.cooldown = this.adjustedTickDelay(20); // brief windup
+                this.cooldown = this.adjustedTickDelay(20);
             }
         }
         else {

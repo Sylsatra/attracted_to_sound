@@ -52,6 +52,9 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import com.example.soundattract.camo.CamouflageCapability;
+import com.example.soundattract.camo.CamoMaterialRegistry;
+import com.example.soundattract.config.separate.StealthConfig;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class StealthDetectionEvents {
@@ -66,7 +69,7 @@ public class StealthDetectionEvents {
 
     private static final Set<UUID> suppressedEdgeDetections = ConcurrentHashMap.newKeySet();
 
-    private enum StealthPerfTier {
+    public enum StealthPerfTier {
         FULL,
         SKIP_EXPENSIVE,
         CURRENT_TARGETS_ONLY,
@@ -76,6 +79,10 @@ public class StealthDetectionEvents {
 
     private static volatile double lastEstimatedTps = 20.0;
     private static volatile long lastEstimatedTpsGameTime = -1L;
+
+    public static double getLastEstimatedTps() {
+        return lastEstimatedTps;
+    }
 
     private static void updateEstimatedTps(MinecraftServer server) {
         if (server == null) return;
@@ -92,7 +99,7 @@ public class StealthDetectionEvents {
         }
     }
 
-    private static StealthPerfTier getPerfTier(MinecraftServer server) {
+    public static StealthPerfTier getPerfTier(MinecraftServer server) {
         if (SoundAttractConfig.COMMON == null) {
             return StealthPerfTier.FULL;
         }
@@ -113,7 +120,7 @@ public class StealthDetectionEvents {
         return StealthPerfTier.FULL;
     }
 
-    private static StealthPerfTier getPerfTier(Level level) {
+    public static StealthPerfTier getPerfTier(Level level) {
         MinecraftServer server = null;
         try {
             if (level instanceof ServerLevel sl) {
@@ -270,29 +277,45 @@ public class StealthDetectionEvents {
         }
 
         if (!skipExpensive && SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
-            java.util.Optional<Integer> armorColorOpt = getEffectiveArmorColorEntity(target);
-            java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColorEntity(target, level);
-            if (armorColorOpt.isPresent() && envColorOpt.isPresent()) {
-                int armorColor = armorColorOpt.get();
+            int finalColor = CamoUtil.getFinalPerceptionColor(target);
+            java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColor(target, level);
+            
+            if (envColorOpt.isPresent()) {
                 int envColor = envColorOpt.get();
-                int rArmor = (armorColor >> 16) & 0xFF;
-                int gArmor = (armorColor >> 8) & 0xFF;
-                int bArmor = armorColor & 0xFF;
-                int rEnv = (envColor >> 16) & 0xFF;
-                int gEnv = (envColor >> 8) & 0xFF;
-                int bEnv = envColor & 0xFF;
-                int diff = Math.abs(rArmor - rEnv) + Math.abs(gArmor - gEnv) + Math.abs(bArmor - bEnv);
-                int matchBonusThreshold = SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get();
-                if (diff <= matchBonusThreshold) {
-                    double maxBonusEffect = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get();
-                    double effectivenessRatio = (matchBonusThreshold > 0) ? 1.0 - ((double) diff / matchBonusThreshold) : ((diff == 0) ? 1.0 : 0.0);
-                    double actualBonus = maxBonusEffect * effectivenessRatio;
+                int rC = (finalColor >> 16) & 0xFF;
+                int gC = (finalColor >> 8) & 0xFF;
+                int bC = finalColor & 0xFF;
+                int rE = (envColor >> 16) & 0xFF;
+                int gE = (envColor >> 8) & 0xFF;
+                int bE = envColor & 0xFF;
+                
+                int diff = Math.abs(rC - rE) + Math.abs(gC - gE) + Math.abs(bC - bE);
+                int matchThreshold = SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get();
+                
+                if (diff <= matchThreshold) {
+                    float strength = CamoUtil.getCombinedCamoStrength(target);
+
+                    float effectiveStrength = 0.5f + (strength * 0.5f); 
+                    
+                    double maxBonus = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get();
+                    double ratio = (matchThreshold > 0) ? 1.0 - ((double) diff / matchThreshold) : ((diff == 0) ? 1.0 : 0.0);
+                    double actualBonus = maxBonus * ratio * effectiveStrength;
                     baseRange *= (1.0 - actualBonus);
+
+                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                        SoundAttractMod.LOGGER.info("[EnvCamo_Mob] {} BONUS: color=0x{}, env=0x{}, diff={}, effect={}, newRange={}",
+                            target.getName().getString(), String.format("%06X", finalColor), String.format("%06X", envColor),
+                            diff, String.format("%.2f", actualBonus), String.format("%.2f", baseRange));
+                    }
                 } else if (SoundAttractConfig.COMMON.enableEnvironmentalMismatchPenalty.get()) {
                     int mismatchThreshold = SoundAttractConfig.COMMON.environmentalMismatchThreshold.get();
                     if (diff > mismatchThreshold) {
-                        double penaltyFactor = SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
-                        baseRange *= penaltyFactor;
+                        double penalty = SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
+                        baseRange *= penalty;
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.info("[EnvCamo_Mob] {} PENALTY: diff={}, penalty={}, newRange={}",
+                                target.getName().getString(), diff, String.format("%.2f", penalty), String.format("%.2f", baseRange));
+                        }
                     }
                 }
             }
@@ -488,105 +511,6 @@ public class StealthDetectionEvents {
         return result;
     }
 
-    private static java.util.Optional<Integer> getEffectiveArmorColorEntity(LivingEntity entity) {
-        java.util.List<Integer> colors = new java.util.ArrayList<>();
-        boolean onlyDyedLeather = SoundAttractConfig.COMMON.environmentalCamouflageOnlyDyedLeather.get();
-        for (net.minecraft.world.item.ItemStack itemStack : entity.getArmorSlots()) {
-            if (itemStack.isEmpty()) continue;
-            net.minecraft.world.item.Item item = itemStack.getItem();
-            boolean colorAdded = false;
-            if (item instanceof net.minecraft.world.item.ArmorItem armorItem && armorItem.getMaterial() == net.minecraft.world.item.ArmorMaterials.LEATHER && item instanceof net.minecraft.world.item.DyeableLeatherItem dyeableItem) {
-                if (dyeableItem.hasCustomColor(itemStack)) {
-                    colors.add(dyeableItem.getColor(itemStack));
-                    colorAdded = true;
-                }
-            }
-            if (onlyDyedLeather && !colorAdded) continue;
-            if (!colorAdded) {
-                net.minecraft.resources.ResourceLocation itemIdRL = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(item);
-                if (itemIdRL != null) {
-                    Integer mapped = SoundAttractConfig.customArmorColors.get(itemIdRL);
-                    if (mapped != null) {
-                        colors.add(mapped);
-                    }
-                }
-            }
-        }
-        if (colors.isEmpty()) return java.util.Optional.empty();
-        long totalR = 0, totalG = 0, totalB = 0;
-        for (int color : colors) {
-            totalR += (color >> 16) & 0xFF;
-            totalG += (color >> 8) & 0xFF;
-            totalB += color & 0xFF;
-        }
-        int n = colors.size();
-        int avgR = (int) (totalR / n);
-        int avgG = (int) (totalG / n);
-        int avgB = (int) (totalB / n);
-        int finalAvg = (avgR << 16) | (avgG << 8) | avgB;
-        return java.util.Optional.of(finalAvg);
-    }
-
-    private static java.util.Optional<Integer> getAverageEnvironmentalColorEntity(LivingEntity entity, Level level) {
-        if (entity == null || level == null) {
-            return java.util.Optional.empty();
-        }
-        if (QuantifiedCacheCompat.isUsable()) {
-            net.minecraft.core.BlockPos base = entity.blockPosition();
-            String key = new StringBuilder(96)
-                .append(level.dimension().location().toString()).append('|')
-                .append(base.getX()).append(',').append(base.getY()).append(',').append(base.getZ())
-                .toString();
-            return QuantifiedCacheCompat.getCached(
-                "soundattract_env_color_entity",
-                key,
-                () -> soundattract$computeAverageEnvironmentalColorEntity(entity, level),
-                2L,
-                8192L
-            );
-        }
-
-        return soundattract$computeAverageEnvironmentalColorEntity(entity, level);
-    }
-
-    private static java.util.Optional<Integer> soundattract$computeAverageEnvironmentalColorEntity(LivingEntity entity, Level level) {
-        java.util.List<Integer> blockColors = new java.util.ArrayList<>();
-        net.minecraft.core.BlockPos base = entity.blockPosition();
-        for (int y = 0; y >= -1; y--) {
-            for (int x = -1; x <= 1; x++) {
-                for (int z = -1; z <= 1; z++) {
-                    net.minecraft.core.BlockPos pos = base.offset(x, y, z);
-                    if (level.isLoaded(pos)) {
-                        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pos);
-                        if (!state.isAir()) {
-                            int mapColor;
-                            try {
-                                mapColor = state.getMapColor(level, pos).col;
-                            } catch (Throwable ignored) {
-                                continue;
-                            }
-                            if (mapColor != 0) {
-                                blockColors.add(mapColor);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (blockColors.isEmpty()) return java.util.Optional.empty();
-        long totalR = 0, totalG = 0, totalB = 0;
-        for (int color : blockColors) {
-            totalR += (color >> 16) & 0xFF;
-            totalG += (color >> 8) & 0xFF;
-            totalB += color & 0xFF;
-        }
-        int n = blockColors.size();
-        int avgR = (int) (totalR / n);
-        int avgG = (int) (totalG / n);
-        int avgB = (int) (totalB / n);
-        int finalAvg = (avgR << 16) | (avgG << 8) | avgB;
-        return java.util.Optional.of(finalAvg);
-    }
     public static void recordPlayerGunshot(Player player, double detectionRange) {
         if (player == null || player.level().isClientSide()) {
             return;
@@ -649,7 +573,7 @@ public class StealthDetectionEvents {
                 return;
             }
 
-            if (!canMobDetectPlayer(mob, playerTarget)) {
+            if (!canMobDetectLivingEntity(mob, playerTarget)) {
                 event.setCanceled(true);
                 try {
                     LivingEntity mem = mob.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
@@ -780,10 +704,10 @@ public class StealthDetectionEvents {
     }
 
 
-    public static boolean canMobDetectPlayer(Mob mob, Player player) {
-        if (mob == null || player == null) {
+    public static boolean canMobDetectLivingEntity(Mob mob, LivingEntity target) {
+        if (mob == null || target == null) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Called with null mob or player. Defaulting to detectable.");
+                SoundAttractMod.LOGGER.warn("[CanDetect] Called with null mob or target. Defaulting to detectable.");
             }
             return true;
         }
@@ -795,10 +719,15 @@ public class StealthDetectionEvents {
         if (shouldUseVanillaTargeting(mob.level())) {
             return true;
         }
-        if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[CanDetectPlayer] Player {} is creative/spectator/dead. Bypassing stealth. Mob {}.", player.getName().getString(), mob.getName().getString());
+
+        if (target instanceof Player player) {
+            if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[CanDetect] Player {} is creative/spectator/dead. Bypassing stealth. Mob {}.", player.getName().getString(), mob.getName().getString());
+                }
+                return true;
             }
+        } else if (!target.isAlive()) {
             return true;
         }
 
@@ -810,25 +739,34 @@ public class StealthDetectionEvents {
 
         double xrayRange = getEffectiveXrayRange(mob);
         if (xrayRange > 0) {
-            double distSqXray = mob.distanceToSqr(player);
+            double distSqXray = mob.distanceToSqr(target);
             if (distSqXray <= xrayRange * xrayRange) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
-                        "[XRAY] Mob {} detects Player {} within XRAY range {} (distSq {}).",
-                        mob.getName().getString(), player.getName().getString(), String.format("%.2f", xrayRange), String.format("%.2f", distSqXray)
+                        "[XRAY] Mob {} detects {} within XRAY range {} (distSq {}).",
+                        mob.getName().getString(), target.getName().getString(), String.format("%.2f", xrayRange), String.format("%.2f", distSqXray)
                     );
                 }
                 return true;
             }
         }
-        double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
-        double distSq = mob.distanceToSqr(player);
+
+        double detectionRange;
+        if (target instanceof Player player) {
+            detectionRange = getRealisticStealthDetectionRange(player, mob, level);
+        } else if (target instanceof Mob targetMob) {
+            detectionRange = getRealisticStealthDetectionRange(targetMob, mob, level);
+        } else {
+            detectionRange = SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
+        }
+
+        double distSq = mob.distanceToSqr(target);
 
         if (distSq > detectionRange * detectionRange) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
-                        "[StealthQuery] Player {} is OUT OF RANGE for mob {} (distSq: {}, rangeSq: {}).",
-                        player.getName().getString(), mob.getName().getString(),
+                        "[StealthQuery] {} is OUT OF RANGE for mob {} (distSq: {}, rangeSq: {}).",
+                        target.getName().getString(), mob.getName().getString(),
                         String.format("%.2f", distSq),
                         String.format("%.2f", (detectionRange * detectionRange))
                 );
@@ -836,17 +774,15 @@ public class StealthDetectionEvents {
             return false;
         }
 
-        if (!FovEvents.isTargetInFov(mob, player, true)) {
+        if (!FovEvents.isTargetInFov(mob, target, true)) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.info(
-                        "[StealthQuery] Player {} is IN RANGE for mob {} but OUTSIDE FOV. Denying detection.",
-                        player.getName().getString(), mob.getName().getString()
+                        "[StealthQuery] {} is IN RANGE for mob {} but OUTSIDE FOV. Denying detection.",
+                        target.getName().getString(), mob.getName().getString()
                 );
             }
             return false;
         }
-
-
 
         if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
             try {
@@ -855,33 +791,40 @@ public class StealthDetectionEvents {
                 if (isEdge && !isDeserter) {
                     recordSuppressedEdgeDetection(mob);
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info("[CanDetectPlayer] Suppressing EDGE mob {} (non-deserter) despite detectability; signaling RAID.", mob.getName().getString());
+                        SoundAttractMod.LOGGER.info("[CanDetect] Suppressing EDGE mob {} (non-deserter) despite detectability; signaling RAID.", mob.getName().getString());
                     }
                     return false;
                 }
             } catch (Throwable t) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.warn("[CanDetectPlayer] Edge suppression check failed: {}", t.getMessage());
+                    SoundAttractMod.LOGGER.warn("[CanDetect] Edge suppression check failed: {}", t.getMessage());
                 }
             }
         }
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(
-                    "[StealthQuery] Player {} IS DETECTABLE by mob {} (in range and in FOV).",
-                    player.getName().getString(), mob.getName().getString()
+                    "[StealthQuery] {} IS DETECTABLE by mob {} (in range and in FOV).",
+                    target.getName().getString(), mob.getName().getString()
             );
         }
         return true;
     }
 
-    private static boolean canMobDetectPlayerNoEdgeSuppression(Mob mob, Player player) {
-        if (mob == null || player == null) {
+    @Deprecated
+    public static boolean canMobDetectPlayer(Mob mob, Player player) {
+        return canMobDetectLivingEntity(mob, player);
+    }
+
+    private static boolean canMobDetectTargetNoEdgeSuppression(Mob mob, LivingEntity target) {
+        if (mob == null || target == null) {
             return true;
         }
         if (SoundAttractConfig.isStealthBypassed(mob)) {
             return true;
         }
-        if (player.isCreative() || player.isSpectator() || !player.isAlive()) {
+        if (target instanceof Player player && (player.isCreative() || player.isSpectator() || !player.isAlive())) {
+            return true;
+        } else if (!target.isAlive()) {
             return true;
         }
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
@@ -895,17 +838,25 @@ public class StealthDetectionEvents {
 
         double xrayRange = getEffectiveXrayRange(mob);
         if (xrayRange > 0) {
-            double distSqXray = mob.distanceToSqr(player);
+            double distSqXray = mob.distanceToSqr(target);
             if (distSqXray <= xrayRange * xrayRange) {
                 return true;
             }
         }
-        double detectionRange = getRealisticStealthDetectionRange(player, mob, level);
-        double distSq = mob.distanceToSqr(player);
+        double detectionRange;
+        if (target instanceof Player player) {
+            detectionRange = getRealisticStealthDetectionRange(player, mob, level);
+        } else if (target instanceof Mob targetMob) {
+            detectionRange = getRealisticStealthDetectionRange(targetMob, mob, level);
+        } else {
+            detectionRange = SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
+        }
+
+        double distSq = mob.distanceToSqr(target);
         if (distSq > detectionRange * detectionRange) {
             return false;
         }
-        if (!FovEvents.isTargetInFov(mob, player, true)) {
+        if (!FovEvents.isTargetInFov(mob, target, true)) {
             return false;
         }
         return true;
@@ -919,14 +870,11 @@ public class StealthDetectionEvents {
         if (target == null) {
             return false;
         }
-        if (!(target instanceof Player player)) {
-            return false;
-        }
-        return !canMobDetectPlayer(mob, player);
+        return !canMobDetectLivingEntity(mob, target);
     }
 
-    public static boolean shouldSuppressTargeting(Mob mob, Player player) {
-        return !canMobDetectPlayer(mob, player);
+    public static boolean shouldSuppressTargeting(Mob mob, LivingEntity target) {
+        return !canMobDetectLivingEntity(mob, target);
     }
 
     @SubscribeEvent
@@ -956,7 +904,6 @@ public class StealthDetectionEvents {
         lastStealthCheckTick = gameTime;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
-
             java.util.Map<Long, Boolean> sharedStealthCache = (tier == StealthPerfTier.SHARE_NEARBY
                     && SoundAttractConfig.COMMON.stealthShareTargetToNearbyMobsRadius.get() > 0.0)
                     ? new java.util.HashMap<>()
@@ -964,22 +911,40 @@ public class StealthDetectionEvents {
 
             int scanningRadius = Math.max(32, (int) Math.ceil(SoundAttractConfig.COMMON.maxStealthDetectionRange.get()) + 16);
             Set<Mob> mobsToCheck = new HashSet<>();
+            Set<LivingEntity> entitiesToTickCamo = new HashSet<>();
+            Set<UUID> activelyTargetedEntityIds = new HashSet<>();
             Set<UUID> seenPlayerIds = new HashSet<>();
             Set<UUID> seenMobIds = new HashSet<>();
+
             for (net.minecraft.server.level.ServerPlayer serverPlayer : level.players()) {
                 seenPlayerIds.add(serverPlayer.getUUID());
                 AABB scanArea = serverPlayer.getBoundingBox().inflate(scanningRadius);
-                mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && isTargetingPlayerCompat(entity)));
+                
+                mobsToCheck.addAll(level.getEntitiesOfClass(Mob.class, scanArea, entity -> entity.isAlive() && getAttackTargetCompat(entity) != null));
+                
+                entitiesToTickCamo.addAll(level.getEntitiesOfClass(LivingEntity.class, scanArea, e -> e.isAlive() && !(e instanceof Player)));
             }
+
+            for (LivingEntity le : entitiesToTickCamo) {
+                le.getCapability(CamouflageCapability.INSTANCE).ifPresent(camo -> {
+                    camo.tickDegradation(le, level, tier);
+                });
+            }
+
             for (Mob mob : mobsToCheck) {
                 seenMobIds.add(mob.getUUID());
-                LivingEntity rawTarget = getAttackTargetCompat(mob);
+                LivingEntity target = getAttackTargetCompat(mob);
                 UUID mobId = mob.getUUID();
-                if (!(rawTarget instanceof Player playerTarget)) {
+                
+                if (target == null) {
                     mobOutOfRangeTicks.remove(mobId);
                     continue;
                 }
-                if (playerTarget.isCreative() || playerTarget.isSpectator()) {
+                
+                UUID targetId = target.getUUID();
+                activelyTargetedEntityIds.add(targetId);
+
+                if (target instanceof Player playerTarget && (playerTarget.isCreative() || playerTarget.isSpectator())) {
                     mobOutOfRangeTicks.remove(mobId);
                     continue;
                 }
@@ -990,14 +955,14 @@ public class StealthDetectionEvents {
                     int cell = (int) Math.max(1, Math.floor(radius));
                     int cx = (int) Math.floor(mob.getX() / (double) cell);
                     int cz = (int) Math.floor(mob.getZ() / (double) cell);
-                    long pHash = playerTarget.getUUID().getMostSignificantBits() ^ playerTarget.getUUID().getLeastSignificantBits();
-                    long key = pHash;
+                    long tHash = targetId.getMostSignificantBits() ^ targetId.getLeastSignificantBits();
+                    long key = tHash;
                     key = 31L * key + (long) cx;
                     key = 31L * key + (long) cz;
 
                     Boolean cached = sharedStealthCache.get(key);
                     if (cached == null) {
-                        cached = canMobDetectPlayerNoEdgeSuppression(mob, playerTarget);
+                        cached = canMobDetectTargetNoEdgeSuppression(mob, target);
                         sharedStealthCache.put(key, cached);
                     }
                     canCurrentlyDetect = cached.booleanValue();
@@ -1014,7 +979,7 @@ public class StealthDetectionEvents {
                         }
                     }
                 } else {
-                    canCurrentlyDetect = canMobDetectPlayer(mob, playerTarget);
+                    canCurrentlyDetect = canMobDetectLivingEntity(mob, target);
                 }
 
                 if (canCurrentlyDetect) {
@@ -1022,7 +987,7 @@ public class StealthDetectionEvents {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
                                     "[TickCheck] Mob {} regained direct detection of {}. Grace period reset.",
-                                    mob.getName().getString(), playerTarget.getName().getString()
+                                    mob.getName().getString(), target.getName().getString()
                             );
                         }
                     }
@@ -1032,7 +997,8 @@ public class StealthDetectionEvents {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
                                     "[TickCheck] Mob {} lost target {} due to stealth grace period timeout.",
-                                    mob.getName().getString(), playerTarget.getName().getString()
+                                    mob.getName().getString(), target.getName().getString()
+                                    
                             );
                         }
                         if (mob.getBrain().hasMemoryValue(MemoryModuleType.ANGRY_AT)) {
@@ -1049,13 +1015,14 @@ public class StealthDetectionEvents {
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
                             SoundAttractMod.LOGGER.info(
                                     "[TickCheck] Mob {} cannot detect {}. In grace period ({}/{}).",
-                                    mob.getName().getString(), playerTarget.getName().getString(),
+                                    mob.getName().getString(), target.getName().getString(),
                                     ticks, SoundAttractConfig.COMMON.stealthGracePeriodTicks.get()
                             );
                         }
                     }
                 }
             }
+
             if (gameTime % Math.max(stealthCheckInterval * 5L, 20L) == 0) {
                 mobOutOfRangeTicks.keySet().removeIf(id -> !seenMobIds.contains(id));
                 XRAY_RANGE_CACHE.keySet().removeIf(id -> !seenMobIds.contains(id));
@@ -1320,70 +1287,53 @@ public class StealthDetectionEvents {
         }
         List<String> camouflageItems = new ArrayList<>(SoundAttractConfig.COMMON.camouflageArmorItems.get());
 
-        if (!skipExpensive && SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
-            Optional<Integer> armorColorOpt = getEffectiveArmorColor(player);
-            Optional<Integer> envColorOpt = getAverageEnvironmentalColor(player, level);
 
-            if (armorColorOpt.isPresent() && envColorOpt.isPresent()) {
-                int armorColor = armorColorOpt.get();
+        if (SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
+            int finalColor = CamoUtil.getFinalPerceptionColor(player);
+            java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColor(player, level);
+
+            if (envColorOpt.isPresent()) {
                 int envColor = envColorOpt.get();
+                int rC = (finalColor >> 16) & 0xFF;
+                int gC = (finalColor >> 8) & 0xFF;
+                int bC = finalColor & 0xFF;
+                int rE = (envColor >> 16) & 0xFF;
+                int gE = (envColor >> 8) & 0xFF;
+                int bE = envColor & 0xFF;
 
-                int rArmor = (armorColor >> 16) & 0xFF;
-                int gArmor = (armorColor >> 8) & 0xFF;
-                int bArmor = armorColor & 0xFF;
+                int diff = Math.abs(rC - rE) + Math.abs(gC - gE) + Math.abs(bC - bE);
+                int matchThreshold = SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get();
 
-                int rEnv = (envColor >> 16) & 0xFF;
-                int gEnv = (envColor >> 8) & 0xFF;
-                int bEnv = envColor & 0xFF;
+                if (diff <= matchThreshold) {
+                    float strength = CamoUtil.getCombinedCamoStrength(player);
 
-                int diff = Math.abs(rArmor - rEnv) + Math.abs(gArmor - gEnv) + Math.abs(bArmor - bEnv);
-                int matchBonusThreshold = SoundAttractConfig.COMMON.environmentalCamouflageColorMatchThreshold.get();
 
-                if (diff <= matchBonusThreshold) {
-                    double maxBonusEffect = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get();
-                    double effectivenessRatio;
-                    if (matchBonusThreshold > 0) {
-                        effectivenessRatio = 1.0 - ((double) diff / matchBonusThreshold);
-                    } else {
-                        effectivenessRatio = (diff == 0) ? 1.0 : 0.0;
-                    }
+                    float effectiveStrength = 0.4f + (strength * 0.6f); 
 
-                    double actualBonusEffectiveness = maxBonusEffect * effectivenessRatio;
-                    baseRange *= (1.0 - actualBonusEffectiveness);
+                    double maxBonus = SoundAttractConfig.COMMON.environmentalCamouflageMaxEffectiveness.get();
+                    double ratio = (matchThreshold > 0) ? 1.0 - ((double) diff / matchThreshold) : ((diff == 0) ? 1.0 : 0.0);
+                    
+                    double actualBonus = maxBonus * ratio * effectiveStrength;
+                    baseRange *= (1.0 - actualBonus);
 
                     if (SoundAttractConfig.COMMON.debugLogging.get()) {
                         SoundAttractMod.LOGGER.info(
-                                "[EnvCamo] Player {} BONUS: armor=0x{}, env=0x{}, diff={}, matchThold={}, ratio={}, effect={}, newRange={}",
-                                player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor),
-                                diff, matchBonusThreshold, String.format("%.2f", effectivenessRatio),
-                                String.format("%.2f", actualBonusEffectiveness), String.format("%.2f", baseRange)
+                                "[EnvCamo_Player] {} BONUS: finalColor=0x{}, envColor=0x{}, diff={}, strength={}, effect={}, newRange={}",
+                                player.getName().getString(), String.format("%06X", finalColor), String.format("%06X", envColor),
+                                diff, String.format("%.2f", strength), String.format("%.2f", actualBonus), String.format("%.2f", baseRange)
                         );
                     }
                 } else if (SoundAttractConfig.COMMON.enableEnvironmentalMismatchPenalty.get()) {
-                    int mismatchPenaltyThreshold = SoundAttractConfig.COMMON.environmentalMismatchThreshold.get();
-                    if (diff > mismatchPenaltyThreshold) {
-                        double penaltyFactor = SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
-                        baseRange *= penaltyFactor;
+                    int mismatchThreshold = SoundAttractConfig.COMMON.environmentalMismatchThreshold.get();
+                    if (diff > mismatchThreshold) {
+                        double penalty = SoundAttractConfig.COMMON.environmentalMismatchPenaltyFactor.get();
+                        baseRange *= penalty;
                         if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[EnvCamo] Player {} PENALTY: armor=0x{}, env=0x{}, diff={}, mismatchThold={}, penaltyFactor={}, newRange={}",
-                                    player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor),
-                                    diff, mismatchPenaltyThreshold, String.format("%.2f", penaltyFactor), String.format("%.2f", baseRange)
-                            );
-                        }
-                    } else {
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info(
-                                    "[EnvCamo] Player {} NEUTRAL: armor=0x{}, env=0x{}, diff={}, no bonus or penalty from env camo.",
-                                    player.getName().getString(), String.format("%06X", armorColor), String.format("%06X", envColor), diff
-                            );
+                            SoundAttractMod.LOGGER.info("[EnvCamo_Player] {} PENALTY: diff={}, penalty={}, newRange={}",
+                                    player.getName().getString(), diff, String.format("%.2f", penalty), String.format("%.2f", baseRange));
                         }
                     }
                 }
-            } else {
-                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[EnvCamo] Player {} - Could not get armor or environment color. Skipping.", player.getName().getString());
-                 }
             }
         }
 
@@ -1551,111 +1501,38 @@ public class StealthDetectionEvents {
     }
 
 
-    private static Optional<Integer> getEffectiveArmorColor(Player player) {
-        List<Integer> colors = new ArrayList<>();
-        boolean onlyDyedLeather = SoundAttractConfig.COMMON.environmentalCamouflageOnlyDyedLeather.get();
-
-        for (ItemStack itemStack : player.getArmorSlots()) {
-            if (itemStack.isEmpty()) {
-                continue;
-            }
-
-            Item item = itemStack.getItem();
-            boolean colorAdded = false;
-
-            if (item instanceof ArmorItem armorItem && armorItem.getMaterial() == ArmorMaterials.LEATHER && item instanceof DyeableLeatherItem dyeableItem) {
-                if (dyeableItem.hasCustomColor(itemStack)) {
-                    colors.add(dyeableItem.getColor(itemStack));
-                    colorAdded = true;
-                }
-            }
-
-            if (onlyDyedLeather && !colorAdded) {
-                continue;
-            }
-
-            if (!colorAdded) {
-                ResourceLocation itemIdRL = ForgeRegistries.ITEMS.getKey(item);
-                if (itemIdRL != null) {
-                    Integer mappedColorValue = SoundAttractConfig.customArmorColors.get(itemIdRL);
-                    if (mappedColorValue != null) {
-                        colors.add(mappedColorValue);
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info("[GetArmorColor] Using MAPPED color for {}: 0x{}",
-                                    itemIdRL, String.format("%06X", mappedColorValue));
-                        }
-                    } else {
-                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                            SoundAttractMod.LOGGER.info("[GetArmorColor] Item {} not found in custom_armor_color_map.", itemIdRL);
-                        }
-                    }
-                }
-            }
-        }
-        if (colors.isEmpty()) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[GetArmorColor] No determinable armor colors found.");
-            }
-            return Optional.empty();
-        }
-
-        long totalR = 0, totalG = 0, totalB = 0;
-        for (int color : colors) {
-            totalR += (color >> 16) & 0xFF;
-            totalG += (color >> 8) & 0xFF;
-            totalB += color & 0xFF;
-        }
-
-        int numColors = colors.size();
-        if (numColors == 0) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.warn("[GetArmorColor] numColors is 0 after processing, this should not happen if colors list was not empty.");
-            }
-            return Optional.empty();
-        }
-        int avgR = (int) (totalR / numColors);
-        int avgG = (int) (totalG / numColors);
-        int avgB = (int) (totalB / numColors);
-        int finalAvgColor = (avgR << 16) | (avgG << 8) | avgB;
-
-        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("[GetArmorColor] Average armor color: 0x{} from {} pieces.",
-                    String.format("%06X", finalAvgColor), numColors);
-        }
-        return Optional.of(finalAvgColor);
-    }
 
 
-    private static Optional<Integer> getAverageEnvironmentalColor(Player player, Level level) {
-        if (player == null || level == null) {
+    private static Optional<Integer> getAverageEnvironmentalColor(LivingEntity entity, Level level) {
+        if (entity == null || level == null) {
             return Optional.empty();
         }
         if (QuantifiedCacheCompat.isUsable()) {
-            BlockPos playerPos = player.blockPosition();
+            BlockPos pos = entity.blockPosition();
             String key = new StringBuilder(96)
                 .append(level.dimension().location().toString()).append('|')
-                .append(playerPos.getX()).append(',').append(playerPos.getY()).append(',').append(playerPos.getZ())
+                .append(pos.getX()).append(',').append(pos.getY()).append(',').append(pos.getZ())
                 .toString();
             return QuantifiedCacheCompat.getCached(
-                "soundattract_env_color_player",
+                "soundattract_env_color_entity",
                 key,
-                () -> soundattract$computeAverageEnvironmentalColor(player, level),
+                () -> soundattract$computeAverageEnvironmentalColor(entity, level),
                 2L,
                 8192L
             );
         }
 
-        return soundattract$computeAverageEnvironmentalColor(player, level);
+        return soundattract$computeAverageEnvironmentalColor(entity, level);
     }
 
-    private static Optional<Integer> soundattract$computeAverageEnvironmentalColor(Player player, Level level) {
+    private static Optional<Integer> soundattract$computeAverageEnvironmentalColor(LivingEntity entity, Level level) {
         List<Integer> blockColors = new ArrayList<>();
-        BlockPos playerPos = player.blockPosition();
+        BlockPos entityPos = entity.blockPosition();
 
         for (int yOffset = 0; yOffset >= -1; yOffset--) {
             for (int xOffset = -1; xOffset <= 1; xOffset++) {
                 for (int zOffset = -1; zOffset <= 1; zOffset++) {
-                    BlockPos currentPos = playerPos.offset(xOffset, yOffset, zOffset);
+                    BlockPos currentPos = entityPos.offset(xOffset, yOffset, zOffset);
                     if (level.isLoaded(currentPos)) {
                         BlockState blockState = level.getBlockState(currentPos);
                         if (!blockState.isAir()) {

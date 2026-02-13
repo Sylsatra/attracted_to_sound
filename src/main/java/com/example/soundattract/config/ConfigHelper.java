@@ -15,17 +15,17 @@ import java.util.List;
 
 public class ConfigHelper {
 
-    public static void register() {
-        // Register new split configs
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GeneralConfig.SPEC, "soundattract/general.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, StealthConfig.SPEC, "soundattract/stealth.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, GunsConfig.SPEC, "soundattract/guns.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, VoiceConfig.SPEC, "soundattract/voice.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, IntegrationConfig.SPEC, "soundattract/integration.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, com.example.soundattract.config.separate.ScentConfig.SPEC, "soundattract/scent.toml");
-        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, PerformanceConfig.SPEC, "soundattract/performance.toml");
+    public static void register(ModLoadingContext context) {
 
-        // Handle migration if needed
+        context.registerConfig(ModConfig.Type.COMMON, GeneralConfig.SPEC, "soundattract/general.toml");
+        context.registerConfig(ModConfig.Type.COMMON, StealthConfig.SPEC, "soundattract/stealth.toml");
+        context.registerConfig(ModConfig.Type.COMMON, GunsConfig.SPEC, "soundattract/guns.toml");
+        context.registerConfig(ModConfig.Type.COMMON, VoiceConfig.SPEC, "soundattract/voice.toml");
+        context.registerConfig(ModConfig.Type.COMMON, IntegrationConfig.SPEC, "soundattract/integration.toml");
+        context.registerConfig(ModConfig.Type.COMMON, com.example.soundattract.config.separate.ScentConfig.SPEC, "soundattract/scent.toml");
+        context.registerConfig(ModConfig.Type.COMMON, PerformanceConfig.SPEC, "soundattract/performance.toml");
+
+
         Path oldConfigPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
         if (Files.exists(oldConfigPath)) {
             migrateOldConfig(oldConfigPath);
@@ -40,7 +40,7 @@ public class ConfigHelper {
                 .build();
         oldConfig.load();
 
-        // 1. Migrate to GeneralConfig
+
         migrateToSpec(oldConfig, GeneralConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/general.toml"), List.of(
                 new Mapping("general.debugLogging", "general.debugLogging"),
                 new Mapping("general.enableDataDriven", "general.enableDataDriven"),
@@ -80,7 +80,7 @@ public class ConfigHelper {
                 new Mapping("legacy_profiles.specialPlayerProfilesRaw", "legacy_profiles.specialPlayerProfilesRaw")
         ));
 
-        // 2. Migrate to StealthConfig
+
         migrateToSpec(oldConfig, StealthConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/stealth.toml"), List.of(
                 new Mapping("sound_attract_stealth.fov.defaultHorizontalFov", "sound_attract_stealth.fov.defaultHorizontalFov"),
                 new Mapping("sound_attract_stealth.fov.defaultVerticalFov", "sound_attract_stealth.fov.defaultVerticalFov"),
@@ -135,7 +135,7 @@ public class ConfigHelper {
                 new Mapping("sound_attract_stealth.detection_range_limits.maxStealthDetectionRange", "sound_attract_stealth.detection_range_limits.maxStealthDetectionRange")
         ));
 
-        // 3. Migrate to GunsConfig
+
         migrateToSpec(oldConfig, GunsConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/guns.toml"), List.of(
                 new Mapping("guns.tacz.enableTaczIntegration", "guns.tacz.enableTaczIntegration"),
                 new Mapping("guns.tacz.taczReloadRange", "guns.tacz.taczReloadRange"),
@@ -160,7 +160,7 @@ public class ConfigHelper {
                 new Mapping("guns.pointblank.pointBlankMuzzleFlashReductions", "guns.pointblank.pointBlankMuzzleFlashReductions")
         ));
 
-        // 4. Migrate to VoiceConfig
+
         migrateToSpec(oldConfig, VoiceConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/voice.toml"), List.of(
                 new Mapping("voice_chat.Simple VC.enableVoiceChatIntegration", "voice_chat.Simple VC.enableVoiceChatIntegration"),
                 new Mapping("voice_chat.Simple VC.voiceChatWhisperRange", "voice_chat.Simple VC.voiceChatWhisperRange"),
@@ -168,7 +168,7 @@ public class ConfigHelper {
                 new Mapping("voice_chat.Simple VC.voiceChatWeight", "voice_chat.Simple VC.voiceChatWeight"),
                 new Mapping("voice_chat.Simple VC.voiceChatDbThresholdMap", "voice_chat.Simple VC.voiceChatDbThresholdMap")
         ));
-        // 5. Migrate to IntegrationConfig
+
         migrateToSpec(oldConfig, IntegrationConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/integration.toml"), List.of(
                 new Mapping("integration.enhanced_ai.enableBlockBreaking", "integration.enhanced_ai_inspired.enableBlockBreaking"),
                 new Mapping("integration.enhanced_ai.allowTeleportInvestigation", "integration.enhanced_ai_inspired.enableTeleportToSound"),
@@ -193,7 +193,7 @@ public class ConfigHelper {
                 new Mapping("mob_ai.xray_targeting.xrayChance", "integration.enhanced_ai_inspired.xrayChance")
         ));
 
-        // 6. Migrate to ScentConfig
+
         migrateToSpec(oldConfig, com.example.soundattract.config.separate.ScentConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/scent.toml"), List.of(
                 new Mapping("scent_system.enableScentSystem", "scent_system.enableScentSystem"),
                 new Mapping("scent_system.scentLifetimeTicks", "scent_system.scentLifetimeTicks"),
@@ -203,7 +203,7 @@ public class ConfigHelper {
                 new Mapping("scent_system.scentStrengthDecay", "scent_system.scentStrengthDecay")
         ));
         
-        // 9. Migrate to PerformanceConfig
+
         migrateToSpec(oldConfig, PerformanceConfig.SPEC, FMLPaths.CONFIGDIR.get().resolve("soundattract/performance.toml"), List.of(
                 new Mapping("performance.enableOptimizedLos", "performance.enableOptimizedLos"),
                 new Mapping("performance.enableOptimizedLosPairCache", "performance.enableOptimizedLosPairCache"),
@@ -218,7 +218,7 @@ public class ConfigHelper {
 
         oldConfig.close();
 
-        // Rename old config to .migrated
+
         try {
             Files.move(oldPath, oldPath.resolveSibling(oldPath.getFileName().toString() + ".migrated"));
             SoundAttractMod.LOGGER.info("Successfully migrated old configuration and renamed it to .migrated");
@@ -228,7 +228,7 @@ public class ConfigHelper {
     }
 
     private static void migrateToSpec(CommentedFileConfig oldConfig, net.minecraftforge.common.ForgeConfigSpec newSpec, Path newPath, List<Mapping> mappings) {
-        // Ensure parent directory exists
+
         try {
             Files.createDirectories(newPath.getParent());
         } catch (IOException e) {

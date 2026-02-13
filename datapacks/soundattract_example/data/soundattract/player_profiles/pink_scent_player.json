@@ -1,0 +1,13 @@
+{
+    "id": "pink_scent_player",
+    "condition": {
+        "nbt": "{ForgeCaps:{\"origins:origins\":{\"Origins\":{\"origins:origin\":\"origins:werewolf\"}}}}"
+    },
+    "scent_emission": {
+        "enabled": true,
+        "scent_strength_multiplier": 1.0,
+        "creation_interval_blocks": 4.0,
+        "show_scent_particles": true,
+        "scent_particle_color": "#FF69B4"
+    }
+}

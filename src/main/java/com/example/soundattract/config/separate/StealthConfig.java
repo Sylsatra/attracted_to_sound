@@ -75,6 +75,19 @@ public class StealthConfig {
     public static final ForgeConfigSpec.IntValue ENV_COLOR_SAMPLE_Y_OFFSET_START;
     public static final ForgeConfigSpec.IntValue ENV_COLOR_SAMPLE_Y_OFFSET_END;
 
+    public static final ForgeConfigSpec.BooleanValue ENABLE_LAYERED_CAMOUFLAGE;
+    public static final ForgeConfigSpec.IntValue MAX_CAMO_LAYERS;
+    public static final ForgeConfigSpec.IntValue BASE_CAMO_DURATION_TICKS;
+    public static final ForgeConfigSpec.DoubleValue WATER_DEGRADATION_RATE;
+    public static final ForgeConfigSpec.DoubleValue SPRINT_DEGRADATION_RATE;
+    public static final ForgeConfigSpec.DoubleValue DAMAGE_DEGRADATION_RATE;
+    public static final ForgeConfigSpec.DoubleValue BIOME_MISMATCH_DEGRADATION_RATE;
+    public static final ForgeConfigSpec.DoubleValue SCENT_MISMATCH_PENALTY_FACTOR;
+    public static final ForgeConfigSpec.DoubleValue CAMO_APPLIED_SCENT_BLOCK_STRENGTH;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CAMOUFLAGE_MATERIALS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> CAMO_CATEGORY_RULES;
+    public static final ForgeConfigSpec.IntValue CAMO_TEXTURE_RESOLUTION;
+
     static {
         BUILDER.comment("Sound Attract Mod - Stealth & Detection Configuration").push("sound_attract_stealth");
 
@@ -258,6 +271,42 @@ public class StealthConfig {
         ENV_COLOR_SAMPLE_Y_OFFSET_START = BUILDER.defineInRange("envColorSampleYOffsetStart", 0, -2, 2);
         ENV_COLOR_SAMPLE_Y_OFFSET_END = BUILDER.defineInRange("envColorSampleYOffsetEnd", -1, -2, 2);
         BUILDER.pop();
+
+        BUILDER.push("layered_camouflage");
+        ENABLE_LAYERED_CAMOUFLAGE = BUILDER.define("enableLayeredCamouflage", true);
+        MAX_CAMO_LAYERS = BUILDER.defineInRange("maxCamoLayers", 3, 1, 10);
+        BASE_CAMO_DURATION_TICKS = BUILDER.defineInRange("baseCamoDurationTicks", 12000, 100, 1000000);
+        WATER_DEGRADATION_RATE = BUILDER.defineInRange("waterDegradationRate", 0.02, 0.0, 1.0);
+        SPRINT_DEGRADATION_RATE = BUILDER.defineInRange("sprintDegradationRate", 0.02, 0.0, 1.0);
+        DAMAGE_DEGRADATION_RATE = BUILDER.defineInRange("damageDegradationRate", 0.1, 0.0, 1.0);
+        BIOME_MISMATCH_DEGRADATION_RATE = BUILDER.defineInRange("biomeMismatchDegradationRate", 0.01, 0.0, 1.0);
+        SCENT_MISMATCH_PENALTY_FACTOR = BUILDER.defineInRange("scentMismatchPenaltyFactor", 0.3, 0.0, 1.0);
+        CAMO_APPLIED_SCENT_BLOCK_STRENGTH = BUILDER.defineInRange("camoAppliedScentBlockStrength", 1.0, 0.0, 1.0);
+        
+        CAMOUFLAGE_MATERIALS = BUILDER.comment("Format: namespace:item_id ; #HexColor ; category ; blocksScent")
+                .defineList("camouflageMaterials", Arrays.asList(
+                    "minecraft:snowball;#CACACA;snow;true",
+                    "minecraft:mud;#5C3A1E;mud;true",
+                    "minecraft:coarse_dirt;#6B5A4A;earth;false",
+                    "minecraft:sand;#D4C98A;earth;false",
+                    "minecraft:red_sand;#B86434;earth;false",
+                    "minecraft:oak_sapling;#2D6B1B;foliage;false",
+                    "minecraft:spruce_sapling;#1A3D14;foliage;false",
+                    "minecraft:moss_block;#4A7A3C;foliage;false"
+                ), obj -> obj instanceof String);
+
+        CAMO_CATEGORY_RULES = BUILDER.comment("Format: category ; preferredTempRange(low-high) ; waterSensitive")
+                .defineList("camoCategoryRules", Arrays.asList(
+                    "snow;0.0-0.3;true",
+                    "mud;0.0-1.5;true",
+                    "earth;0.0-2.0;false",
+                    "foliage;0.6-0.95;false"
+                ), obj -> obj instanceof String);
+
+        CAMO_TEXTURE_RESOLUTION = BUILDER.comment("Resolution of the procedurally generated camouflage smudge textures. Higher values look smoother but use more memory.")
+                .defineInRange("camoTextureResolution", 256, 16, 1024);
+        BUILDER.pop();
+
         BUILDER.pop();
 
         BUILDER.comment("Detection Range Limits").push("detection_range_limits");

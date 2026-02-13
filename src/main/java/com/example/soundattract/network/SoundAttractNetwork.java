@@ -25,6 +25,18 @@ public class SoundAttractNetwork {
                 .decoder(SoundMessage::decode)
                 .consumerMainThread(SoundMessage::handle)
                 .add();
+
+        INSTANCE.messageBuilder(CamoSyncMessage.class, id++)
+                .encoder(CamoSyncMessage::encode)
+                .decoder(CamoSyncMessage::decode)
+                .consumerMainThread(CamoSyncMessage::handle)
+                .add();
+
+        INSTANCE.messageBuilder(PacketCamoRemoval.class, id++)
+                .encoder(PacketCamoRemoval::toBytes)
+                .decoder(PacketCamoRemoval::new)
+                .consumerMainThread(PacketCamoRemoval::handle)
+                .add();
     }
 
 }

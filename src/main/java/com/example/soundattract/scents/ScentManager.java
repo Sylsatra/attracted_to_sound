@@ -78,6 +78,20 @@ public class ScentManager {
     public void clear() {
         scentMap.clear();
     }
+
+    /**
+     * Gets all scent nodes across all loaded chunks.
+     * Used by the persistent scent particle system.
+     */
+    public List<ScentNode> getAllNodes() {
+        List<ScentNode> result = new ArrayList<>();
+
+
+        for (ConcurrentLinkedQueue<ScentNode> queue : new ArrayList<>(scentMap.values())) {
+            result.addAll(queue);
+        }
+        return result;
+    }
     
 
 

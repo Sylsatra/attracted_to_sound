@@ -491,6 +491,9 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue enableScentSystem = ScentConfig.ENABLE_SCENT_SYSTEM;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> scentEligibleMobs = ScentConfig.SCENT_ELIGIBLE_MOBS;
         public final ForgeConfigSpec.BooleanValue enableScentParticles = ScentConfig.ENABLE_SCENT_PARTICLES;
+        public final ForgeConfigSpec.BooleanValue enableGameplayScentParticles = ScentConfig.ENABLE_GAMEPLAY_SCENT_PARTICLES;
+        public final ForgeConfigSpec.IntValue scentParticleSpawnInterval = ScentConfig.SCENT_PARTICLE_SPAWN_INTERVAL;
+        public final ForgeConfigSpec.DoubleValue scentParticleRenderDistance = ScentConfig.SCENT_PARTICLE_RENDER_DISTANCE;
         public final ForgeConfigSpec.IntValue scentNodeDurationTicks = ScentConfig.SCENT_NODE_DURATION_TICKS;
         public final ForgeConfigSpec.DoubleValue scentCreationIntervalBlocks = ScentConfig.SCENT_CREATION_INTERVAL_BLOCKS;
         public final ForgeConfigSpec.DoubleValue tempHeavyDecayThreshold = ScentConfig.TEMP_HEAVY_DECAY_THRESHOLD;
@@ -998,6 +1001,7 @@ public class SoundAttractConfig {
         }
 
         parseAndCachePlayerActionConfig();
+        com.example.soundattract.camo.CamoMaterialRegistry.parseConfig();
 
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(

@@ -25,7 +25,7 @@ public enum PlayerStance implements net.minecraft.util.StringRepresentable {
         return configName;
     }
 
-    public static final StringRepresentable.EnumCodec<PlayerStance> CODEC = StringRepresentable.fromEnum(PlayerStance::values);
+    public static final net.minecraft.util.StringRepresentable.EnumCodec<PlayerStance> CODEC = net.minecraft.util.StringRepresentable.fromEnum(PlayerStance::values);
     
     @Override
     public String getSerializedName() {
