@@ -28,6 +28,8 @@ public class ScentConfig {
     public static final ForgeConfigSpec.DoubleValue SCENT_STRENGTH_DECAY;
     public static final ForgeConfigSpec.DoubleValue SCENT_DETECTION_RADIUS;
     public static final ForgeConfigSpec.BooleanValue RAIN_WASHES_SCENTS;
+    
+    public static final ForgeConfigSpec.IntValue SCENT_SCAN_BUDGET_PER_TICK;
 
     static {
         BUILDER.comment("Sound Attract Mod - Scent System Configuration").push("scent_system");
@@ -80,6 +82,8 @@ public class ScentConfig {
                 .defineInRange("scentStrengthDecay", 0.01, 0.0, 1.0);
         SCENT_DETECTION_RADIUS = BUILDER.comment("Radius within which mobs can detect scents.")
                 .defineInRange("scentDetectionRadius", 16.0, 1.0, 64.0);
+        SCENT_SCAN_BUDGET_PER_TICK = BUILDER.comment("Maximum number of mobs that can compute a new scent path per tick (prevents lag spikes during horde scent tracking).")
+                .defineInRange("scentScanBudgetPerTick", 5, 1, 100);
         BUILDER.pop();
 
         BUILDER.pop();

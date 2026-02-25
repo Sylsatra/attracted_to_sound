@@ -17,41 +17,62 @@ public final class WorkerComputations {
 
     public static WorkerScheduler.GroupComputeResult computeGroups(List<WorkerScheduler.MobSnapshot> mobs, WorkerScheduler.ConfigSnapshot cfg, long deadlineMs, ResourceLocation dimension) {
         if (mobs == null || mobs.isEmpty()) return null;
-        List<WorkerScheduler.MobSnapshot> candidates = new ArrayList<>();
+        List<WorkerScheduler.MobSnapshot> candidates = new ArrayList<>(mobs.size());
+        Map<UUID, WorkerScheduler.MobSnapshot> mobLookup = new HashMap<>((int) (mobs.size() / 0.75f) + 1);
+        
         for (WorkerScheduler.MobSnapshot m : mobs) {
-            if (m.alive()) candidates.add(m);
+            if (m.alive()) {
+                candidates.add(m);
+                mobLookup.put(m.uuid(), m);
+            }
         }
         if (candidates.isEmpty()) return null;
 
-        candidates.sort(Comparator.comparingDouble(WorkerScheduler.MobSnapshot::health).reversed());
+        candidates.sort((a, b) -> Double.compare(b.health(), a.health()));
 
         List<WorkerScheduler.MobSnapshot> leaders = new ArrayList<>();
         Map<UUID, UUID> mobToLeader = new HashMap<>();
 
         double groupRadius = cfg.leaderGroupRadius();
         double leaderSpacing = groupRadius * cfg.leaderSpacingMultiplier();
+        double leaderSpacingSq = leaderSpacing * leaderSpacing;
         int maxLeaders = cfg.maxLeaders();
         int maxGroupSize = cfg.maxGroupSize();
         int sectors = cfg.numEdgeSectors();
         int perSector = cfg.edgeMobsPerSector();
 
+        double cellSize = leaderSpacing;
+        Map<Long, List<WorkerScheduler.MobSnapshot>> leaderGrid = new HashMap<>();
+
         for (WorkerScheduler.MobSnapshot p : candidates) {
             if (leaders.size() >= maxLeaders) break;
+            
+            long cellKey = getCellKey(p.x(), p.z(), cellSize);
             boolean tooClose = false;
-            for (WorkerScheduler.MobSnapshot l : leaders) {
-                double dx = p.x() - l.x();
-                double dz = p.z() - l.z();
-                double dist2 = dx * dx + dz * dz;
-                if (dist2 < (leaderSpacing * leaderSpacing)) {
-                    tooClose = true;
-                    break;
+            
+            long[] adjacentCells = getAdjacentCells(cellKey, p.x(), p.z(), cellSize);
+            for (long adjKey : adjacentCells) {
+                List<WorkerScheduler.MobSnapshot> cellLeaders = leaderGrid.get(adjKey);
+                if (cellLeaders != null) {
+                    for (WorkerScheduler.MobSnapshot l : cellLeaders) {
+                        double dx = p.x() - l.x();
+                        double dz = p.z() - l.z();
+                        if (dx * dx + dz * dz < leaderSpacingSq) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
                 }
+                if (tooClose) break;
             }
+            
             if (!tooClose) {
                 leaders.add(p);
+                leaderGrid.computeIfAbsent(cellKey, k -> new ArrayList<>()).add(p);
             }
             if (System.currentTimeMillis() > deadlineMs) break;
         }
+        
         if (leaders.isEmpty()) {
             leaders.add(candidates.get(0));
         }
@@ -62,25 +83,32 @@ public final class WorkerComputations {
         }
 
         Set<UUID> assigned = new HashSet<>();
+        
+        double groupRadiusSq = groupRadius * groupRadius;
         for (WorkerScheduler.MobSnapshot m : candidates) {
             if (leaders.contains(m)) {
                 assigned.add(m.uuid());
                 mobToLeader.put(m.uuid(), m.uuid());
                 continue;
             }
+            
             WorkerScheduler.MobSnapshot bestLeader = null;
-            double bestDist = Double.MAX_VALUE;
+            double bestDistSq = Double.MAX_VALUE;
+            
             for (WorkerScheduler.MobSnapshot l : leaders) {
                 List<UUID> group = leaderToGroup.get(l.uuid());
                 if (group.size() >= maxGroupSize) continue;
+                
                 double dx = m.x() - l.x();
                 double dz = m.z() - l.z();
-                double dist = Math.hypot(dx, dz);
-                if (dist <= groupRadius && dist < bestDist) {
-                    bestDist = dist;
+                double distSq = dx * dx + dz * dz;
+                
+                if (distSq <= groupRadiusSq && distSq < bestDistSq) {
+                    bestDistSq = distSq;
                     bestLeader = l;
                 }
             }
+            
             if (bestLeader != null) {
                 leaderToGroup.get(bestLeader.uuid()).add(m.uuid());
                 mobToLeader.put(m.uuid(), bestLeader.uuid());
@@ -93,39 +121,44 @@ public final class WorkerComputations {
         for (WorkerScheduler.MobSnapshot leader : leaders) {
             List<UUID> group = leaderToGroup.getOrDefault(leader.uuid(), Collections.emptyList());
             Map<Integer, List<UUID>> sectorLists = new HashMap<>();
+            
             for (UUID memberId : group) {
                 if (memberId.equals(leader.uuid())) continue;
-                WorkerScheduler.MobSnapshot m = find(mobs, memberId);
+                WorkerScheduler.MobSnapshot m = mobLookup.get(memberId);
                 if (m == null) continue;
+                
                 double dx = m.x() - leader.x();
                 double dz = m.z() - leader.z();
-                double angle = Math.atan2(dz, dx);
-                int sector = (int) Math.floor(((angle + Math.PI) / (2 * Math.PI)) * sectors) % sectors;
+                int sector = getFastSector(dx, dz, sectors);
                 sectorLists.computeIfAbsent(sector, k -> new ArrayList<>()).add(memberId);
             }
+            
             Set<UUID> edge = new HashSet<>();
             for (Map.Entry<Integer, List<UUID>> e : sectorLists.entrySet()) {
                 List<UUID> ids = e.getValue();
+                
                 ids.sort((a, b) -> {
-                    WorkerScheduler.MobSnapshot ma = find(mobs, a);
-                    WorkerScheduler.MobSnapshot mb = find(mobs, b);
-                    double da = (ma == null) ? 0 : distance(ma, leader);
-                    double db = (mb == null) ? 0 : distance(mb, leader);
+                    WorkerScheduler.MobSnapshot ma = mobLookup.get(a);
+                    WorkerScheduler.MobSnapshot mb = mobLookup.get(b);
+                    double da = (ma == null) ? 0 : distanceSq(ma, leader);
+                    double db = (mb == null) ? 0 : distanceSq(mb, leader);
                     return Double.compare(db, da);
                 });
+                
                 int count = Math.min(perSector, ids.size());
                 for (int i = 0; i < count; i++) edge.add(ids.get(i));
             }
+            
             if (edge.isEmpty() && group.size() > 1) {
                 UUID far = null;
-                double best = -1;
+                double bestSq = -1;
                 for (UUID id : group) {
                     if (id.equals(leader.uuid())) continue;
-                    WorkerScheduler.MobSnapshot m = find(mobs, id);
+                    WorkerScheduler.MobSnapshot m = mobLookup.get(id);
                     if (m == null) continue;
-                    double d = distance(m, leader);
-                    if (d > best) {
-                        best = d;
+                    double dSq = distanceSq(m, leader);
+                    if (dSq > bestSq) {
+                        bestSq = dSq;
                         far = id;
                     }
                 }
@@ -213,14 +246,38 @@ public final class WorkerComputations {
         return score;
     }
 
-    private static double distance(WorkerScheduler.MobSnapshot a, WorkerScheduler.MobSnapshot b) {
+    private static double distanceSq(WorkerScheduler.MobSnapshot a, WorkerScheduler.MobSnapshot b) {
         double dx = a.x() - b.x();
         double dz = a.z() - b.z();
-        return Math.hypot(dx, dz);
+        return dx * dx + dz * dz;
     }
 
-    private static WorkerScheduler.MobSnapshot find(List<WorkerScheduler.MobSnapshot> list, UUID id) {
-        for (WorkerScheduler.MobSnapshot m : list) if (m.uuid().equals(id)) return m;
-        return null;
+    private static long getCellKey(double x, double z, double cellSize) {
+        if (cellSize <= 0) cellSize = 1;
+        long cx = (long) Math.floor(x / cellSize);
+        long cz = (long) Math.floor(z / cellSize);
+        return (cx & 0xFFFFFFFFL) | (cz << 32);
+    }
+
+    private static long[] getAdjacentCells(long centerKey, double x, double z, double cellSize) {
+        if (cellSize <= 0) return new long[]{centerKey};
+        long cx = (long) Math.floor(x / cellSize);
+        long cz = (long) Math.floor(z / cellSize);
+        return new long[]{
+            centerKey,
+            ((cx - 1) & 0xFFFFFFFFL) | (cz << 32),
+            ((cx + 1) & 0xFFFFFFFFL) | (cz << 32),
+            (cx & 0xFFFFFFFFL) | ((cz - 1) << 32),
+            (cx & 0xFFFFFFFFL) | ((cz + 1) << 32),
+            ((cx - 1) & 0xFFFFFFFFL) | ((cz - 1) << 32),
+            ((cx + 1) & 0xFFFFFFFFL) | ((cz + 1) << 32),
+            ((cx - 1) & 0xFFFFFFFFL) | ((cz + 1) << 32),
+            ((cx + 1) & 0xFFFFFFFFL) | ((cz - 1) << 32)
+        };
+    }
+
+    private static int getFastSector(double dx, double dz, int totalSectors) {
+        double angle = Math.atan2(dz, dx);
+        return (int) Math.floor(((angle + Math.PI) / (2 * Math.PI)) * totalSectors) % totalSectors;
     }
 }

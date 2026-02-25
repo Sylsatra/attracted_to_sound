@@ -439,6 +439,7 @@ public class FollowerEdgeRelayGoal extends Goal {
                         usedFallback = true;
                     }
                     if (raidLeader != null
+                            && SoundAttractConfig.COMMON.enableSoundRaid.get()
                             && !com.example.soundattract.ai.RaidManager.isRaidTicking(raidLeader)
                             && !com.example.soundattract.ai.RaidManager.isRaidAdvancing(raidLeader)) {
                         com.example.soundattract.ai.RaidManager.scheduleRaid(
@@ -513,6 +514,7 @@ public class FollowerEdgeRelayGoal extends Goal {
                             usedFallbackArr = true;
                         }
                         if (raidLeader != null && !raidScheduled
+                                && SoundAttractConfig.COMMON.enableSoundRaid.get()
                                 && !com.example.soundattract.ai.RaidManager.isRaidTicking(raidLeader)
                                 && !com.example.soundattract.ai.RaidManager.isRaidAdvancing(raidLeader)) {
                             com.example.soundattract.ai.RaidManager.scheduleRaid(raidLeader, this.targetSoundPos, this.mob.level().getGameTime());

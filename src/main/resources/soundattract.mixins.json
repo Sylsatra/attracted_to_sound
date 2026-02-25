@@ -19,7 +19,8 @@
     "LivingEntityMixin",
     "EntityMixin",
     "SnowballMixin",
-    "ThrownPotionMixin"
+    "ThrownPotionMixin",
+    "MobAccessor"
   ],
   "client": [
     "HumanoidArmorLayerMixin",

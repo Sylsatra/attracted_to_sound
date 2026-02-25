@@ -170,9 +170,35 @@ public class FollowLeaderGoal extends Goal {
                 Vec3 curPos = mob.position();
                 if (curPos.distanceToSqr(lastRandomDest) > 2.25) {
                     double sprintMult = com.example.soundattract.config.SoundAttractConfig.COMMON.groupSprintMultiplier.get();
-                    mob.getNavigation().moveTo(
-                        lastRandomDest.x, lastRandomDest.y, lastRandomDest.z, moveSpeed * sprintMult
-                    );
+                    double finalSpeed = moveSpeed * sprintMult;
+
+                    boolean useFlowField = false;
+                    try {
+                        useFlowField = com.example.soundattract.config.SoundAttractConfig.COMMON.enableFlowField.get();
+                    } catch (Throwable ignored) {}
+                    int ffThreshold = 15;
+                    try {
+                        ffThreshold = com.example.soundattract.config.SoundAttractConfig.COMMON.flowFieldMobThreshold.get();
+                    } catch (Throwable ignored) {}
+
+                    boolean moved = false;
+                    if (useFlowField) {
+                        int groupSize = MobGroupManager.getFollowerCount(leader);
+                        if (groupSize >= ffThreshold) {
+                            Vec3 flowVec = com.example.soundattract.pathfinding.FlowFieldManager.getNextStep(mob, lastRandomDest);
+                            if (flowVec != null) {
+                                double fx = curPos.x + flowVec.x * 3.0;
+                                double fy = curPos.y + flowVec.y * 3.0;
+                                double fz = curPos.z + flowVec.z * 3.0;
+                                moved = com.example.soundattract.pathfinding.NavLimiter.maybeMoveTo(mob, fx, fy, fz, finalSpeed);
+                            }
+                        }
+                    }
+                    if (!moved) {
+                        com.example.soundattract.pathfinding.NavLimiter.maybeMoveTo(
+                            mob, lastRandomDest.x, lastRandomDest.y, lastRandomDest.z, finalSpeed
+                        );
+                    }
                 }
 
                 if (lastPos != null && curPos.distanceToSqr(lastPos) < 0.04) {
@@ -314,9 +340,35 @@ public class FollowLeaderGoal extends Goal {
         if (lastRandomDest != null) {
             Vec3 curPos = mob.position();
             if (curPos.distanceToSqr(lastRandomDest) > 2.25) {
-                mob.getNavigation().moveTo(
-                    lastRandomDest.x, lastRandomDest.y, lastRandomDest.z, moveSpeed
-                );
+                double finalSpeed = moveSpeed;
+
+                boolean useFlowField = false;
+                try {
+                    useFlowField = com.example.soundattract.config.SoundAttractConfig.COMMON.enableFlowField.get();
+                } catch (Throwable ignored) {}
+                int ffThreshold = 15;
+                try {
+                    ffThreshold = com.example.soundattract.config.SoundAttractConfig.COMMON.flowFieldMobThreshold.get();
+                } catch (Throwable ignored) {}
+
+                boolean moved = false;
+                if (useFlowField) {
+                    int groupSize = MobGroupManager.getFollowerCount(leader);
+                    if (groupSize >= ffThreshold) {
+                        Vec3 flowVec = com.example.soundattract.pathfinding.FlowFieldManager.getNextStep(mob, lastRandomDest);
+                        if (flowVec != null) {
+                            double fx = curPos.x + flowVec.x * 3.0;
+                            double fy = curPos.y + flowVec.y * 3.0;
+                            double fz = curPos.z + flowVec.z * 3.0;
+                            moved = com.example.soundattract.pathfinding.NavLimiter.maybeMoveTo(mob, fx, fy, fz, finalSpeed);
+                        }
+                    }
+                }
+                if (!moved) {
+                    com.example.soundattract.pathfinding.NavLimiter.maybeMoveTo(
+                        mob, lastRandomDest.x, lastRandomDest.y, lastRandomDest.z, finalSpeed
+                    );
+                }
             }
 
             if (lastPos != null && curPos.distanceToSqr(lastPos) < 0.04) {

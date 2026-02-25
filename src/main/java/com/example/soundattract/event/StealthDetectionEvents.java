@@ -6,6 +6,7 @@ import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.util.CamoUtil;
 import com.example.soundattract.enchantment.ModEnchantments;
 import com.example.soundattract.ai.MobGroupManager;
+import com.example.soundattract.ai.RaidManager;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -55,17 +56,48 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import com.example.soundattract.camo.CamouflageCapability;
 import com.example.soundattract.camo.CamoMaterialRegistry;
 import com.example.soundattract.config.separate.StealthConfig;
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.TimeUnit;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class StealthDetectionEvents {
 
-    private static final Map<UUID, Integer> mobOutOfRangeTicks = new ConcurrentHashMap<>();
-    private static final Map<UUID, net.minecraft.world.phys.Vec3> lastPlayerPositions = new ConcurrentHashMap<>();
-    private static final Map<java.util.UUID, net.minecraft.world.phys.Vec3> lastMobPositions = new ConcurrentHashMap<>();
+    private static Map<UUID, Integer> mobOutOfRangeTicks = new ConcurrentHashMap<>();
+    private static Map<UUID, net.minecraft.world.phys.Vec3> lastPlayerPositions = new ConcurrentHashMap<>();
+    private static Map<java.util.UUID, net.minecraft.world.phys.Vec3> lastMobPositions = new ConcurrentHashMap<>();
     private static long lastStealthCheckTick = -1;
-    private static final Map<UUID, GunshotInfo> playerGunshotInfo = new ConcurrentHashMap<>();
+    private static Map<UUID, GunshotInfo> playerGunshotInfo = new ConcurrentHashMap<>();
 
-    private static final Map<UUID, Double> XRAY_RANGE_CACHE = new ConcurrentHashMap<>();
+    private static Map<UUID, Double> XRAY_RANGE_CACHE = new ConcurrentHashMap<>();
+
+    public static void reinitializeCaches() {
+        int max = SoundAttractConfig.COMMON.globalCacheMaxSize.get();
+        int mins = SoundAttractConfig.COMMON.globalCacheExpireMins.get();
+
+        Map<UUID, Integer> oldObj1 = mobOutOfRangeTicks;
+        mobOutOfRangeTicks = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, Integer>build().asMap();
+        mobOutOfRangeTicks.putAll(oldObj1);
+
+        Map<UUID, net.minecraft.world.phys.Vec3> oldObj2 = lastPlayerPositions;
+        lastPlayerPositions = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, net.minecraft.world.phys.Vec3>build().asMap();
+        lastPlayerPositions.putAll(oldObj2);
+
+        Map<java.util.UUID, net.minecraft.world.phys.Vec3> oldObj3 = lastMobPositions;
+        lastMobPositions = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<java.util.UUID, net.minecraft.world.phys.Vec3>build().asMap();
+        lastMobPositions.putAll(oldObj3);
+
+        Map<UUID, GunshotInfo> oldObj4 = playerGunshotInfo;
+        playerGunshotInfo = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, GunshotInfo>build().asMap();
+        playerGunshotInfo.putAll(oldObj4);
+
+        Map<UUID, Double> oldObj5 = XRAY_RANGE_CACHE;
+        XRAY_RANGE_CACHE = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, Double>build().asMap();
+        XRAY_RANGE_CACHE.putAll(oldObj5);
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[StealthDetectionEvents] Initialized Guava internal memory caches (max {}, {} mins)", max, mins);
+        }
+    }
 
     private static final Set<UUID> suppressedEdgeDetections = ConcurrentHashMap.newKeySet();
 
@@ -735,6 +767,19 @@ public class StealthDetectionEvents {
             return true;
         }
 
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            try {
+                net.minecraft.world.entity.Mob leader = com.example.soundattract.ai.MobGroupManager.getLeader(mob);
+                if (leader != null && leader != mob) {
+                    boolean isEdge = com.example.soundattract.ai.MobGroupManager.isEdgeMob(mob);
+                    boolean isDeserter = com.example.soundattract.ai.MobGroupManager.isDeserter(mob);
+                    if (!isEdge && !isDeserter) {
+                        return false;
+                    }
+                }
+            } catch (Throwable t) {}
+        }
+
         Level level = mob.level();
 
         double xrayRange = getEffectiveXrayRange(mob);
@@ -832,6 +877,19 @@ public class StealthDetectionEvents {
         }
         if (shouldUseVanillaTargeting(mob.level())) {
             return true;
+        }
+
+        if (SoundAttractConfig.COMMON.edgeMobSmartBehavior.get()) {
+            try {
+                net.minecraft.world.entity.Mob leader = com.example.soundattract.ai.MobGroupManager.getLeader(mob);
+                if (leader != null && leader != mob) {
+                    boolean isEdge = com.example.soundattract.ai.MobGroupManager.isEdgeMob(mob);
+                    boolean isDeserter = com.example.soundattract.ai.MobGroupManager.isDeserter(mob);
+                    if (!isEdge && !isDeserter) {
+                        return false;
+                    }
+                }
+            } catch (Throwable t) {}
         }
 
         Level level = mob.level();
@@ -950,6 +1008,24 @@ public class StealthDetectionEvents {
                 }
 
                 boolean canCurrentlyDetect;
+
+                boolean raidFollowerSkipped = false;
+                try {
+                    if (SoundAttractConfig.COMMON.raidFollowerInheritTarget.get()) {
+                        Mob leader = MobGroupManager.getLeader(mob);
+                        if (leader != null && RaidManager.isRaidAdvancing(leader)) {
+                            boolean isEdge = MobGroupManager.isEdgeMob(mob);
+                            boolean isLeader = (mob == leader);
+                            if (!isEdge && !isLeader) {
+                                raidFollowerSkipped = true;
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
+
+                if (raidFollowerSkipped) {
+                    canCurrentlyDetect = false;
+                } else
                 if (sharedStealthCache != null) {
                     double radius = SoundAttractConfig.COMMON.stealthShareTargetToNearbyMobsRadius.get();
                     int cell = (int) Math.max(1, Math.floor(radius));
@@ -972,6 +1048,21 @@ public class StealthDetectionEvents {
                             boolean isEdge = MobGroupManager.isEdgeMob(mob);
                             boolean isDeserter = MobGroupManager.isDeserter(mob);
                             if (isEdge && !isDeserter) {
+                                Mob edgeLeader = MobGroupManager.getLeader(mob);
+                                if (edgeLeader != null && RaidManager.isRaidAdvancing(edgeLeader) && canCurrentlyDetect && target != null) {
+                                    try {
+                                        String action = SoundAttractConfig.COMMON.raidEdgeDetectionAction.get();
+                                        if ("redirect".equalsIgnoreCase(action)) {
+                                            RaidManager.updateRaidTarget(edgeLeader, target.blockPosition());
+                                        } else if ("share".equalsIgnoreCase(action)) {
+                                            for (Mob nearby : mob.level().getEntitiesOfClass(Mob.class, mob.getBoundingBox().inflate(16.0), m -> m.isAlive())) {
+                                                if (MobGroupManager.getLeader(nearby) == edgeLeader && nearby != mob) {
+                                                    nearby.setTarget(target);
+                                                }
+                                            }
+                                        }
+                                    } catch (Throwable ignored) {}
+                                }
                                 recordSuppressedEdgeDetection(mob);
                                 canCurrentlyDetect = false;
                             }

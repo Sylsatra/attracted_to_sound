@@ -74,7 +74,9 @@ public class SoundAttractMod {
             event.getConfig().getSpec() == VoiceConfig.SPEC ||
             event.getConfig().getSpec() == IntegrationConfig.SPEC ||
             event.getConfig().getSpec() == ScentConfig.SPEC ||
-            event.getConfig().getSpec() == PerformanceConfig.SPEC) {
+            event.getConfig().getSpec() == PerformanceConfig.SPEC ||
+            event.getConfig().getSpec() == RaidConfig.SPEC ||
+            event.getConfig().getSpec() == PathfindingConfig.SPEC) {
             SoundAttractConfig.bakeConfig();
         }
     }
@@ -86,7 +88,9 @@ public class SoundAttractMod {
             event.getConfig().getSpec() == VoiceConfig.SPEC ||
             event.getConfig().getSpec() == IntegrationConfig.SPEC ||
             event.getConfig().getSpec() == ScentConfig.SPEC ||
-            event.getConfig().getSpec() == PerformanceConfig.SPEC) {
+            event.getConfig().getSpec() == PerformanceConfig.SPEC ||
+            event.getConfig().getSpec() == RaidConfig.SPEC ||
+            event.getConfig().getSpec() == PathfindingConfig.SPEC) {
             SoundAttractConfig.bakeConfig();
         }
     }

@@ -4,6 +4,7 @@ import com.example.soundattract.event.FovEvents;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.async.AsyncManager;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.tracking.SoundTracker;
 
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
@@ -197,6 +198,7 @@ public final class OptimizedLOS {
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
+        resetMufflingBudget();
         if (LOS_QUEUE.isEmpty()) return;
 
         int budget = 64;
@@ -503,5 +505,143 @@ public final class OptimizedLOS {
         }
 
         return true;
+    }
+
+    private static final AtomicInteger MUFFLING_RAYCASTS_THIS_TICK = new AtomicInteger(0);
+
+    public static void resetMufflingBudget() {
+        MUFFLING_RAYCASTS_THIS_TICK.set(0);
+    }
+
+    public static boolean tryConsumeMufflingBudget() {
+        int max = 0;
+        try {
+            max = SoundAttractConfig.COMMON.maxMufflingRaycastsPerTick.get();
+        } catch (Throwable ignored) {}
+        if (max <= 0) return true; 
+        return MUFFLING_RAYCASTS_THIS_TICK.incrementAndGet() <= max;
+    }
+
+    public static double[] computeMufflingDda(Level level, BlockPos src, BlockPos dst,
+                                               double origRange, double origWeight) {
+        if (level == null || src == null || dst == null) {
+            return new double[]{origRange, origWeight};
+        }
+
+        Vec3 start = Vec3.atCenterOf(src);
+        Vec3 end   = Vec3.atCenterOf(dst);
+
+        double dx = end.x - start.x;
+        double dy = end.y - start.y;
+        double dz = end.z - start.z;
+        double distSqr = dx * dx + dy * dy + dz * dz;
+        if (distSqr < 1.0e-8) {
+            return new double[]{origRange, origWeight};
+        }
+
+        int x = Mth.floor(start.x);
+        int y = Mth.floor(start.y);
+        int z = Mth.floor(start.z);
+
+        int endX = Mth.floor(end.x);
+        int endY = Mth.floor(end.y);
+        int endZ = Mth.floor(end.z);
+
+        if (x == endX && y == endY && z == endZ) {
+            return new double[]{origRange, origWeight};
+        }
+
+        int stepX = dx > 0.0 ? 1 : (dx < 0.0 ? -1 : 0);
+        int stepY = dy > 0.0 ? 1 : (dy < 0.0 ? -1 : 0);
+        int stepZ = dz > 0.0 ? 1 : (dz < 0.0 ? -1 : 0);
+
+        double invDx = stepX == 0 ? Double.POSITIVE_INFINITY : (1.0 / Math.abs(dx));
+        double invDy = stepY == 0 ? Double.POSITIVE_INFINITY : (1.0 / Math.abs(dy));
+        double invDz = stepZ == 0 ? Double.POSITIVE_INFINITY : (1.0 / Math.abs(dz));
+
+        double tMaxX = stepX == 0 ? Double.POSITIVE_INFINITY
+                : ((stepX > 0 ? (x + 1.0) - start.x : start.x - x) * invDx);
+        double tMaxY = stepY == 0 ? Double.POSITIVE_INFINITY
+                : ((stepY > 0 ? (y + 1.0) - start.y : start.y - y) * invDy);
+        double tMaxZ = stepZ == 0 ? Double.POSITIVE_INFINITY
+                : ((stepZ > 0 ? (z + 1.0) - start.z : start.z - z) * invDz);
+
+        double tDeltaX = invDx;
+        double tDeltaY = invDy;
+        double tDeltaZ = invDz;
+
+        int maxSteps = 4 + Math.abs(endX - x) + Math.abs(endY - y) + Math.abs(endZ - z);
+        int maxBlocksToCheck = 32;
+        try {
+            maxBlocksToCheck = SoundAttractConfig.COMMON.maxMufflingBlocksToCheck.get();
+        } catch (Throwable ignored) {}
+
+        double currentRange  = origRange;
+        double currentWeight = origWeight;
+        int blocksHit = 0;
+
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+
+        double factorWool, factorSolid, factorNonSolid, factorThin, factorLiquid, factorAir;
+        try {
+            factorWool     = SoundAttractConfig.COMMON.mufflingFactorWool.get();
+            factorSolid    = SoundAttractConfig.COMMON.mufflingFactorSolid.get();
+            factorNonSolid = SoundAttractConfig.COMMON.mufflingFactorNonSolid.get();
+            factorThin     = SoundAttractConfig.COMMON.mufflingFactorThin.get();
+            factorLiquid   = SoundAttractConfig.COMMON.mufflingFactorLiquid.get();
+            factorAir      = SoundAttractConfig.COMMON.mufflingFactorAir.get();
+        } catch (Throwable ignored) {
+            factorWool = 0.15; factorSolid = 0.35; factorNonSolid = 0.7;
+            factorThin = 0.9;  factorLiquid = 0.5; factorAir = 1.0;
+        }
+
+        for (int steps = 0; steps < maxSteps && blocksHit < maxBlocksToCheck
+                && currentRange > 0.1 && currentWeight > 0.01; steps++) {
+            double tMin = Math.min(tMaxX, Math.min(tMaxY, tMaxZ));
+
+            boolean stepAxisX = (tMaxX - tMin) <= TIE_EPS;
+            boolean stepAxisY = (tMaxY - tMin) <= TIE_EPS;
+            boolean stepAxisZ = (tMaxZ - tMin) <= TIE_EPS;
+
+            if (stepAxisX) { x += stepX; tMaxX += tDeltaX; }
+            if (stepAxisY) { y += stepY; tMaxY += tDeltaY; }
+            if (stepAxisZ) { z += stepZ; tMaxZ += tDeltaZ; }
+
+            pos.set(x, y, z);
+            if (!level.isLoaded(pos)) break;
+
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir()) {
+                if (factorAir >= 1.0) continue;
+                currentRange  *= factorAir;
+                currentWeight *= factorAir;
+                blocksHit++;
+                if (x == endX && y == endY && z == endZ) break;
+                continue;
+            }
+
+            net.minecraft.world.level.block.Block block = state.getBlock();
+            double factor = 1.0;
+            if (SoundTracker.isCustomWool(state, block, level, pos)) {
+                factor = factorWool;
+            } else if (SoundTracker.isCustomLiquid(state, block, level, pos)) {
+                factor = factorLiquid;
+            } else if (SoundTracker.isCustomThin(state, block, level, pos)) {
+                factor = factorThin;
+            } else if (SoundTracker.isCustomSolid(state, block, level, pos)) {
+                factor = factorSolid;
+            } else if (SoundTracker.isCustomNonSolid(state, block, level, pos)) {
+                factor = factorNonSolid;
+            }
+            if (factor < 1.0) {
+                currentRange  *= factor;
+                currentWeight *= factor;
+                blocksHit++;
+            }
+
+            if (x == endX && y == endY && z == endZ) break;
+        }
+
+        return new double[]{Math.max(0, currentRange), Math.max(0, currentWeight)};
     }
 }

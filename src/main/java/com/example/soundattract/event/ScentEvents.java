@@ -26,12 +26,31 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.concurrent.ConcurrentHashMap;
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.TimeUnit;
 
 @Mod.EventBusSubscriber(modid = SoundAttractMod.MOD_ID)
 public class ScentEvents {
 
-    private static final Map<UUID, Vec3> lastScentPos = new ConcurrentHashMap<>();
-    private static final Map<UUID, Long> lastScentTime = new ConcurrentHashMap<>();
+    private static Map<UUID, Vec3> lastScentPos = new ConcurrentHashMap<>();
+    private static Map<UUID, Long> lastScentTime = new ConcurrentHashMap<>();
+
+    public static void reinitializeCaches() {
+        int max = SoundAttractConfig.COMMON.globalCacheMaxSize.get();
+        int mins = SoundAttractConfig.COMMON.globalCacheExpireMins.get();
+
+        Map<UUID, Vec3> oldObj1 = lastScentPos;
+        lastScentPos = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, Vec3>build().asMap();
+        lastScentPos.putAll(oldObj1);
+
+        Map<UUID, Long> oldObj2 = lastScentTime;
+        lastScentTime = CacheBuilder.newBuilder().expireAfterWrite(mins, TimeUnit.MINUTES).maximumSize(max).concurrencyLevel(4).<UUID, Long>build().asMap();
+        lastScentTime.putAll(oldObj2);
+
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[ScentEvents] Initialized Guava internal memory caches (max {}, {} mins)", max, mins);
+        }
+    }
 
     @SubscribeEvent
     public static void attachCapabilities(AttachCapabilitiesEvent<Level> event) {

@@ -37,11 +37,25 @@ public class RaidManager {
         if (!(leader.level() instanceof ServerLevel level)) return;
         PerWorldData d = getData(level);
         Raid raid = new Raid(leader, targetPos, now);
+        
+        leader.setPersistenceRequired(); 
+        raid.persistentParticipants.add(leader.getUUID());
+        
+        List<Mob> followers = MobGroupManager.getFollowers(leader);
+        if (followers != null) {
+            for (Mob follower : followers) {
+                if (follower != null && follower.isAlive() && !follower.isRemoved()) {
+                    follower.setPersistenceRequired(); 
+                    raid.persistentParticipants.add(follower.getUUID());
+                }
+            }
+        }
+
         d.leaderToRaid.put(leader, raid);
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             int countdown = SoundAttractConfig.COMMON.raidCountdownTicks.get();
-            SoundAttractMod.LOGGER.info("[RaidManager] Scheduled RAID for leader {} at {} (countdown {} ticks)",
-                    leader.getName().getString(), targetPos, countdown);
+            SoundAttractMod.LOGGER.info("[RaidManager] Scheduled RAID for leader {} at {} (countdown {} ticks). Made {} participants persistent.",
+                    leader.getName().getString(), targetPos, countdown, raid.persistentParticipants.size());
         }
     }
 
@@ -68,9 +82,33 @@ public class RaidManager {
     public static void clearRaid(Mob leader) {
         if (!(leader.level() instanceof ServerLevel level)) return;
         PerWorldData d = getData(level);
-        d.leaderToRaid.remove(leader);
+        Raid raid = d.leaderToRaid.remove(leader);
+        if (raid != null) {
+            clearPersistence(level, raid);
+        }
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[RaidManager] Cleared RAID for leader {}", leader.getName().getString());
+        }
+    }
+
+    private static void clearPersistence(ServerLevel level, Raid raid) {
+        if (raid == null || raid.persistentParticipants.isEmpty()) return;
+        for (UUID uuid : raid.persistentParticipants) {
+            net.minecraft.world.entity.Entity entity = level.getEntity(uuid);
+            if (entity instanceof Mob mob && mob.isAlive() && !mob.isRemoved()) {
+                ((com.example.soundattract.mixin.MobAccessor) mob).setPersistenceRequiredFlag(false);
+            }
+        }
+        raid.persistentParticipants.clear();
+    }
+
+    public static void updateRaidTarget(Mob leader, BlockPos newTarget) {
+        Raid r = getRaid(leader);
+        if (r == null || !r.advancing) return;
+        r.target = newTarget;
+        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+            SoundAttractMod.LOGGER.info("[RaidManager] RAID target updated for leader {} to {}",
+                    leader.getName().getString(), newTarget);
         }
     }
 
@@ -86,12 +124,29 @@ public class RaidManager {
         return r;
     }
 
+    public static void registerPersistentRaidMob(Mob leader, Mob spawned) {
+        Raid r = getRaid(leader);
+        if (r != null) {
+            r.persistentParticipants.add(spawned.getUUID());
+        }
+    }
+
     public static void tick(ServerLevel level) {
         PerWorldData d = getData(level);
         long now = level.getGameTime();
 
         if (d.lastCleanupTime == -1L || now - d.lastCleanupTime > 200) {
-            d.leaderToRaid.entrySet().removeIf(e -> e.getKey() == null || e.getKey().isRemoved() || !e.getKey().isAlive());
+            d.leaderToRaid.entrySet().removeIf(e -> {
+                Mob leader = e.getKey();
+                Raid raid = e.getValue();
+                if (leader == null || leader.isRemoved() || !leader.isAlive() || raid == null || !raid.isValid()) {
+                   if (raid != null) {
+                       clearPersistence(level, raid);
+                   }
+                   return true;
+                }
+                return false;
+            });
             d.lastCleanupTime = now;
         }
         synchronized (d.leaderToRaid) {
@@ -100,6 +155,9 @@ public class RaidManager {
                 Mob leader = entry.getKey();
                 Raid raid = entry.getValue();
                 if (leader == null || leader.isRemoved() || !leader.isAlive() || raid == null) {
+                    if (raid != null) {
+                        clearPersistence(level, raid);
+                    }
                     it.remove();
                     continue;
                 }
@@ -110,6 +168,7 @@ public class RaidManager {
                             SoundAttractMod.LOGGER.info("[RaidManager] RAID ticking for leader {}: {} ticks remaining",
                                     leader.getName().getString(), raid.ticksRemaining);
                         }
+                        com.example.soundattract.raid.RaidReinforcementManager.trySpawnReinforcement(level, leader, raid.target);
                     }
                     if (raid.ticksRemaining <= 0) {
                         raid.ticksRemaining = 0;
@@ -126,9 +185,10 @@ public class RaidManager {
 
     private static class Raid {
         final WeakReference<Mob> leaderRef;
-        final BlockPos target;
+        volatile BlockPos target;
         int ticksRemaining;
         boolean advancing;
+        final Set<UUID> persistentParticipants = new HashSet<>();
 
         Raid(Mob leader, BlockPos target, long now) {
             this.leaderRef = new WeakReference<>(leader);
