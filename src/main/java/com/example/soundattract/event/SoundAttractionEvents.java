@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import com.example.soundattract.ai.AttractionGoal;
 import com.example.soundattract.ai.BlockBreakerManager;
 import com.example.soundattract.ai.FollowLeaderGoal;
+import com.example.soundattract.ai.FollowScentGoal;
 import com.example.soundattract.ai.FollowerEdgeRelayGoal;
 import com.example.soundattract.ai.LeaderAttractionGoal;
 import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
@@ -61,18 +62,9 @@ public class SoundAttractionEvents {
         }
     }
 
-    public static boolean isCustomNpcsMob(Mob mob) {
-        if (SoundAttractConfig.COMMON.debugLogging.get()) {
-            SoundAttractMod.LOGGER.info("[SoundAttractionEvents] isCustomNpcsMob called for {} with class: {}", 
-                mob != null ? mob.getName().getString() : "null", 
-                mob != null ? mob.getClass().getName() : "null");
-        }
-        
+    public static boolean isCustomNpcsMob(Mob mob) {        
         if (mob == null) return false;
         if (SoundAttractConfig.COMMON == null || !SoundAttractConfig.COMMON.enableCustomNpcsIntegration.get()) {
-            if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.info("[SoundAttractionEvents] CustomNPCs integration disabled");
-            }
             return false;
         }
         try {
@@ -84,9 +76,6 @@ public class SoundAttractionEvents {
                     className.contains("EntityCustomNpc") || 
                     className.contains("EntityNPCFlying") ||
                     className.contains("noppes.npcs.entity")) {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.info("[SoundAttractionEvents] Detected CustomNPCs by class: {}", className);
-                    }
                     return true;
                 }
                 c = c.getSuperclass();

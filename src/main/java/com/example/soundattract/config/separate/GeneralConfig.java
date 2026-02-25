@@ -29,6 +29,7 @@ public class GeneralConfig {
     public static final ForgeConfigSpec.IntValue SOUND_LIFETIME_TICKS;
     public static final ForgeConfigSpec.DoubleValue ARRIVAL_DISTANCE;
     public static final ForgeConfigSpec.DoubleValue MOB_MOVE_SPEED;
+    public static final ForgeConfigSpec.DoubleValue FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT;
 
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SOUND_ID_WHITELIST;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> SOUND_ID_BLACKLIST;
@@ -41,13 +42,9 @@ public class GeneralConfig {
     public static final ForgeConfigSpec.IntValue NUM_EDGE_SECTORS;
     public static final ForgeConfigSpec.IntValue GROUP_UPDATE_INTERVAL;
     public static final ForgeConfigSpec.IntValue MAX_LEADERS;
-    public static final ForgeConfigSpec.IntValue EDGE_MOBS_PER_SECTOR;
-    public static final ForgeConfigSpec.DoubleValue GROUP_SPRINT_MULTIPLIER;
-    public static final ForgeConfigSpec.DoubleValue LEADER_RETURN_ARRIVAL_DISTANCE;
-    public static final ForgeConfigSpec.IntValue RAID_COUNTDOWN_TICKS;
-    public static final ForgeConfigSpec.BooleanValue EDGE_MOB_SMART_BEHAVIOR;
-    public static final ForgeConfigSpec.DoubleValue FOLLOW_LEADER_SPREAD_OUT_DISTANCE;
-    public static final ForgeConfigSpec.DoubleValue FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT;
+    public static final ForgeConfigSpec.BooleanValue SKIP_SOUND_SCAN_WHEN_HAS_TARGET;
+    public static final ForgeConfigSpec.IntValue MAX_MUFFLING_RAYCASTS_PER_TICK;
+
 
     public static final ForgeConfigSpec.BooleanValue ENABLE_BLOCK_MUFFLING;
     public static final ForgeConfigSpec.DoubleValue MUFFLING_FACTOR_WOOL;
@@ -149,8 +146,10 @@ public class GeneralConfig {
         STEALTH_BYPASS_MOB_IDS = BUILDER.defineList("stealthBypassMobIds", Arrays.asList(), obj -> obj instanceof String);
         STEALTH_BYPASS_MOD_NAMESPACES = BUILDER.defineList("stealthBypassModNamespaces", Arrays.asList(), obj -> obj instanceof String);
         SOUND_LIFETIME_TICKS = BUILDER.defineInRange("soundLifetimeTicks", 1200, 20, 1000000);
-        ARRIVAL_DISTANCE = BUILDER.defineInRange("arrivalDistance", 6.0, 1.0, 100.0);
+        ARRIVAL_DISTANCE = BUILDER.defineInRange("arrivalDistance", 4.0, 0.0, 16.0);
         MOB_MOVE_SPEED = BUILDER.defineInRange("mobMoveSpeed", 1.15, 0.1, 3.0);
+        FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT = BUILDER.comment("Minimum sound weight before followers begin spreading out at the target location.")
+                .defineInRange("followLeaderMinSoundWeightToSpreadOut", 10.0, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("sounds");
@@ -1446,13 +1445,10 @@ public class GeneralConfig {
         NUM_EDGE_SECTORS = BUILDER.defineInRange("numEdgeSectors", 4, 1, 64);
         GROUP_UPDATE_INTERVAL = BUILDER.defineInRange("groupUpdateInterval", 200, 1, 20000);
         MAX_LEADERS = BUILDER.defineInRange("maxLeaders", 16, 1, 64);
-        EDGE_MOBS_PER_SECTOR = BUILDER.defineInRange("edgeMobsPerSector", 1, 1, 64);
-        GROUP_SPRINT_MULTIPLIER = BUILDER.defineInRange("sprintMultiplier", 1.1, 1.0, 5.0);
-        LEADER_RETURN_ARRIVAL_DISTANCE = BUILDER.defineInRange("leaderReturnArrivalDistance", 2.0, 0.5, 16.0);
-        RAID_COUNTDOWN_TICKS = BUILDER.defineInRange("raidCountdownTicks", 100, 20, 72000);
-        EDGE_MOB_SMART_BEHAVIOR = BUILDER.define("edgeMobSmartBehavior", false);
-        FOLLOW_LEADER_SPREAD_OUT_DISTANCE = BUILDER.defineInRange("followLeaderSpreadOutDistance", 24.0, 0.0, 256.0);
-        FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT = BUILDER.defineInRange("followLeaderMinSoundWeightToSpreadOut", 10.0, 0.0, 1000000.0);
+        SKIP_SOUND_SCAN_WHEN_HAS_TARGET = BUILDER.comment("If true, mobs skip sound scanning when they already have a live attack target. Dramatically reduces lag when mobs chase a player who fires a gun.")
+                .define("skipSoundScanWhenHasTarget", true);
+        MAX_MUFFLING_RAYCASTS_PER_TICK = BUILDER.comment("Maximum number of muffling raycasts allowed per server tick. Prevents lag spikes from too many simultaneous muffling calculations. Set to 0 for unlimited.")
+                .defineInRange("maxMufflingRaycastsPerTick", 50, 0, 10000);
         BUILDER.pop();
 
         BUILDER.push("muffling");

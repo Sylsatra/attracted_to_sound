@@ -565,65 +565,26 @@ public class SoundTracker {
     }
 
     private static double[] computeBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
-        double currentRange = origRange;
-        double currentWeight = origWeight;
+        if (!com.example.soundattract.los.OptimizedLOS.tryConsumeMufflingBudget()) {
+            return new double[]{origRange, origWeight};
+        }
+
+        double[] result = com.example.soundattract.los.OptimizedLOS.computeMufflingDda(
+                level, src, dst, origRange, origWeight);
+
         int blocksHit = 0;
-
-        Vec3 start = Vec3.atCenterOf(src);
-        Vec3 end = Vec3.atCenterOf(dst);
-        BlockHitResult result = level.clip(new ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
-
-        if (result.getType() == HitResult.Type.BLOCK) {
-            BlockPos currentPos = result.getBlockPos();
-            Vec3 currentHitVec = result.getLocation();
-
-            int maxChecks = SoundAttractConfig.COMMON.maxMufflingBlocksToCheck.get();
-
-            for (int i = 0; i < maxChecks && currentRange > 0.1 && currentWeight > 0.01; ++i) {
-                BlockState blockState = level.getBlockState(currentPos);
-                Block block = blockState.getBlock();
-                double rangeMultiplier = NO_MUFFLING_RANGE;
-                double weightMultiplier = NO_MUFFLING_WEIGHT;
-
-                if (isCustomWool(blockState, block, level, currentPos)) {
-                    rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorWool.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorWool.get();
-                } else if (isCustomLiquid(blockState, block, level, currentPos)) {
-                    rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorLiquid.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorLiquid.get();
-                } else if (isCustomThin(blockState, block, level, currentPos)) {
-                    rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorThin.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorThin.get();
-                } else if (isCustomSolid(blockState, block, level, currentPos)) {
-                    rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorSolid.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorSolid.get();
-                } else if (isCustomNonSolid(blockState, block, level, currentPos)) {
-                    rangeMultiplier = SoundAttractConfig.COMMON.mufflingFactorNonSolid.get();
-                    weightMultiplier = SoundAttractConfig.COMMON.mufflingFactorNonSolid.get();
-                } else if (blockState.isAir()) {
-                }
-                currentRange *= rangeMultiplier;
-                currentWeight *= weightMultiplier;
-                blocksHit++;
-                Vec3 direction = end.subtract(start).normalize();
-                currentHitVec = currentHitVec.add(direction.scale(0.1));
-                BlockHitResult nextResult = level.clip(new ClipContext(currentHitVec, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, null));
-                if (nextResult.getType() != HitResult.Type.BLOCK || nextResult.getBlockPos().equals(currentPos)) {
-                    break;
-                }
-                currentPos = nextResult.getBlockPos();
-                currentHitVec = nextResult.getLocation();
-            }
+        if (result[0] < origRange || result[1] < origWeight) {
+            blocksHit = 1;
         }
         if (SoundAttractConfig.COMMON.debugLogging.get() && blocksHit > 0) {
-            SoundAttractMod.LOGGER.debug("Muffling for sound {} from {} to {}: {} blocks hit. Range: {} -> {}, Weight: {} -> {}",
-                    soundId, src, dst, blocksHit, origRange, currentRange, origWeight, currentWeight);
+            SoundAttractMod.LOGGER.debug("Muffling (DDA) for sound {} from {} to {}: Range: {} -> {}, Weight: {} -> {}",
+                    soundId, src, dst, origRange, result[0], origWeight, result[1]);
         }
 
-        return new double[]{Math.max(0, currentRange), Math.max(0, currentWeight)};
+        return result;
     }
 
-    private static boolean isCustomWool(BlockState state, Block block, Level level, BlockPos pos) {
+    public static boolean isCustomWool(BlockState state, Block block, Level level, BlockPos pos) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         boolean inConfig = id != null && SoundAttractConfig.CUSTOM_WOOL_BLOCKS_CACHE.contains(id);
 
@@ -657,7 +618,7 @@ public class SoundTracker {
         }
     }
 
-    private static boolean isCustomSolid(BlockState state, Block block, Level level, BlockPos pos) {
+    public static boolean isCustomSolid(BlockState state, Block block, Level level, BlockPos pos) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         boolean inConfig = id != null && SoundAttractConfig.CUSTOM_SOLID_BLOCKS_CACHE.contains(id);
 
@@ -694,7 +655,7 @@ public class SoundTracker {
         }
     }
 
-    private static boolean isCustomNonSolid(BlockState state, Block block, Level level, BlockPos pos) {
+    public static boolean isCustomNonSolid(BlockState state, Block block, Level level, BlockPos pos) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         boolean inConfig = id != null && SoundAttractConfig.CUSTOM_NON_SOLID_BLOCKS_CACHE.contains(id);
 
@@ -733,7 +694,7 @@ public class SoundTracker {
         return !isNormallySolid;
     }
 
-    private static boolean isCustomThin(BlockState state, Block block, Level level, BlockPos pos) {
+    public static boolean isCustomThin(BlockState state, Block block, Level level, BlockPos pos) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         boolean inConfig = id != null && SoundAttractConfig.CUSTOM_THIN_BLOCKS_CACHE.contains(id);
 
@@ -768,7 +729,7 @@ public class SoundTracker {
                 || path.contains("rail");
     }
 
-    private static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) {
+    public static boolean isCustomLiquid(BlockState state, Block block, Level level, BlockPos pos) {
         ResourceLocation id = ForgeRegistries.BLOCKS.getKey(block);
         boolean inConfig = id != null && SoundAttractConfig.CUSTOM_LIQUID_BLOCKS_CACHE.contains(id);
 

@@ -85,6 +85,16 @@ public class AttractionGoal extends Goal {
         if (this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
             return false;
         }
+        if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()
+                && this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            return false;
+        }
+        if (SoundAttractConfig.COMMON.raidLeaderOnlySoundScan.get()) {
+            Mob leader = MobGroupManager.getLeader(this.mob);
+            if (leader != null && leader != this.mob && RaidManager.isRaidAdvancing(leader)) {
+                return false;
+            }
+        }
 
 
         if (!isMobEligible()) {
@@ -121,6 +131,10 @@ public class AttractionGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping() || shouldSuppressTargeting()) {
+            return false;
+        }
+        if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()
+                && this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
             return false;
         }
         if (this.targetSoundPos == null) {

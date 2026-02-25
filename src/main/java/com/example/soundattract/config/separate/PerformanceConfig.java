@@ -34,6 +34,8 @@ public class PerformanceConfig {
     public static final ForgeConfigSpec.BooleanValue ENABLE_LIVING_ENTITY_LOS_OVERRIDE;
     public static final ForgeConfigSpec.IntValue MAX_MUFFLING_BLOCKS_TO_CHECK;
     public static final ForgeConfigSpec.IntValue MAX_SOUNDS_TRACKED;
+    public static final ForgeConfigSpec.IntValue GLOBAL_CACHE_MAX_SIZE;
+    public static final ForgeConfigSpec.IntValue GLOBAL_CACHE_EXPIRE_MINS;
 
     static {
         BUILDER.comment("Performance and optimization settings").push("performance");
@@ -96,6 +98,12 @@ public class PerformanceConfig {
         
         MAX_MUFFLING_BLOCKS_TO_CHECK = BUILDER.comment("Maximum number of blocks to check for muffling between sound and mob.")
                 .defineInRange("maxMufflingBlocksToCheck", 16, 8, 256);
+
+        GLOBAL_CACHE_MAX_SIZE = BUILDER.comment("Maximum number of entries in internal tracking caches (e.g. stealth/scent memory) before oldest are evicted. Protects server RAM.")
+                .defineInRange("globalCacheMaxSize", 10000, 100, 1000000);
+
+        GLOBAL_CACHE_EXPIRE_MINS = BUILDER.comment("Time in minutes before an offline player or dead mob's data is naturally purged from memory.")
+                .defineInRange("globalCacheExpireMins", 5, 1, 1440);
 
         BUILDER.pop();
         SPEC = BUILDER.build();

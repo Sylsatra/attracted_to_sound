@@ -24,6 +24,8 @@ public class ConfigHelper {
         context.registerConfig(ModConfig.Type.COMMON, IntegrationConfig.SPEC, "soundattract/integration.toml");
         context.registerConfig(ModConfig.Type.COMMON, com.example.soundattract.config.separate.ScentConfig.SPEC, "soundattract/scent.toml");
         context.registerConfig(ModConfig.Type.COMMON, PerformanceConfig.SPEC, "soundattract/performance.toml");
+        context.registerConfig(ModConfig.Type.COMMON, RaidConfig.SPEC, "soundattract/raid.toml");
+        context.registerConfig(ModConfig.Type.COMMON, PathfindingConfig.SPEC, "soundattract/pathfinding.toml");
 
 
         Path oldConfigPath = FMLPaths.CONFIGDIR.get().resolve(SoundAttractMod.MOD_ID + "-common.toml");
@@ -62,7 +64,7 @@ public class ConfigHelper {
                 new Mapping("groups.numEdgeSectors", "groups.numEdgeSectors"),
                 new Mapping("groups.groupUpdateInterval", "groups.groupUpdateInterval"),
                 new Mapping("groups.maxLeaders", "groups.maxLeaders"),
-                new Mapping("groups.edgeMobSmartBehavior", "groups.edgeMobSmartBehavior"),
+
                 new Mapping("muffling.enableBlockMuffling", "muffling.enableBlockMuffling"),
                 new Mapping("muffling.mufflingFactorWool", "muffling.mufflingFactorWool"),
                 new Mapping("muffling.mufflingFactorSolid", "muffling.mufflingFactorSolid"),

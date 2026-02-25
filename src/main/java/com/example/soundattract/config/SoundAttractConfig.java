@@ -273,11 +273,11 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> playerActionWeights = GeneralConfig.PLAYER_ACTION_WEIGHTS;
         public final ForgeConfigSpec.DoubleValue playerActionCheckRadius = GeneralConfig.PLAYER_ACTION_CHECK_RADIUS;
 
-        public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior = GeneralConfig.EDGE_MOB_SMART_BEHAVIOR;
+        public final ForgeConfigSpec.BooleanValue edgeMobSmartBehavior = RaidConfig.EDGE_MOB_SMART_BEHAVIOR;
         public final ForgeConfigSpec.BooleanValue enableFleeFromUnseenAttackerGoal = GeneralConfig.ENABLE_FLEE_FROM_UNSEEN_ATTACKER_GOAL;
         public final ForgeConfigSpec.IntValue soundLifetimeTicks = GeneralConfig.SOUND_LIFETIME_TICKS;
         public final ForgeConfigSpec.DoubleValue arrivalDistance = GeneralConfig.ARRIVAL_DISTANCE;
-        public final ForgeConfigSpec.DoubleValue followLeaderSpreadOutDistance = GeneralConfig.FOLLOW_LEADER_SPREAD_OUT_DISTANCE;
+        public final ForgeConfigSpec.DoubleValue followLeaderSpreadOutDistance = RaidConfig.FOLLOW_LEADER_SPREAD_OUT_DISTANCE;
         public final ForgeConfigSpec.DoubleValue followLeaderMinSoundWeightToSpreadOut = GeneralConfig.FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed = GeneralConfig.MOB_MOVE_SPEED;
         public final ForgeConfigSpec.IntValue maxSoundsTracked = PerformanceConfig.MAX_SOUNDS_TRACKED;
@@ -308,10 +308,29 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue numEdgeSectors = GeneralConfig.NUM_EDGE_SECTORS;
         public final ForgeConfigSpec.IntValue groupUpdateInterval = GeneralConfig.GROUP_UPDATE_INTERVAL;
         public final ForgeConfigSpec.IntValue maxLeaders = GeneralConfig.MAX_LEADERS;
-        public final ForgeConfigSpec.IntValue edgeMobsPerSector = GeneralConfig.EDGE_MOBS_PER_SECTOR;
-        public final ForgeConfigSpec.DoubleValue groupSprintMultiplier = GeneralConfig.GROUP_SPRINT_MULTIPLIER;
-        public final ForgeConfigSpec.DoubleValue leaderReturnArrivalDistance = GeneralConfig.LEADER_RETURN_ARRIVAL_DISTANCE;
-        public final ForgeConfigSpec.IntValue raidCountdownTicks = GeneralConfig.RAID_COUNTDOWN_TICKS;
+        public final ForgeConfigSpec.IntValue edgeMobsPerSector = RaidConfig.EDGE_MOBS_PER_SECTOR;
+        public final ForgeConfigSpec.DoubleValue groupSprintMultiplier = RaidConfig.GROUP_SPRINT_MULTIPLIER;
+        public final ForgeConfigSpec.DoubleValue leaderReturnArrivalDistance = RaidConfig.LEADER_RETURN_ARRIVAL_DISTANCE;
+        public final ForgeConfigSpec.IntValue raidCountdownTicks = RaidConfig.RAID_COUNTDOWN_TICKS;
+        public final ForgeConfigSpec.BooleanValue skipSoundScanWhenHasTarget = GeneralConfig.SKIP_SOUND_SCAN_WHEN_HAS_TARGET;
+        public final ForgeConfigSpec.IntValue maxMufflingRaycastsPerTick = GeneralConfig.MAX_MUFFLING_RAYCASTS_PER_TICK;
+        public final ForgeConfigSpec.BooleanValue raidLeaderOnlySoundScan = RaidConfig.RAID_LEADER_ONLY_SOUND_SCAN;
+        public final ForgeConfigSpec.BooleanValue enableFlowField = PathfindingConfig.ENABLE_FLOW_FIELD;
+        public final ForgeConfigSpec.IntValue flowFieldMobThreshold = PathfindingConfig.FLOW_FIELD_MOB_THRESHOLD;
+        public final ForgeConfigSpec.IntValue moveToCooldownTicks = PathfindingConfig.MOVE_TO_COOLDOWN_TICKS;
+        public final ForgeConfigSpec.DoubleValue moveToMinDelta = PathfindingConfig.MOVE_TO_MIN_DELTA;
+        public final ForgeConfigSpec.IntValue moveToTeamBudgetPerTick = PathfindingConfig.MOVE_TO_TEAM_BUDGET_PER_TICK;
+        public final ForgeConfigSpec.IntValue maxPathAttemptsPerTick = PathfindingConfig.MAX_PATH_ATTEMPTS_PER_TICK;
+        public final ForgeConfigSpec.BooleanValue enableNodeRouter = PathfindingConfig.ENABLE_NODE_ROUTER;
+        public final ForgeConfigSpec.BooleanValue enableSoundRaid = RaidConfig.ENABLE_SOUND_RAID;
+        public final ForgeConfigSpec.BooleanValue enableScentRaid = RaidConfig.ENABLE_SCENT_RAID;
+        public final ForgeConfigSpec.BooleanValue enableRaidReinforcements = RaidConfig.ENABLE_RAID_REINFORCEMENTS;
+        public final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> raidReinforcementCaps = RaidConfig.RAID_REINFORCEMENT_CAPS;
+        public final ForgeConfigSpec.IntValue raidMaxTotalMobs = RaidConfig.RAID_MAX_TOTAL_MOBS;
+        public final ForgeConfigSpec.DoubleValue raidReinforcementDifficultyMultiplier = RaidConfig.RAID_REINFORCEMENT_DIFFICULTY_MULTIPLIER;
+        public final ForgeConfigSpec.IntValue raidReinforcementInterval = RaidConfig.RAID_REINFORCEMENT_INTERVAL;
+        public final ForgeConfigSpec.ConfigValue<String> raidEdgeDetectionAction = RaidConfig.RAID_EDGE_DETECTION_ACTION;
+        public final ForgeConfigSpec.BooleanValue raidFollowerInheritTarget = RaidConfig.RAID_FOLLOWER_INHERIT_TARGET;
         public final ForgeConfigSpec.IntValue initialGroupComputationDelay = PerformanceConfig.INITIAL_GROUP_COMPUTATION_DELAY;
 
         public final ForgeConfigSpec.IntValue workerThreads = PerformanceConfig.WORKER_THREADS;
@@ -482,6 +501,9 @@ public class SoundAttractConfig {
 
         public final ForgeConfigSpec.BooleanValue enableLivingEntityLosOverride = PerformanceConfig.ENABLE_LIVING_ENTITY_LOS_OVERRIDE;
 
+        public final ForgeConfigSpec.IntValue globalCacheMaxSize = PerformanceConfig.GLOBAL_CACHE_MAX_SIZE;
+        public final ForgeConfigSpec.IntValue globalCacheExpireMins = PerformanceConfig.GLOBAL_CACHE_EXPIRE_MINS;
+
         public final ForgeConfigSpec.BooleanValue enableRelentlessClimbing = IntegrationConfig.ENABLE_RELENTLESS_CLIMBING;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> relentlessEligibleMobs = IntegrationConfig.RELENTLESS_ELIGIBLE_MOBS;
         public final ForgeConfigSpec.BooleanValue zombiesIgnoreHeight = IntegrationConfig.ZOMBIES_IGNORE_HEIGHT;
@@ -502,7 +524,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue rainDecayMultiplier = ScentConfig.RAIN_DECAY_MULTIPLIER;
         public final ForgeConfigSpec.BooleanValue waterStopsScent = ScentConfig.WATER_STOPS_SCENT;
         public final ForgeConfigSpec.IntValue scentAmbushDurationTicks = ScentConfig.SCENT_AMBUSH_DURATION_TICKS;
-
+        public final ForgeConfigSpec.IntValue scentScanBudgetPerTick = ScentConfig.SCENT_SCAN_BUDGET_PER_TICK;
         public Common(ForgeConfigSpec.Builder builder) {
 
 
@@ -1002,6 +1024,10 @@ public class SoundAttractConfig {
 
         parseAndCachePlayerActionConfig();
         com.example.soundattract.camo.CamoMaterialRegistry.parseConfig();
+
+        com.example.soundattract.event.StealthDetectionEvents.reinitializeCaches();
+        com.example.soundattract.event.ScentEvents.reinitializeCaches();
+        com.example.soundattract.pathfinding.PathTaskScheduler.reinitializeCaches();
 
         if (COMMON != null && COMMON.debugLogging != null && COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info(

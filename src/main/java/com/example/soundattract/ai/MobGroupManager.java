@@ -25,6 +25,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.AABB;
 
+@net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid = com.example.soundattract.SoundAttractMod.MOD_ID, bus = net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus.FORGE)
 public class MobGroupManager {
 
   private static final Map<ResourceLocation, PerWorldData> worldData = new ConcurrentHashMap<>();
@@ -262,6 +263,27 @@ public class MobGroupManager {
     return edgeSet != null && edgeSet.contains(mob);
   }
 
+  public static List<Mob> getFollowers(Mob leader) {
+      if (leader == null || leader.level() == null) return Collections.emptyList();
+      PerWorldData data = getData(leader.level().dimension().location());
+      List<Mob> followers = new ArrayList<>();
+      
+      synchronized (data.uuidToLeader) {
+          for (Map.Entry<UUID, Mob> entry : data.uuidToLeader.entrySet()) {
+              if (entry.getValue() == leader) {
+                  UUID followerId = entry.getKey();
+                  if (leader.level() instanceof ServerLevel sl) {
+                      net.minecraft.world.entity.Entity e = sl.getEntity(followerId);
+                      if (e instanceof Mob m && m != leader && m.isAlive() && !m.isRemoved()) {
+                          followers.add(m);
+                      }
+                  }
+              }
+          }
+      }
+      return followers;
+  }
+
   private static void cleanupStaleEntries(ServerLevel level) {
     PerWorldData data = getData(level.dimension().location());
     data.leaders.removeIf(ref -> {
@@ -271,6 +293,24 @@ public class MobGroupManager {
     data.uuidToLeader.values().removeIf(mob -> mob == null || mob.isRemoved());
     data.mobToRelayedSounds.keySet().removeIf(mob -> mob == null || mob.isRemoved());
     data.mobLastRelayTime.keySet().removeIf(mob -> mob == null || mob.isRemoved());
+    
+    data.lastEdgeMobMap.keySet().removeIf(mob -> mob == null || mob.isRemoved());
+    for (Set<Mob> edges : data.lastEdgeMobMap.values()) {
+        if (edges != null) {
+            edges.removeIf(mob -> mob == null || mob.isRemoved());
+        }
+    }
+  }
+
+  @net.minecraftforge.eventbus.api.SubscribeEvent
+  public static void onLevelUnload(net.minecraftforge.event.level.LevelEvent.Unload event) {
+      if (event.getLevel() instanceof ServerLevel serverLevel) {
+          ResourceLocation dimension = serverLevel.dimension().location();
+          worldData.remove(dimension);
+          if (SoundAttractConfig.COMMON.debugLogging.get()) {
+              SoundAttractMod.LOGGER.info("[MobGroupManager] Cleared cluster memory for unloaded dimension: {}", dimension);
+          }
+      }
   }
 
   public static void updateGroups(ServerLevel level) {
@@ -484,5 +524,17 @@ public class MobGroupManager {
   public static boolean isDeserter(Mob mob) {
     PerWorldData data = getData(mob.level().dimension().location());
     return data.deserterUuids.contains(mob.getUUID());
+  }
+
+  public static int getFollowerCount(Mob leader) {
+    if (leader == null || leader.level() == null) return 0;
+    PerWorldData data = getData(leader.level().dimension().location());
+    int count = 0;
+    synchronized (data.uuidToLeader) {
+      for (Mob l : data.uuidToLeader.values()) {
+        if (l == leader) count++;
+      }
+    }
+    return count;
   }
 }
