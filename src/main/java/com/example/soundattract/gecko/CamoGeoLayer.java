@@ -26,6 +26,7 @@ public class CamoGeoLayer<T extends GeoAnimatable> extends GeoRenderLayer<T> {
         if (!(animatable instanceof LivingEntity living)) {
             return;
         }
+        if (living.isInvisible()) return;
 
         var cap = living.getCapability(com.example.soundattract.camo.CamouflageCapability.INSTANCE);
         if (!cap.isPresent()) return;

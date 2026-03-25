@@ -24,6 +24,7 @@
   ],
   "client": [
     "HumanoidArmorLayerMixin",
+    "ItemInHandLayerMixin",
     "SimpleTextureMixin",
     "HttpTextureMixin",
     "NativeImageAccessor"

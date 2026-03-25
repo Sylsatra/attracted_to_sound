@@ -51,6 +51,13 @@ public class IntegrationConfig {
     public static final ForgeConfigSpec.BooleanValue ZOMBIES_IGNORE_HEIGHT;
     public static final ForgeConfigSpec.BooleanValue ZOMBIES_CAN_STACK;
     public static final ForgeConfigSpec.DoubleValue ZOMBIE_FALL_DAMAGE_MULTIPLIER;
+    
+    public static final ForgeConfigSpec.BooleanValue ENABLE_IMMERSIVE_MELODIES_INTEGRATION;
+    public static final ForgeConfigSpec.IntValue IMMERSIVE_MELODIES_POLL_INTERVAL;
+    public static final ForgeConfigSpec.DoubleValue IMMERSIVE_MELODIES_DEFAULT_RANGE;
+    public static final ForgeConfigSpec.DoubleValue IMMERSIVE_MELODIES_DEFAULT_WEIGHT;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> IMMERSIVE_MELODIES_INSTRUMENT_MULTIPLIERS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> IMMERSIVE_MELODIES_MELODY_OVERRIDES;
 
     static {
         BUILDER.comment("Settings for other mod integrations").push("integration");
@@ -119,6 +126,21 @@ public class IntegrationConfig {
         ZOMBIES_IGNORE_HEIGHT = BUILDER.define("zombiesIgnoreHeight", false);
         ZOMBIES_CAN_STACK = BUILDER.define("zombiesCanStack", true);
         ZOMBIE_FALL_DAMAGE_MULTIPLIER = BUILDER.defineInRange("zombieFallDamageMultiplier", 0.5, 0.0, 10.0);
+        BUILDER.pop();
+        
+        BUILDER.push("immersive_melodies");
+        ENABLE_IMMERSIVE_MELODIES_INTEGRATION = BUILDER.comment("Enable integration with Immersive Melodies: playing instruments attracts mobs.")
+                .define("enableImmersiveMelodiesIntegration", true);
+        IMMERSIVE_MELODIES_POLL_INTERVAL = BUILDER.comment("How often (in ticks) to check if a player is playing an instrument. A higher value reduces overhead and increases the gap in the sound trail.")
+                .defineInRange("immersiveMelodiesPollInterval", 40, 1, 1200);
+        IMMERSIVE_MELODIES_DEFAULT_RANGE = BUILDER.comment("Default attraction range for instruments.")
+                .defineInRange("immersiveMelodiesDefaultRange", 48.0, 0.0, 512.0);
+        IMMERSIVE_MELODIES_DEFAULT_WEIGHT = BUILDER.comment("Default weight for instruments.")
+                .defineInRange("immersiveMelodiesDefaultWeight", 30.0, 0.0, 100.0);
+        IMMERSIVE_MELODIES_INSTRUMENT_MULTIPLIERS = BUILDER.comment("List of instrument item IDs and their weight multipliers (e.g. 'immersive_melodies:drum:2.0').")
+                .defineList("immersiveMelodiesInstrumentMultipliers", Arrays.asList("immersive_melodies:drum:1.5"), obj -> obj instanceof String);
+        IMMERSIVE_MELODIES_MELODY_OVERRIDES = BUILDER.comment("List of melody IDs and their custom range:weight (e.g. 'immersive_melodies:test_melody:32.0:3.0').")
+                .defineList("immersiveMelodiesMelodyOverrides", Arrays.asList(), obj -> obj instanceof String);
         BUILDER.pop();
 
         BUILDER.pop();

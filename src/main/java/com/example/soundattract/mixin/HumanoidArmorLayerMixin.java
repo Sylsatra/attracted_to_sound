@@ -39,8 +39,12 @@ public abstract class HumanoidArmorLayerMixin {
     private static final ThreadLocal<java.util.List<ResourceLocation>> s_CapturedTextures = ThreadLocal.withInitial(java.util.ArrayList::new);
     private static final ThreadLocal<Boolean> s_IsRecording = ThreadLocal.withInitial(() -> false);
     
-    @Inject(method = "renderArmorPiece", at = @At("HEAD"))
+    @Inject(method = "renderArmorPiece", at = @At("HEAD"), cancellable = true)
     private void soundattract$startRecording(PoseStack poseStack, MultiBufferSource buffer, LivingEntity entity, EquipmentSlot slot, int packedLight, HumanoidModel<?> armorModel, CallbackInfo ci) {
+        if (entity.isInvisible()) {
+            ci.cancel();
+            return;
+        }
         s_CapturedTextures.get().clear();
         s_IsRecording.set(true);
     }
@@ -63,6 +67,7 @@ public abstract class HumanoidArmorLayerMixin {
             CallbackInfo ci) {
         
         s_IsRecording.set(false);
+        if (entity.isInvisible()) return;
         CamoLODUtil.LODResult lod = CamoLODUtil.getLOD(entity);
         if (!lod.shouldRender()) return;
 

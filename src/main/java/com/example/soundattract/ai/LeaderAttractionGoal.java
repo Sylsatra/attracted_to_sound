@@ -31,6 +31,7 @@ public class LeaderAttractionGoal extends Goal {
     private BlockBreakerPosGoal blockBreakerGoal = null;
 
     private SoundTracker.SoundRecord cachedSound = null;
+    private boolean highWeightOverrideActive = false;
 
     public LeaderAttractionGoal(Mob mob, double moveSpeed) {
         this.mob = mob;
@@ -77,9 +78,12 @@ public class LeaderAttractionGoal extends Goal {
         if (this.mob.isVehicle() || this.mob.isSleeping()) {
             return false;
         }
-        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+
+        if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()
+                && this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
             return false;
         }
+
         if (!isMobEligible()) {
             return false;
         }
@@ -101,10 +105,29 @@ public class LeaderAttractionGoal extends Goal {
             this.chosenDest = null;
             return true;
         }
+
         SoundTracker.SoundRecord relayed = findBestRelayedSound();
         if (relayed == null) {
+            if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+                if (shouldOverrideTarget()) {
+                    this.mob.setTarget(null);
+                    this.highWeightOverrideActive = true;
+                    return true;
+                }
+            }
             return false;
         }
+
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+            if (threshold > 0 && relayed.weight >= threshold) {
+                this.mob.setTarget(null);
+                this.highWeightOverrideActive = true;
+            } else {
+                return false;
+            }
+        }
+
         this.cachedSound = relayed;
         this.targetSoundPos = relayed.pos;
         this.currentTargetWeight = relayed.weight;
@@ -115,11 +138,18 @@ public class LeaderAttractionGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
-            return false;
-        }
         if (!isMobEligible() || this.mob.isVehicle() || this.mob.isSleeping()) {
             return false;
+        }
+
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+            if (threshold > 0 && this.currentTargetWeight >= threshold) {
+                this.mob.setTarget(null);
+                this.highWeightOverrideActive = true;
+            } else if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()) {
+                return false;
+            }
         }
         if (this.targetSoundPos == null) {
             return false;
@@ -171,6 +201,7 @@ public class LeaderAttractionGoal extends Goal {
         this.cachedSound = null;
         this.hasPicked = false;
         this.chosenDest = null;
+        this.highWeightOverrideActive = false;
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("LeaderAttractionGoal stop: {}", mob.getName().getString());
         }
@@ -369,7 +400,39 @@ public class LeaderAttractionGoal extends Goal {
             }
         }
     }
+    /**
+     * Returns true if this leader qualifies for the high-sound-weight target override.
+     * Leaders directly scan the SoundTracker for this check (rather than relayed sounds)
+     * so they can react to extremely loud nearby events even without follower input.
+     */
+    private boolean shouldOverrideTarget() {
+        double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+        if (threshold <= 0) return false;
+        if (RaidManager.isRaidAdvancing(this.mob) || RaidManager.isRaidTicking(this.mob)) return false;
+        com.example.soundattract.tracking.SoundTracker.SoundRecord best =
+                com.example.soundattract.tracking.SoundTracker.findNearestSound(
+                        this.mob, this.mob.level(),
+                        this.mob.blockPosition(), this.mob.getEyePosition(), null);
+        if (best == null || best.weight < threshold) return false;
+        this.cachedSound = new com.example.soundattract.tracking.SoundTracker.SoundRecord(
+                null, best.soundId, best.pos, 200,
+                this.mob.level().dimension().location().toString(), best.range, best.weight);
+        this.targetSoundPos = best.pos;
+        this.currentTargetWeight = best.weight;
+        this.hasPicked = false;
+        this.chosenDest = null;
+        return true;
+    }
+
+    private boolean isEligibleForOverride() {
+        return !RaidManager.isRaidAdvancing(this.mob) && !RaidManager.isRaidTicking(this.mob);
+    }
+
     public BlockPos getTargetSoundPos() {
         return this.targetSoundPos;
+    }
+
+    public boolean isHighWeightOverrideActive() {
+        return this.highWeightOverrideActive;
     }
 }

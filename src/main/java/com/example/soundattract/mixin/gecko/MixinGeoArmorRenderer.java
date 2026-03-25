@@ -44,7 +44,8 @@ public abstract class MixinGeoArmorRenderer<T extends net.minecraft.world.item.I
         if (!(entity instanceof LivingEntity living)) {
              return;
         }
-        
+        if (living.isInvisible()) return;
+
         ItemStack stack = getCurrentStack();
         if (stack.isEmpty() || !stack.hasTag()) {
              return;

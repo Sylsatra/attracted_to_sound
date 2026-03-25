@@ -231,6 +231,10 @@ public class StealthDetectionEvents {
     }
 
     public static double getRealisticStealthDetectionRange(Mob target, Mob looker, Level level) {
+        if (com.example.soundattract.ai.MobGroupManager.isMobInHighWeightOverride(looker)) {
+            return 0.0;
+        }
+
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
         }
@@ -580,6 +584,14 @@ public class StealthDetectionEvents {
             return;
         }
 
+        if (event.getNewTarget() != null && com.example.soundattract.ai.MobGroupManager.isMobInHighWeightOverride(mob)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[LivingChangeTargetEvent] Suppressing target acquisition for {} - high-weight sound override active.", mob.getName().getString());
+            }
+            event.setCanceled(true);
+            return;
+        }
+
         if (SoundAttractConfig.isStealthBypassed(mob)) {
             return;
         }
@@ -742,6 +754,13 @@ public class StealthDetectionEvents {
                 SoundAttractMod.LOGGER.warn("[CanDetect] Called with null mob or target. Defaulting to detectable.");
             }
             return true;
+        }
+
+        if (com.example.soundattract.ai.MobGroupManager.isMobInHighWeightOverride(mob)) {
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[CanDetect] Mob {} is blind due to high-weight sound override.", mob.getName().getString());
+            }
+            return false;
         }
 
         if (SoundAttractConfig.isStealthBypassed(mob)) {
@@ -1181,6 +1200,10 @@ public class StealthDetectionEvents {
     }
 
     public static double getRealisticStealthDetectionRange(Player player, Mob mob, Level level) {
+        if (com.example.soundattract.ai.MobGroupManager.isMobInHighWeightOverride(mob)) {
+            return 0.0;
+        }
+
         if (!SoundAttractConfig.COMMON.enableStealthMechanics.get()) {
             return SoundAttractConfig.COMMON.maxStealthDetectionRange.get();
         }
