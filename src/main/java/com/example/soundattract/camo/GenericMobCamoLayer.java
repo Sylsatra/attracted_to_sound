@@ -34,6 +34,7 @@ public class GenericMobCamoLayer<T extends LivingEntity, M extends HumanoidModel
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
         CamoLODUtil.LODResult lod = CamoLODUtil.getLOD(entity);
         if (!lod.shouldRender()) return;
+        if (entity.isInvisible()) return;
 
         entity.getCapability(CamouflageCapability.INSTANCE).ifPresent(camo -> {
             if (camo.getLayers().isEmpty()) return;
@@ -118,6 +119,7 @@ public class GenericMobCamoLayer<T extends LivingEntity, M extends HumanoidModel
         public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
             CamoLODUtil.LODResult lod = CamoLODUtil.getLOD(entity);
             if (!lod.shouldRender()) return;
+            if (entity.isInvisible()) return;
 
             entity.getCapability(CamouflageCapability.INSTANCE).ifPresent(camo -> {
                 if (camo.getLayers().isEmpty()) return;
@@ -147,6 +149,7 @@ public class GenericMobCamoLayer<T extends LivingEntity, M extends HumanoidModel
         public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T entity, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
             CamoLODUtil.LODResult lod = CamoLODUtil.getLOD(entity);
             if (!lod.shouldRender()) return;
+            if (entity.isInvisible()) return;
 
             entity.getCapability(CamouflageCapability.INSTANCE).ifPresent(camo -> {
                 if (camo.getLayers().isEmpty()) return;

@@ -134,6 +134,7 @@ public class SoundAttractConfig {
         SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.walking"));
         SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.sprinting"));
         SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:player_action.sprint_jumping"));
+        SOUND_ID_WHITELIST_CACHE.add(ResourceLocation.tryParse("soundattract:virtual"));
     }
 
     public static void parseAndCacheCustomArmorColors() {
@@ -279,6 +280,7 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.DoubleValue arrivalDistance = GeneralConfig.ARRIVAL_DISTANCE;
         public final ForgeConfigSpec.DoubleValue followLeaderSpreadOutDistance = RaidConfig.FOLLOW_LEADER_SPREAD_OUT_DISTANCE;
         public final ForgeConfigSpec.DoubleValue followLeaderMinSoundWeightToSpreadOut = GeneralConfig.FOLLOW_LEADER_MIN_SOUND_WEIGHT_TO_SPREAD_OUT;
+        public final ForgeConfigSpec.DoubleValue highSoundWeightTargetOverride = GeneralConfig.HIGH_SOUND_WEIGHT_TARGET_OVERRIDE;
         public final ForgeConfigSpec.DoubleValue mobMoveSpeed = GeneralConfig.MOB_MOVE_SPEED;
         public final ForgeConfigSpec.IntValue maxSoundsTracked = PerformanceConfig.MAX_SOUNDS_TRACKED;
         public final ForgeConfigSpec.DoubleValue soundSwitchRatio = GeneralConfig.SOUND_SWITCH_RATIO;
@@ -509,6 +511,13 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.BooleanValue zombiesIgnoreHeight = IntegrationConfig.ZOMBIES_IGNORE_HEIGHT;
         public final ForgeConfigSpec.BooleanValue zombiesCanStack = IntegrationConfig.ZOMBIES_CAN_STACK;
         public final ForgeConfigSpec.DoubleValue zombieFallDamageMultiplier = IntegrationConfig.ZOMBIE_FALL_DAMAGE_MULTIPLIER;
+
+        public final ForgeConfigSpec.BooleanValue enableImmersiveMelodiesIntegration = IntegrationConfig.ENABLE_IMMERSIVE_MELODIES_INTEGRATION;
+        public final ForgeConfigSpec.IntValue immersiveMelodiesPollInterval = IntegrationConfig.IMMERSIVE_MELODIES_POLL_INTERVAL;
+        public final ForgeConfigSpec.DoubleValue immersiveMelodiesDefaultRange = IntegrationConfig.IMMERSIVE_MELODIES_DEFAULT_RANGE;
+        public final ForgeConfigSpec.DoubleValue immersiveMelodiesDefaultWeight = IntegrationConfig.IMMERSIVE_MELODIES_DEFAULT_WEIGHT;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> immersiveMelodiesInstrumentMultipliers = IntegrationConfig.IMMERSIVE_MELODIES_INSTRUMENT_MULTIPLIERS;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> immersiveMelodiesMelodyOverrides = IntegrationConfig.IMMERSIVE_MELODIES_MELODY_OVERRIDES;
 
         public final ForgeConfigSpec.BooleanValue enableScentSystem = ScentConfig.ENABLE_SCENT_SYSTEM;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> scentEligibleMobs = ScentConfig.SCENT_ELIGIBLE_MOBS;

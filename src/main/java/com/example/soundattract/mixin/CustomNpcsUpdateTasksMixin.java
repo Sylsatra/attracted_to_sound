@@ -84,7 +84,8 @@ public abstract class CustomNpcsUpdateTasksMixin {
                 mob.goalSelector.addGoal(attractionPriority, new AttractionGoal(mob, moveSpeed) {
                     @Override
                     public boolean canUse() {
-                        boolean result = (mob.getTarget() == null || !mob.getTarget().isAlive()) && super.canUse();
+                        boolean hasTarget = (mob.getTarget() != null && mob.getTarget().isAlive());
+                        boolean result = (!hasTarget || isHighWeightOverrideActive()) && super.canUse();
                         if (SoundAttractConfig.COMMON.debugLogging.get() && result) {
                             SoundAttractMod.LOGGER.info("[CustomNPCs] AttractionGoal.canUse() returning true for {}", mob.getName().getString());
                         }
@@ -93,7 +94,8 @@ public abstract class CustomNpcsUpdateTasksMixin {
 
                     @Override
                     public boolean canContinueToUse() {
-                        boolean result = (mob.getTarget() == null || !mob.getTarget().isAlive()) && super.canContinueToUse();
+                        boolean hasTarget = (mob.getTarget() != null && mob.getTarget().isAlive());
+                        boolean result = (!hasTarget || isHighWeightOverrideActive()) && super.canContinueToUse();
                         if (SoundAttractConfig.COMMON.debugLogging.get() && result) {
                             SoundAttractMod.LOGGER.info("[CustomNPCs] AttractionGoal.canContinueToUse() returning true for {}", mob.getName().getString());
                         }

@@ -35,7 +35,15 @@ public class FollowLeaderGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) return false;
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            if (!shouldMemberDropTargetForHighWeightSound()) return false;
+            if (com.example.soundattract.config.SoundAttractConfig.COMMON.debugLogging.get()) {
+                com.example.soundattract.SoundAttractMod.LOGGER.info(
+                    "[FollowLeaderGoal] Member {} dropping target - leader is in high-weight sound override.",
+                    mob.getName().getString());
+            }
+            this.mob.setTarget(null);
+        }
         leader = MobGroupManager.getLeader(mob);
         if (leader == null || leader == mob) return false; 
         if (!leader.isAlive()) return false;
@@ -66,13 +74,20 @@ public class FollowLeaderGoal extends Goal {
             }
         });
         if (leaderPursuitGoal == null) return false;
-        if (leaderPursuitGoal instanceof AttractionGoal ag && !ag.isPursuingSound()) return false;
+        if (leaderPursuitGoal instanceof AttractionGoal ag) {
+            if (!ag.isPursuingSound() && !ag.isHighWeightOverrideActive()) {
+                return false;
+            }
+        }
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) return false;
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            if (!shouldMemberDropTargetForHighWeightSound()) return false;
+            this.mob.setTarget(null);
+        }
         if (leader == null || !leader.isAlive()) return false;
 
 
@@ -100,7 +115,11 @@ public class FollowLeaderGoal extends Goal {
             .orElse(null);
 
         if (leaderPursuitGoal == null) return false;
-        if (leaderPursuitGoal instanceof AttractionGoal ag && !ag.isPursuingSound()) return false;
+        if (leaderPursuitGoal instanceof AttractionGoal ag) {
+            if (!ag.isPursuingSound() && !ag.isHighWeightOverrideActive()) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -217,7 +236,11 @@ public class FollowLeaderGoal extends Goal {
 
 
         if (leaderPursuitGoal == null) return;
-        if (leaderPursuitGoal instanceof AttractionGoal ag && !ag.isPursuingSound()) return;
+        if (leaderPursuitGoal instanceof AttractionGoal ag) {
+            if (!ag.isPursuingSound() && !ag.isHighWeightOverrideActive()) {
+                return;
+            }
+        }
         if (debug) {
             com.example.soundattract.SoundAttractMod.LOGGER.info(
                 "[FollowLeaderGoal] Mob {} following leader {} (leader is pursuing sound)",
@@ -402,5 +425,27 @@ public class FollowLeaderGoal extends Goal {
     }
     public BlockPos getTargetSoundPos() {
         return this.lastAnchorPos;
+    }
+
+    /**
+     * Returns true if the member mob's current leader is actively navigating to a
+     * high-weight sound via the override mechanism. When true, the member should
+     * drop its combat target and follow the leader.
+     */
+    private boolean shouldMemberDropTargetForHighWeightSound() {
+        double threshold = com.example.soundattract.config.SoundAttractConfig.COMMON
+                .highSoundWeightTargetOverride.get();
+        if (threshold <= 0) return false;
+
+        Mob leader = MobGroupManager.getLeader(mob);
+        if (leader == null || leader == mob) return false;
+
+        if (RaidManager.isRaidTicking(leader) || RaidManager.isRaidAdvancing(leader)) return false;
+
+        return leader.goalSelector.getRunningGoals()
+                .map(WrappedGoal::getGoal)
+                .anyMatch(g ->
+                        (g instanceof AttractionGoal ag && ag.isHighWeightOverrideActive()) ||
+                        (g instanceof LeaderAttractionGoal lag && lag.isHighWeightOverrideActive()));
     }
 }

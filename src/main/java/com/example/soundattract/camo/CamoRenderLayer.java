@@ -26,6 +26,7 @@ public class CamoRenderLayer extends RenderLayer<AbstractClientPlayer, PlayerMod
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, AbstractClientPlayer player, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
         CamoLODUtil.LODResult lod = CamoLODUtil.getLOD(player);
         if (!lod.shouldRender()) return;
+        if (player.isInvisible()) return;
 
         player.getCapability(CamouflageCapability.INSTANCE).ifPresent(camo -> {
             if (camo.getLayers().isEmpty()) return;

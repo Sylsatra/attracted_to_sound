@@ -537,4 +537,29 @@ public class MobGroupManager {
     }
     return count;
   }
+
+  /**
+   * Returns true if the mob or its current leader is actively investigating a
+   * high-weight sound. Used to suppress target acquisition.
+   */
+  public static boolean isMobInHighWeightOverride(Mob mob) {
+    if (mob == null || !mob.isAlive()) return false;
+
+    boolean ownOverride = mob.goalSelector.getAvailableGoals().stream()
+            .map(net.minecraft.world.entity.ai.goal.WrappedGoal::getGoal)
+            .anyMatch(g -> (g instanceof AttractionGoal ag && ag.isHighWeightOverrideActive()) ||
+                           (g instanceof LeaderAttractionGoal lag && lag.isHighWeightOverrideActive()) ||
+                           (g instanceof FollowerEdgeRelayGoal feg && feg.isHighWeightOverrideActive()));
+    if (ownOverride) return true;
+
+    Mob leader = getLeader(mob);
+    if (leader != null && leader != mob) {
+      return leader.goalSelector.getAvailableGoals().stream()
+              .map(net.minecraft.world.entity.ai.goal.WrappedGoal::getGoal)
+              .anyMatch(g -> (g instanceof AttractionGoal ag && ag.isHighWeightOverrideActive()) ||
+                             (g instanceof LeaderAttractionGoal lag && lag.isHighWeightOverrideActive()));
+    }
+
+    return false;
+  }
 }

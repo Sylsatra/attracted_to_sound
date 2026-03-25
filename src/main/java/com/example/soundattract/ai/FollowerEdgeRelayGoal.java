@@ -28,6 +28,7 @@ public class FollowerEdgeRelayGoal extends Goal {
     private int stuckTicks = 0;
 
     private SoundTracker.SoundRecord cachedSound = null;
+    private boolean highWeightOverrideActive = false;
 
     private BlockBreakerPosGoal blockBreakerGoal = null;
 
@@ -132,9 +133,12 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (this.mob.isVehicle() || this.mob.isSleeping()) {
             return false;
         }
-        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+
+        if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()
+                && this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
             return false;
         }
+
         if (!isMobEligible()) {
             return false;
         }
@@ -163,6 +167,26 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (newSound == null) {
             return false;
         }
+
+        if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
+            double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+            if (threshold > 0 && newSound.weight >= threshold && isEligibleForOverride()) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.info("[FollowerEdgeRelayGoal] Mob {} dropping target for high-weight sound ({}).", this.mob.getName().getString(), newSound.weight);
+                }
+                this.mob.setTarget(null);
+                this.highWeightOverrideActive = true;
+                this.edgeMobState = EdgeMobState.GOING_TO_SOUND;
+                this.foundPlayerOrHit = false;
+                this.edgeArrivalTicks = 0;
+                this.cachedReturnLeader = null;
+                this.returnLogCooldown = 0;
+                this.raidScheduled = false;
+            } else {
+                return false;
+            }
+        }
+
         this.targetSoundPos = newSound.pos;
         this.currentTargetWeight = newSound.weight;
         this.cachedSound = newSound;
@@ -186,9 +210,15 @@ public class FollowerEdgeRelayGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-
         if (this.mob.getTarget() != null && this.mob.getTarget().isAlive()) {
-            return false;
+            double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+            SoundTracker.SoundRecord bestNow = getCachedNearestSound();
+            if (threshold > 0 && bestNow != null && bestNow.weight >= threshold && isEligibleForOverride()) {
+                this.mob.setTarget(null);
+                this.highWeightOverrideActive = true;
+            } else if (SoundAttractConfig.COMMON.skipSoundScanWhenHasTarget.get()) {
+                return false;
+            }
         }
 
         if (this.edgeMobState == EdgeMobState.RETURNING_TO_LEADER) {
@@ -272,6 +302,7 @@ public class FollowerEdgeRelayGoal extends Goal {
 
         this.lastIssuedNavTarget = null;
         this.repathCooldown = 0;
+        this.highWeightOverrideActive = false;
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.info("[FollowerEdgeRelayGoal] stop(): mob {} cleanup complete (state reset).", mob.getName().getString());
         }
@@ -648,6 +679,31 @@ public class FollowerEdgeRelayGoal extends Goal {
         if (this.edgeMobState != EdgeMobState.RETURNING_TO_LEADER && this.mob.isSprinting()) {
             this.mob.setSprinting(false);
         }
+    }
+
+    /**
+     * Returns true if this mob qualifies for the high-sound-weight target override:
+     * - Must detect a sound at or above the configured weight threshold
+     * - Must NOT be in an active raid phase
+     */
+    private boolean shouldOverrideTarget() {
+        double threshold = SoundAttractConfig.COMMON.highSoundWeightTargetOverride.get();
+        if (threshold <= 0) return false;
+        if (RaidManager.isRaidAdvancing(this.mob) || RaidManager.isRaidTicking(this.mob)) return false;
+        SoundTracker.SoundRecord best = getCachedNearestSound();
+        if (best == null || best.weight < threshold) return false;
+        this.targetSoundPos = best.pos;
+        this.currentTargetWeight = best.weight;
+        this.cachedSound = best;
+        return true;
+    }
+
+    private boolean isEligibleForOverride() {
+        return !RaidManager.isRaidAdvancing(this.mob) && !RaidManager.isRaidTicking(this.mob);
+    }
+
+    public boolean isHighWeightOverrideActive() {
+        return this.highWeightOverrideActive;
     }
 
     private boolean areSoundsEffectivelySame(SoundTracker.SoundRecord s1, SoundTracker.SoundRecord s2) {
