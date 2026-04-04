@@ -140,7 +140,7 @@ public final class RaidReinforcementManager {
             for (String entry : entries) {
                 String[] parts = entry.split(",");
                 if (parts.length == 2) {
-                    ResourceLocation id = new ResourceLocation(parts[0].trim());
+                    ResourceLocation id = ResourceLocation.tryParse(parts[0].trim());
                     int cap = Integer.parseInt(parts[1].trim());
                     if (cap > 0) result.put(id, cap);
                 }

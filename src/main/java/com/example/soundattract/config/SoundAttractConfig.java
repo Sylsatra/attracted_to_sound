@@ -519,6 +519,23 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> immersiveMelodiesInstrumentMultipliers = IntegrationConfig.IMMERSIVE_MELODIES_INSTRUMENT_MULTIPLIERS;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> immersiveMelodiesMelodyOverrides = IntegrationConfig.IMMERSIVE_MELODIES_MELODY_OVERRIDES;
 
+        public final ForgeConfigSpec.BooleanValue enableSporeIntegration = IntegrationConfig.ENABLE_SPORE_INTEGRATION;
+        public final ForgeConfigSpec.BooleanValue enableSporeScentTrail = IntegrationConfig.ENABLE_SPORE_SCENT_TRAIL;
+        public final ForgeConfigSpec.BooleanValue enableStealthMarkerBridge = IntegrationConfig.ENABLE_STEALTH_MARKER_BRIDGE;
+        public final ForgeConfigSpec.BooleanValue enableScentBlockSuppression = IntegrationConfig.ENABLE_SCENT_BLOCK_SUPPRESSION;
+        public final ForgeConfigSpec.BooleanValue enableProtoSoundDeployment = IntegrationConfig.ENABLE_PROTO_SOUND_DEPLOYMENT;
+        public final ForgeConfigSpec.BooleanValue enableSoundRelay = IntegrationConfig.ENABLE_SOUND_RELAY;
+        public final ForgeConfigSpec.BooleanValue smartSpreadToSound = IntegrationConfig.SMART_SPREAD_TO_SOUND;
+        public final ForgeConfigSpec.DoubleValue stealthMarkerCamoThreshold = IntegrationConfig.STEALTH_MARKER_CAMO_THRESHOLD;
+        public final ForgeConfigSpec.IntValue stealthBridgeCheckIntervalTicks = IntegrationConfig.STEALTH_BRIDGE_CHECK_INTERVAL_TICKS;
+        public final ForgeConfigSpec.IntValue scentEntityDissipationAccel = IntegrationConfig.SCENT_ENTITY_DISSIPATION_ACCEL;
+        public final ForgeConfigSpec.DoubleValue protoSoundWeightThreshold = IntegrationConfig.PROTO_SOUND_WEIGHT_THRESHOLD;
+        public final ForgeConfigSpec.IntValue protoSoundDeploymentCooldownTicks = IntegrationConfig.PROTO_SOUND_DEPLOYMENT_COOLDOWN_TICKS;
+        public final ForgeConfigSpec.IntValue protoSoundBiomassThreshold = IntegrationConfig.PROTO_SOUND_BIOMASS_THRESHOLD;
+        public final ForgeConfigSpec.DoubleValue protoSpreadMaxDistance = IntegrationConfig.PROTO_SPREAD_MAX_DISTANCE;
+        public final ForgeConfigSpec.DoubleValue protoSpreadLerpFactor = IntegrationConfig.PROTO_SPREAD_LERP_FACTOR;
+        public final ForgeConfigSpec.DoubleValue soundRelayRange = IntegrationConfig.SOUND_RELAY_RANGE;
+
         public final ForgeConfigSpec.BooleanValue enableScentSystem = ScentConfig.ENABLE_SCENT_SYSTEM;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> scentEligibleMobs = ScentConfig.SCENT_ELIGIBLE_MOBS;
         public final ForgeConfigSpec.BooleanValue enableScentParticles = ScentConfig.ENABLE_SCENT_PARTICLES;
@@ -555,6 +572,36 @@ public class SoundAttractConfig {
     }
 
     public static void bakeConfig() {
+        if (COMMON.configSchemaVersion.get() < 12) {
+            SoundAttractMod.LOGGER.info("Config migration: Sound muffling factors updated to new defaults (Schema v12).");
+            COMMON.mufflingFactorWool.set(0.75);
+            COMMON.mufflingFactorSolid.set(0.85);
+            COMMON.mufflingFactorNonSolid.set(0.93);
+            COMMON.mufflingFactorThin.set(0.95);
+            COMMON.configSchemaVersion.set(12);
+        }
+
+        if (COMMON.configSchemaVersion.get() < 13) {
+            SoundAttractMod.LOGGER.info("Config migration: Updating attracted entities to include new Spore support (Schema v13).");
+            
+            List<String> currentEntities = new ArrayList<>(COMMON.attractedEntities.get());
+            List<? extends String> defaultEntities = GeneralConfig.ATTRACTED_ENTITIES.getDefault();
+            
+            int addedCount = 0;
+            for (String entityId : defaultEntities) {
+                if (!currentEntities.contains(entityId)) {
+                    currentEntities.add(entityId);
+                    addedCount++;
+                }
+            }
+            
+            if (addedCount > 0) {
+                COMMON.attractedEntities.set(currentEntities);
+                SoundAttractMod.LOGGER.info("Added {} new default entities to the attracted list.", addedCount);
+            }
+            
+            COMMON.configSchemaVersion.set(13);
+        }
 
 
 

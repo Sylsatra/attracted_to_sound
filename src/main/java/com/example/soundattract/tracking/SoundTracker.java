@@ -67,6 +67,10 @@ public class SoundTracker {
             this.weight = weight;
         }
 
+        public boolean isPlayerProduced() {
+            return this instanceof VirtualSoundRecord || (soundId != null && soundId.contains(":virtual#"));
+        }
+
         public SoundRecord(SoundEvent sound, BlockPos pos, int lifetime, String dimensionKey, double range, double weight) {
             this(sound, sound != null && sound.getLocation() != null ? sound.getLocation().toString() : null, pos, lifetime, dimensionKey, range, weight);
         }
@@ -210,7 +214,7 @@ public class SoundTracker {
         }
     }
 
-    private static List<SoundRecord> getNearbySounds(String dim, BlockPos pos) {
+    public static List<SoundRecord> getNearbySounds(Level level, String dim, BlockPos pos, @Nullable java.util.Collection<net.minecraft.world.level.ChunkPos> additionalChunks) {
         List<SoundRecord> result = new ArrayList<>();
         Map<GridKey3D, Map<String, SoundRecord>> dimMap = SPATIAL_SOUNDS.get(dim);
         if (dimMap != null) {
@@ -236,6 +240,20 @@ public class SoundTracker {
             }
         }
         return result;
+    }
+
+    /**
+     * Simplified helper for integration goals to find sounds within a specific range.
+     */
+    public static List<SoundRecord> getNearbySounds(Level level, BlockPos pos, double range) {
+        if (level == null || pos == null) return java.util.Collections.emptyList();
+        
+        List<SoundRecord> all = getNearbySounds(level, level.dimension().location().toString(), pos, null);
+        double rangeSq = range * range;
+        
+        return all.stream()
+                .filter(r -> r.pos.distSqr(pos) <= rangeSq)
+                .toList();
     }
 
     public static void addSound(SoundEvent se,
@@ -330,6 +348,16 @@ public class SoundTracker {
             if (SoundAttractConfig.COMMON.debugLogging.get() && !soundIdToUse.startsWith("pointblank:")) {
                 SoundAttractMod.LOGGER.info("[SoundTracker] Successfully added sound: {} at {} (range={}, weight={}, lifetime={})", 
                     soundIdToUse, pos, range, weight, lifetime);
+            }
+
+            if (net.minecraftforge.fml.ModList.get().isLoaded("spore")) {
+                try {
+                    com.example.soundattract.integration.spore.BiomassSoundSystem.recordBiomassSound(
+                        net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer().getLevel(
+                            net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, 
+                            new net.minecraft.resources.ResourceLocation(dimensionKey))),
+                        pos, weight);
+                } catch (Exception ignored) {}
             }
         } finally {
             writeLock.unlock();
@@ -491,7 +519,7 @@ public class SoundTracker {
         }
     }
 
-    public static double[] applyBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
+    public static double[] applyBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId, boolean skipBiomassMuffle) {
         if (level == null || src == null || dst == null) {
             return new double[]{origRange, origWeight};
         }
@@ -515,7 +543,7 @@ public class SoundTracker {
             return QuantifiedCacheCompat.getCached(
                 "soundattract_raycast_muffling",
                 key,
-                () -> computeBlockMuffling(level, src, dst, origRange, origWeight, soundId),
+                () -> computeBlockMuffling(level, src, dst, origRange, origWeight, soundId, skipBiomassMuffle),
                 raycastTtl,
                 raycastMax
             );
@@ -539,7 +567,7 @@ public class SoundTracker {
             }
         }
 
-        double[] finalResult = computeBlockMuffling(level, src, dst, origRange, origWeight, soundId);
+        double[] finalResult = computeBlockMuffling(level, src, dst, origRange, origWeight, soundId, skipBiomassMuffle);
         if (useCache) {
             RAYCAST_CACHE.put(cacheKey, new RaycastEntry(finalResult, level.getGameTime()));
             if (RAYCAST_CACHE.size() > raycastMax) {
@@ -564,13 +592,13 @@ public class SoundTracker {
         return finalResult;
     }
 
-    private static double[] computeBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId) {
+    private static double[] computeBlockMuffling(Level level, BlockPos src, BlockPos dst, double origRange, double origWeight, String soundId, boolean skipBiomassMuffle) {
         if (!com.example.soundattract.los.OptimizedLOS.tryConsumeMufflingBudget()) {
             return new double[]{origRange, origWeight};
         }
 
         double[] result = com.example.soundattract.los.OptimizedLOS.computeMufflingDda(
-                level, src, dst, origRange, origWeight);
+                level, src, dst, origRange, origWeight, skipBiomassMuffle);
 
         int blocksHit = 0;
         if (result[0] < origRange || result[1] < origWeight) {
@@ -759,6 +787,10 @@ public class SoundTracker {
     }
 
     public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 eyePos, @Nullable String currentTargetSoundId) {
+        return findNearestSound(mob, level, mobPos, eyePos, currentTargetSoundId, null, false);
+    }
+
+    public static SoundRecord findNearestSound(Mob mob, Level level, BlockPos mobPos, Vec3 eyePos, @Nullable String currentTargetSoundId, @Nullable java.util.Collection<net.minecraft.world.level.ChunkPos> additionalChunks, boolean skipBiomassMuffle) {
         if (mob == null || level == null || mobPos == null) {
             return null;
         }
@@ -798,7 +830,7 @@ public class SoundTracker {
             }
 
             String dimensionKey = level.dimension().location().toString();
-            List<SoundRecord> nearbySounds = getNearbySounds(dimensionKey, mobPos);
+            List<SoundRecord> nearbySounds = getNearbySounds(level, dimensionKey, mobPos, additionalChunks);
             if (nearbySounds.isEmpty()) {
                 return null;
             }
@@ -965,7 +997,7 @@ public class SoundTracker {
                 for (SoundSnapshot rec : asyncFiltered) {
                     String soundIdStr = rec.soundId;
                     double[] muffled = applyBlockMuffling(level, rec.pos, mobPos, rec.range, rec.weight,
-                        soundIdStr != null ? soundIdStr : "unknown");
+                        soundIdStr != null ? soundIdStr : "unknown", skipBiomassMuffle);
                     double muffledRange = muffled[0];
                     double muffledWeight = muffled[1];
                     if (soundIdStr != null) {
@@ -1027,7 +1059,7 @@ public class SoundTracker {
                     muffledRange = cachedMuffled.range();
                     muffledWeight = cachedMuffled.weight();
                 } else {
-                    double[] muffled = applyBlockMuffling(level, r.pos, mobPos, initialRange, initialWeight, soundIdStr != null ? soundIdStr : "unknown");
+                    double[] muffled = applyBlockMuffling(level, r.pos, mobPos, initialRange, initialWeight, soundIdStr != null ? soundIdStr : "unknown", skipBiomassMuffle);
                     muffledRange = muffled[0];
                     muffledWeight = muffled[1];
                 }

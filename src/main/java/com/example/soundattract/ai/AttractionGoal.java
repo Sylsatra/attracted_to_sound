@@ -207,6 +207,14 @@ public class AttractionGoal extends Goal {
         return true;
     }
 
+    protected boolean isBiomassBypass() {
+        return false;
+    }
+
+    protected java.util.Collection<net.minecraft.world.level.ChunkPos> getExtendedListeningChunks() {
+        return null;
+    }
+
     private SoundTracker.SoundRecord getCachedNearestSound() {
         long currentTick = this.mob.level().getGameTime();
         if (this.cacheTick == currentTick) {
@@ -222,7 +230,9 @@ public class AttractionGoal extends Goal {
             this.mob.level(),
             this.mob.blockPosition(),
             this.mob.getEyePosition(),
-            this.cachedSound != null ? this.cachedSound.soundId : null
+            this.cachedSound != null ? this.cachedSound.soundId : null,
+            this.getExtendedListeningChunks(),
+            this.isBiomassBypass()
         );
         return this.soundResultCache;
     }
@@ -554,6 +564,10 @@ public class AttractionGoal extends Goal {
 
     public BlockPos getTargetSoundPos() {
         return this.targetSoundPos;
+    }
+
+    public double getCurrentTargetWeight() {
+        return this.currentTargetWeight;
     }
 
     public boolean isHighWeightOverrideActive() {

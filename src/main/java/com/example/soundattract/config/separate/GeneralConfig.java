@@ -89,7 +89,7 @@ public class GeneralConfig {
                 .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
 
         CONFIG_SCHEMA_VERSION = BUILDER.comment("Internal schema version for config migrations. Do not change.")
-                .defineInRange("configSchemaVersion", 11, 0, Integer.MAX_VALUE);
+                .defineInRange("configSchemaVersion", 13, 0, Integer.MAX_VALUE);
 
         BUILDER.pop();
 
@@ -120,18 +120,16 @@ public class GeneralConfig {
                         "minecraft:wither_skeleton", "minecraft:zoglin", "minecraft:zombie", "minecraft:zombie_villager",
                         "scguns:cog_knight", "scguns:cog_minion", "scguns:blunderer", "scguns:hive", "scguns:dissident", "scguns:hornlin", "scguns:redcoat", "scguns:cog_knight",
                         "scguns:sky_carrier", "scguns:supply_scamp", "scguns:swarm", "scguns:zombified_hornlin",
-                        "spore:braiomil", "spore:braurei", "spore:brot", "spore:brute", "spore:busser",
-                        "spore:inf_construct", "spore:delusioner", "spore:gastgaber", "spore:gazenbreacher",
-                        "spore:griefer", "spore:hevoker", "spore:hidenburg", "spore:howitzer", "spore:howler",
-                        "spore:hvindicator", "spore:illusion", "spore:inf_drownded", "spore:inf_evoker",
-                        "spore:inf_hazmat", "spore:husk", "spore:inf_pillager", "spore:inf_player",
-                        "spore:inf_villager", "spore:inf_vindicator", "spore:inf_wanderer", "spore:inf_witch",
-                        "spore:inf_human", "spore:inquisitor", "spore:jagd", "spore:knight",
-                        "spore:lacerator", "spore:leaper", "spore:mound", "spore:nuclea",
-                        "spore:ogre", "spore:plagued", "spore:proto", "spore:reconstructor",
-                        "spore:scamper", "spore:scavenger", "spore:scent", "spore:sieger", "spore:specter",
-                        "spore:spitter", "spore:stalker", "spore:thorn", "spore:umarmed", "spore:usurper",
-                        "spore:verva", "spore:vigil", "spore:volatile", "spore:wendigo",
+                        "spore:inf_human", "spore:inf_husk", "spore:inf_drowned", "spore:inf_villager", "spore:inf_pillager", 
+                        "spore:inf_player", "spore:inf_witch", "spore:inf_diseased_villager", "spore:inf_wanderer", "spore:inf_hazmat", 
+                        "spore:knight", "spore:griefer", "spore:braiomil", "spore:busser", "spore:thorn", "spore:jagd", "spore:scavenger", "spore:bloater", "spore:naiad", 
+                        "spore:leaper", "spore:slasher", "spore:spitter", "spore:volatile", "spore:mephitic", "spore:howler", "spore:stalker", "spore:brute", "spore:nuclea", 
+                        "spore:protector", "spore:chemist", "spore:inebriater", "spore:inf_vindicator", "spore:inf_evoker", "spore:inquisitor", "spore:brot", "spore:wendigo", 
+                        "spore:ogre", "spore:hvindicator", "spore:hevoker", "spore:plagued", "spore:lacerator", "spore:biobloob", "spore:saugling", "spore:bairn", "spore:scamper", 
+                        "spore:gastgaber", "spore:specter", "spore:vanguard", "spore:claw", "spore:hevoker_arm", "spore:sieger_tail", "spore:licker", "spore:howit_arm", "spore:stahl_arm", 
+                        "spore:arena_tendril", "spore:tentacle", "spore:mound", "spore:umarmed", "spore:usurper", "spore:vigil", "spore:braurei", "spore:verva", "spore:delusioner", 
+                        "spore:reconstructor", "spore:proto", "spore:hivetumor", "spore:sieger", "spore:howitzer", "spore:stahl", "spore:hohlfresser", "spore:gazenbreacher", "spore:kraken", "spore:hindenburg",
+                        "spore:gargoyle", "spore:conductor", "spore:grober", "spore:reaper", "spore:leviathan",
                         "sculkhorde:sculk_zombie", "sculkhorde:sculk_witch", "sculkhorde:sculk_vindicator", "sculkhorde:sculk_vex",
                         "sculkhorde:sculk_squid", "sculkhorde:sculk_spore_spewer",
                         "sculkhorde:sculk_spitter", "sculkhorde:sculk_soul_reaper",
@@ -1635,14 +1633,14 @@ public class GeneralConfig {
         BUILDER.push("muffling");
         ENABLE_BLOCK_MUFFLING = BUILDER.comment("Enable/disable block muffling effects on sound range/weight.")
                 .define("enableBlockMuffling", true);
-        MUFFLING_FACTOR_WOOL = BUILDER.comment("Sound muffling factor for wool blocks. Default: 0.15")
-                .defineInRange("mufflingFactorWool", 0.15, 0.0, 1.0);
-        MUFFLING_FACTOR_SOLID = BUILDER.comment("Sound muffling factor for solid blocks. Default: 0.35")
-                .defineInRange("mufflingFactorSolid", 0.35, 0.0, 1.0);
-        MUFFLING_FACTOR_NON_SOLID = BUILDER.comment("Sound muffling factor for non-solid blocks. Default: 0.7")
-                .defineInRange("mufflingFactorNonSolid", 0.7, 0.0, 1.0);
-        MUFFLING_FACTOR_THIN = BUILDER.comment("Sound muffling factor for thin blocks (e.g., carpets, panes). Default: 0.9")
-                .defineInRange("mufflingFactorThin", 0.9, 0.0, 1.0);
+        MUFFLING_FACTOR_WOOL = BUILDER.comment("Sound muffling factor for wool blocks. Default: 0.75")
+                .defineInRange("mufflingFactorWool", 0.75, 0.0, 1.0);
+        MUFFLING_FACTOR_SOLID = BUILDER.comment("Sound muffling factor for solid blocks. Default: 0.85")
+                .defineInRange("mufflingFactorSolid", 0.85, 0.0, 1.0);
+        MUFFLING_FACTOR_NON_SOLID = BUILDER.comment("Sound muffling factor for non-solid blocks. Default: 0.93")
+                .defineInRange("mufflingFactorNonSolid", 0.93, 0.0, 1.0);
+        MUFFLING_FACTOR_THIN = BUILDER.comment("Sound muffling factor for thin blocks (e.g., carpets, panes). Default: 0.95")
+                .defineInRange("mufflingFactorThin", 0.95, 0.0, 1.0);
         MUFFLING_FACTOR_LIQUID = BUILDER.comment("Sound muffling factor for liquid blocks. Default: 0.5")
                 .defineInRange("mufflingFactorLiquid", 0.5, 0.0, 1.0);
         MUFFLING_FACTOR_AIR = BUILDER.comment("Sound muffling factor for air blocks. Default: 1.0")

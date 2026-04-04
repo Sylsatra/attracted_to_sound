@@ -14,7 +14,15 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
-public class LeaderAttractionGoal extends Goal {
+public class LeaderAttractionGoal extends net.minecraft.world.entity.ai.goal.Goal {
+
+    protected boolean isBiomassBypass() {
+        return false;
+    }
+
+    protected java.util.Collection<net.minecraft.world.level.ChunkPos> getExtendedListeningChunks() {
+        return null;
+    }
 
     private final Mob mob;
     private final double moveSpeed;
@@ -412,7 +420,8 @@ public class LeaderAttractionGoal extends Goal {
         com.example.soundattract.tracking.SoundTracker.SoundRecord best =
                 com.example.soundattract.tracking.SoundTracker.findNearestSound(
                         this.mob, this.mob.level(),
-                        this.mob.blockPosition(), this.mob.getEyePosition(), null);
+                        this.mob.blockPosition(), this.mob.getEyePosition(), 
+                        null, this.getExtendedListeningChunks(), this.isBiomassBypass());
         if (best == null || best.weight < threshold) return false;
         this.cachedSound = new com.example.soundattract.tracking.SoundTracker.SoundRecord(
                 null, best.soundId, best.pos, 200,
@@ -430,6 +439,10 @@ public class LeaderAttractionGoal extends Goal {
 
     public BlockPos getTargetSoundPos() {
         return this.targetSoundPos;
+    }
+
+    public double getCurrentTargetWeight() {
+        return this.currentTargetWeight;
     }
 
     public boolean isHighWeightOverrideActive() {

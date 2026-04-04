@@ -55,6 +55,8 @@ import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import com.example.soundattract.camo.CamouflageCapability;
 import com.example.soundattract.camo.CamoMaterialRegistry;
+import com.example.soundattract.integration.spore.SporeIntegration;
+import com.example.soundattract.integration.spore.SporeGoalInjectorProxy;
 import com.example.soundattract.config.separate.StealthConfig;
 import com.google.common.cache.CacheBuilder;
 import java.util.concurrent.TimeUnit;
@@ -582,6 +584,12 @@ public class StealthDetectionEvents {
     public static void onMobAttemptTarget(LivingChangeTargetEvent event) {
         if (!(event.getEntity() instanceof Mob mob)) {
             return;
+        }
+
+        if (event.getNewTarget() != null && SporeIntegration.isSporeLoaded()) {
+            if (SporeGoalInjectorProxy.shouldBypassStealth(mob, event.getNewTarget())) {
+                return;
+            }
         }
 
         if (event.getNewTarget() != null && com.example.soundattract.ai.MobGroupManager.isMobInHighWeightOverride(mob)) {

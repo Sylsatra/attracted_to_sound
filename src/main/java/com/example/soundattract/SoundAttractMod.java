@@ -48,12 +48,20 @@ public class SoundAttractMod {
         MinecraftForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
         MinecraftForge.EVENT_BUS.register(new VanillaIntegrationEvents());
         MinecraftForge.EVENT_BUS.register(new com.example.soundattract.event.ScentEvents());
-        com.example.soundattract.integration.immersive_melodies.ImmersiveMelodiesIntegration.init();
+        
+        modEventBus.addListener(this::onRegister);
+
         MinecraftForge.EVENT_BUS.addGenericListener(net.minecraft.world.entity.Entity.class, this::attachPlayerCapabilities);
 
         modEventBus.addListener(this::registerCapabilities);
         modEventBus.addListener(this::onConfigLoading);
         modEventBus.addListener(this::onConfigReloading);
+    }
+
+    private void onRegister(net.minecraftforge.registries.RegisterEvent event) {
+        if (event.getRegistryKey().equals(net.minecraft.core.registries.Registries.ITEM)) {
+            com.example.soundattract.integration.immersive_melodies.ImmersiveMelodiesIntegration.init();
+        }
     }
 
     private void registerCapabilities(net.minecraftforge.common.capabilities.RegisterCapabilitiesEvent event) {

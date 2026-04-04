@@ -59,6 +59,35 @@ public class IntegrationConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> IMMERSIVE_MELODIES_INSTRUMENT_MULTIPLIERS;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> IMMERSIVE_MELODIES_MELODY_OVERRIDES;
 
+    public static final ForgeConfigSpec.BooleanValue ENABLE_SPORE_INTEGRATION;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_SPORE_SCENT_TRAIL;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_STEALTH_MARKER_BRIDGE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_SCENT_BLOCK_SUPPRESSION;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_PROTO_SOUND_DEPLOYMENT;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_SOUND_RELAY;
+    public static final ForgeConfigSpec.BooleanValue SMART_SPREAD_TO_SOUND;
+    public static final ForgeConfigSpec.DoubleValue STEALTH_MARKER_CAMO_THRESHOLD;
+    public static final ForgeConfigSpec.IntValue STEALTH_BRIDGE_CHECK_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.IntValue SCENT_ENTITY_DISSIPATION_ACCEL;
+    public static final ForgeConfigSpec.DoubleValue PROTO_SOUND_WEIGHT_THRESHOLD;
+    public static final ForgeConfigSpec.IntValue PROTO_SOUND_DEPLOYMENT_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.IntValue PROTO_SOUND_BIOMASS_THRESHOLD;
+    public static final ForgeConfigSpec.DoubleValue PROTO_SPREAD_MAX_DISTANCE;
+    public static final ForgeConfigSpec.DoubleValue PROTO_SPREAD_LERP_FACTOR;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_PROTO_PREDATORY_CREEP;
+    public static final ForgeConfigSpec.DoubleValue PROTO_CREEP_ADVANCE_DISTANCE;
+    public static final ForgeConfigSpec.IntValue PROTO_CREEP_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.ConfigValue<String> VIGIL_SIGHTED_SOUND;
+    public static final ForgeConfigSpec.ConfigValue<String> PROTO_HUNT_BEGIN_SOUND;
+    public static final ForgeConfigSpec.ConfigValue<String> PROTO_HUNT_BEGIN_PARTICLE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_PROTO_NEURAL_INFLUENCE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_HARMONIC_FEAR;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_DELUGE_OF_SOUND;
+    public static final ForgeConfigSpec.DoubleValue HARMONIC_FEAR_RANGE;
+    public static final ForgeConfigSpec.DoubleValue DELUGE_OF_SOUND_WEIGHT_THRESHOLD;
+
+    public static final ForgeConfigSpec.DoubleValue SOUND_RELAY_RANGE;
+
     static {
         BUILDER.comment("Settings for other mod integrations").push("integration");
 
@@ -141,6 +170,70 @@ public class IntegrationConfig {
                 .defineList("immersiveMelodiesInstrumentMultipliers", Arrays.asList("immersive_melodies:drum:1.5"), obj -> obj instanceof String);
         IMMERSIVE_MELODIES_MELODY_OVERRIDES = BUILDER.comment("List of melody IDs and their custom range:weight (e.g. 'immersive_melodies:test_melody:32.0:3.0').")
                 .defineList("immersiveMelodiesMelodyOverrides", Arrays.asList(), obj -> obj instanceof String);
+        BUILDER.pop();
+
+        BUILDER.push("spore");
+        ENABLE_SPORE_INTEGRATION = BUILDER.comment("Master toggle for Spore mod integration. Enables sound attraction, stealth bridge, and Proto deployment for Spore entities.")
+                .define("enableSporeIntegration", true);
+        ENABLE_SPORE_SCENT_TRAIL = BUILDER.comment("Inject FollowScentGoal into Spore Infected entities so they can follow player scent trails.")
+                .define("enableSporeScentTrail", true);
+        ENABLE_STEALTH_MARKER_BRIDGE = BUILDER.comment("Bridge Sound Attract's camouflage system with Spore's MARKER effect. Degraded camo applies MARKER, making the entity visible to all Infected through walls.")
+                .define("enableStealthMarkerBridge", true);
+        ENABLE_SCENT_BLOCK_SUPPRESSION = BUILDER.comment("When a player with high scent-blocking camo is near a Spore ScentEntity, accelerate its dissipation.")
+                .define("enableScentBlockSuppression", true);
+        ENABLE_PROTO_SOUND_DEPLOYMENT = BUILDER.comment("Allow Proto to react to high-weight sounds by deploying Vigil scouts toward the sound source.")
+                .define("enableProtoSoundDeployment", true);
+        ENABLE_SOUND_RELAY = BUILDER.comment("Allow linked Infected to propagate sound positions to nearby linked Infected via their searchPos.")
+                .define("enableSoundRelay", true);
+        SMART_SPREAD_TO_SOUND = BUILDER.comment("Proto waits for scout confirmation before spreading biomass toward sound. If false, spreads immediately.")
+                .define("smartSpreadToSound", true);
+
+        STEALTH_MARKER_CAMO_THRESHOLD = BUILDER.comment("Visual camo strength below which MARKER is applied when degrading from above.")
+                .defineInRange("stealthMarkerCamoThreshold", 0.3, 0.0, 1.0);
+        STEALTH_BRIDGE_CHECK_INTERVAL_TICKS = BUILDER.comment("How often (in ticks) the stealth bridge scans for camo transitions and ScentEntity suppression.")
+                .defineInRange("stealthBridgeCheckIntervalTicks", 40, 1, 1200);
+        SCENT_ENTITY_DISSIPATION_ACCEL = BUILDER.comment("Extra dissipation ticks added per bridge cycle to ScentEntities near camo'd entities.")
+                .defineInRange("scentEntityDissipationAccel", 40, 1, 600);
+
+        PROTO_SOUND_WEIGHT_THRESHOLD = BUILDER.comment("Minimum sound weight for Proto to consider deploying scouts.")
+                .defineInRange("protoSoundWeightThreshold", 10.0, 0.0, 100.0);
+        PROTO_SOUND_DEPLOYMENT_COOLDOWN_TICKS = BUILDER.comment("Cooldown (in ticks) between Proto scout deployments.")
+                .defineInRange("protoSoundDeploymentCooldownTicks", 200, 0, 72000);
+        PROTO_SOUND_BIOMASS_THRESHOLD = BUILDER.comment("Minimum biomass for Proto to deploy scouts.")
+                .defineInRange("protoSoundBiomassThreshold", 20, 0, 10000);
+        PROTO_SPREAD_MAX_DISTANCE = BUILDER.comment("Maximum distance from Proto's NODE for biased biomass spread toward sound. Beyond this, no spread occurs.")
+                .defineInRange("protoSpreadMaxDistance", 256.0, 0.0, 512.0);
+        PROTO_SPREAD_LERP_FACTOR = BUILDER.comment("How far toward the sound source to bias the spread center (0.0=at NODE, 1.0=at sound).")
+                .defineInRange("protoSpreadLerpFactor", 0.35, 0.0, 1.0);
+
+        BUILDER.push("predatory_creep");
+        ENABLE_PROTO_PREDATORY_CREEP = BUILDER.comment("If true, when a Vigil spots a player, the Proto will creep biomass toward their location.")
+                .define("enableProtoPredatoryCreep", true);
+        PROTO_CREEP_ADVANCE_DISTANCE = BUILDER.comment("Distance (blocks) the biomass advances per creeping step.")
+                .defineInRange("protoCreepAdvanceDistance", 8.0, 1.0, 64.0);
+        PROTO_CREEP_INTERVAL_TICKS = BUILDER.comment("Ticks between creeping steps. Higher values reduce CPU usage.")
+                .defineInRange("protoCreepIntervalTicks", 200, 20, 12000);
+        VIGIL_SIGHTED_SOUND = BUILDER.comment("Sound played by the Vigil when spotting a player to alert the Proto. Default is Spore's eye stare sound.")
+                .define("vigilSightedSound", "spore:vigil_eye_use");
+        PROTO_HUNT_BEGIN_SOUND = BUILDER.comment("Sound played by the Proto when it begins a predatory hunt.")
+                .define("protoHuntBeginSound", "spore:proto_ambient");
+        PROTO_HUNT_BEGIN_PARTICLE = BUILDER.comment("Particle played at the Proto's NODE when a hunt begins.")
+                .define("protoHuntBeginParticle", "minecraft:sculk_soul");
+        
+        ENABLE_PROTO_NEURAL_INFLUENCE = BUILDER.comment("Neural-Net Influence: Loud sounds bias Proto toward heavy units; quiet sounds bias it toward scouts.")
+                .define("enableProtoNeuralInfluence", true);
+        ENABLE_HARMONIC_FEAR = BUILDER.comment("Harmonic Fear: Hive Tumors panic if players make sound while standing on biomass.")
+                .define("enableHarmonicFear", true);
+        ENABLE_DELUGE_OF_SOUND = BUILDER.comment("Deluge of Sound: Delusionares warp nearby infected to noisy players.")
+                .define("enableDelugeOfSound", true);
+        HARMONIC_FEAR_RANGE = BUILDER.comment("Range (blocks) for Hive Tumor biomass sound detection.")
+                .defineInRange("harmonicFearRange", 32.0, 1.0, 512.0);
+        DELUGE_OF_SOUND_WEIGHT_THRESHOLD = BUILDER.comment("Minimum sound weight to trigger Delusionare's mass teleportation.")
+                .defineInRange("delugeOfSoundWeightThreshold", 20.0, 1.0, 100.0);
+        BUILDER.pop();
+
+        SOUND_RELAY_RANGE = BUILDER.comment("Range (blocks) for linked Infected sound propagation to nearby Infected.")
+                .defineInRange("soundRelayRange", 32.0, 0.0, 256.0);
         BUILDER.pop();
 
         BUILDER.pop();

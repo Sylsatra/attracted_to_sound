@@ -13,6 +13,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.registries.ForgeRegistries;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -523,7 +526,7 @@ public final class OptimizedLOS {
     }
 
     public static double[] computeMufflingDda(Level level, BlockPos src, BlockPos dst,
-                                               double origRange, double origWeight) {
+                                               double origRange, double origWeight, boolean skipBiomassMuffle) {
         if (level == null || src == null || dst == null) {
             return new double[]{origRange, origWeight};
         }
@@ -611,6 +614,14 @@ public final class OptimizedLOS {
             if (!level.isLoaded(pos)) break;
 
             BlockState state = level.getBlockState(pos);
+            if (skipBiomassMuffle) {
+                ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
+                if (id != null && id.getNamespace().equals("spore")) {
+                    if (x == endX && y == endY && z == endZ) break;
+                    continue;
+                }
+            }
+
             if (state.isAir()) {
                 if (factorAir >= 1.0) continue;
                 currentRange  *= factorAir;
