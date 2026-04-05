@@ -24,6 +24,7 @@ import com.example.soundattract.network.SoundAttractNetwork;
 import com.example.soundattract.quantified.QuantifiedIntegration;
 import com.example.soundattract.worker.WorkSchedulerManager;
 import com.example.soundattract.camo.CamouflageCapability;
+import com.example.soundattract.integration.spore.BiomassSoundHandler;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraft.resources.ResourceLocation;
@@ -110,6 +111,11 @@ public class SoundAttractMod {
             WorkSchedulerManager.refresh();
             SoundAttractNetwork.register();
             QuantifiedIntegration.bootstrap();
+            
+            if (ModList.get().isLoaded("spore")) {
+                MinecraftForge.EVENT_BUS.register(BiomassSoundHandler.class);
+                LOGGER.info("Spore mod detected. Registered BiomassSoundHandler.");
+            }
         });
         event.enqueueWork(this::handleTaczIntegration);
     }

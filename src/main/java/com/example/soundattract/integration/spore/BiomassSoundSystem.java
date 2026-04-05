@@ -1,19 +1,9 @@
 package com.example.soundattract.integration.spore;
 
-import com.Harbinger.Spore.Sentities.Organoids.Vigil;
-import com.Harbinger.Spore.Sentities.Organoids.Verwa;
-import com.Harbinger.Spore.Core.Sentities;
-import com.example.soundattract.tracking.SoundTracker;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,27 +14,25 @@ import java.util.concurrent.ConcurrentHashMap;
  * High sound pressure triggers a 'Hive Alert', summoning reinforcements and alerting Vigil entities.
  * 
  * Safety: Uses ConcurrentHashMap for thread safety and periodic cleanup for memory management.
+ * Non-mandatory: Logic is guarded by ModList checks and Spore-specific implementation is 
+ * delegated to BiomassSoundHandler to avoid NoClassDefFoundError.
  */
-@Mod.EventBusSubscriber(modid = "soundattract")
 public class BiomassSoundSystem {
     private static final double ALERT_THRESHOLD = 500.0;
     
     private static final Map<BlockPos, Double> pressureMap = new ConcurrentHashMap<>();
     private static int cleanupTimer = 0;
 
-    @SubscribeEvent
-    public static void onServerTick(TickEvent.LevelTickEvent event) {
-        if (!ModList.get().isLoaded("spore") || event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)) {
-            return;
-        }
-
+    /**
+     * Called by BiomassSoundHandler only if Spore is loaded.
+     */
+    public static void processTick(ServerLevel level) {
         cleanupTimer++;
         if (cleanupTimer >= 100) { 
             cleanupTimer = 0;
             pressureMap.replaceAll((pos, weight) -> weight * 0.8);
             pressureMap.values().removeIf(weight -> weight < 1.0);
         }
-
     }
 
     /**
@@ -64,19 +52,6 @@ public class BiomassSoundSystem {
     }
 
     private static void triggerHiveAlert(ServerLevel level, BlockPos pos) {
-        AABB area = new AABB(pos).inflate(64);
-        List<Vigil> vigils = level.getEntitiesOfClass(Vigil.class, area);
-        
-        for (Vigil vigil : vigils) {
-            vigil.setTrigger(3);
-            vigil.setWaveSize(10); 
-        }
-
-        if (vigils.size() > 0 || level.random.nextFloat() < 0.3f) {
-            Verwa verwa = new Verwa(Sentities.VERVA.get(), level);
-            verwa.moveTo(pos.getX(), pos.getY(), pos.getZ());
-            verwa.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.EVENT, null, null);
-            level.addFreshEntity(verwa);
-        }
+        BiomassSoundHandler.triggerHiveAlert(level, pos);
     }
 }

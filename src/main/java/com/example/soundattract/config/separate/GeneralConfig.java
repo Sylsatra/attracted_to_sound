@@ -89,7 +89,7 @@ public class GeneralConfig {
                 .defineInRange("soundNoveltyTimeTicks", 100, 1, 200);
 
         CONFIG_SCHEMA_VERSION = BUILDER.comment("Internal schema version for config migrations. Do not change.")
-                .defineInRange("configSchemaVersion", 13, 0, Integer.MAX_VALUE);
+                .defineInRange("configSchemaVersion", 14, 0, Integer.MAX_VALUE);
 
         BUILDER.pop();
 
@@ -871,7 +871,17 @@ public class GeneralConfig {
                                     "immersive_melodies:instruments.handpan.c4;32;32",
                                     "immersive_melodies:instruments.handpan.c3;32;32",
                                     "immersive_melodies:instruments.handpan.c2;32;32",
-                                    "immersive_melodies:instruments.handpan.c1;32;32"
+                                     "immersive_melodies:instruments.handpan.c1;32;32",
+                                     "spore:engine;64;40", "spore:saw_sound;48;30", "spore:electric1;32;20", "spore:electric2;32;20", "spore:nuke;256;200", 
+                                     "spore:kraken_growl1;96;60", "spore:kraken_growl2;96;60", "spore:vanguard_fireworks;128;80", "spore:vanguard_call;80;50", 
+                                     "spore:printing;24;15", "spore:signal;40;25", "spore:infected_weapon_throw;24;15", "spore:infected_weapon_hit_block;16;12", 
+                                     "spore:infected_weapon_hit_entity;16;12", "spore:cdu_insert;12;8", "spore:cleaver_spin;40;25", "spore:infected_pickaxe;20;15", 
+                                     "spore:reaver_reave;48;35", "spore:saber_leap;32;20", "spore:scanner_item;16;10", "spore:syringe_suck;8;5", 
+                                     "spore:syringe_inject;8;5", "spore:reagent;12;8", "spore:infected_gear_break;24;15", "spore:infected_gear_equip;12;8", 
+                                     "spore:pci_inject;10;6", "spore:shield_bash;24;18", "spore:syringegun_reload;24;10", "spore:syringegun_spin;32;15", 
+                                     "spore:syringegun_shot;64;40", "spore:syringegun_inject;12;8", "spore:tumoroid_nuke;256;200", "spore:mistmaker_deploy;16;10", 
+                                     "spore:mistmaker_shot1;48;30", "spore:mistmaker_shot2;48;30", "spore:bile_blaster_shot1;56;35", "spore:bile_blaster_shot2;56;35", 
+                                     "spore:assassin_shot1;48;30", "spore:assassin_shot2;48;30"
                 ), obj -> obj instanceof String && ((String) obj).split(";").length == 3);        
         SOUND_ID_BLACKLIST = BUILDER.comment("List of sound IDs that are explicitly ignored by mobs, even if loud.")
                 .defineList("soundIdBlacklist", Arrays.asList(), obj -> obj instanceof String && net.minecraft.resources.ResourceLocation.tryParse((String) obj) != null);
@@ -1611,7 +1621,15 @@ public class GeneralConfig {
                             "immersive_melodies:instruments.handpan.c4",
                             "immersive_melodies:instruments.handpan.c3",
                             "immersive_melodies:instruments.handpan.c2",
-                            "immersive_melodies:instruments.handpan.c1"
+                            "immersive_melodies:instruments.handpan.c1",
+                            "spore:engine", "spore:saw_sound", "spore:electric1", "spore:electric2", "spore:nuke", "spore:kraken_growl1", 
+                            "spore:kraken_growl2", "spore:vanguard_fireworks", "spore:vanguard_call", "spore:printing", "spore:signal", 
+                            "spore:infected_weapon_throw", "spore:infected_weapon_hit_block", "spore:infected_weapon_hit_entity", 
+                            "spore:cdu_insert", "spore:cleaver_spin", "spore:infected_pickaxe", "spore:reaver_reave", "spore:saber_leap", 
+                            "spore:scanner_item", "spore:syringe_suck", "spore:syringe_inject", "spore:reagent", "spore:infected_gear_break", 
+                            "spore:infected_gear_equip", "spore:pci_inject", "spore:shield_bash", "spore:syringegun_reload", "spore:syringegun_spin", 
+                            "spore:syringegun_shot", "spore:syringegun_inject", "spore:tumoroid_nuke", "spore:mistmaker_deploy", "spore:mistmaker_shot1", 
+                            "spore:mistmaker_shot2", "spore:bile_blaster_shot1", "spore:bile_blaster_shot2", "spore:assassin_shot1", "spore:assassin_shot2"
                 ), obj -> obj instanceof String && net.minecraft.resources.ResourceLocation.tryParse((String) obj) != null);
         BUILDER.pop();
 

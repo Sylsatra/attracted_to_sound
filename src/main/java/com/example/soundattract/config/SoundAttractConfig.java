@@ -603,6 +603,28 @@ public class SoundAttractConfig {
             COMMON.configSchemaVersion.set(13);
         }
 
+        if (COMMON.configSchemaVersion.get() < 14) {
+            SoundAttractMod.LOGGER.info("Config migration: Updating sound whitelist to include new Spore sounds (Schema v14).");
+            
+            List<String> currentWhitelist = new ArrayList<>(COMMON.soundIdWhitelist.get());
+            List<? extends String> defaultWhitelist = GeneralConfig.SOUND_ID_WHITELIST.getDefault();
+            
+            int addedCount = 0;
+            for (String soundId : defaultWhitelist) {
+                if (!currentWhitelist.contains(soundId)) {
+                    currentWhitelist.add(soundId);
+                    addedCount++;
+                }
+            }
+            
+            if (addedCount > 0) {
+                COMMON.soundIdWhitelist.set(currentWhitelist);
+                SoundAttractMod.LOGGER.info("Added {} new default sounds to the whitelist.", addedCount);
+            }
+            
+            COMMON.configSchemaVersion.set(14);
+        }
+
 
 
         SOUND_ID_WHITELIST_CACHE.clear();
