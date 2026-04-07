@@ -2,16 +2,22 @@ package com.example.soundattract.quantified;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.quantified.bridge.QuantifiedOptionalBridge;
 import com.example.soundattract.worker.LocalWorkScheduler;
 import com.example.soundattract.worker.SoundAttractWorkScheduler;
 import com.example.soundattract.worker.WorkerComputations;
 import com.example.soundattract.worker.WorkerScheduler;
 import net.minecraft.resources.ResourceLocation;
 
-import java.lang.reflect.Method;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
@@ -26,17 +32,9 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
 
     private final LocalWorkScheduler fallback = new LocalWorkScheduler();
 
-    private final Method register;
-    private final Method submit;
-
     public QuantifiedWorkScheduler() {
-        try {
-            Class<?> api = Class.forName("org.admany.quantified.api.QuantifiedAPI");
-            this.register = api.getMethod("register", String.class);
-            this.submit = api.getMethod("submit", Class.forName("org.admany.quantified.api.model.QuantifiedTask$Builder"));
-            this.register.invoke(null, SoundAttractMod.MOD_ID);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize QuantifiedWorkScheduler", e);
+        if (!QuantifiedOptionalBridge.register(SoundAttractMod.MOD_ID)) {
+            throw new RuntimeException("Failed to initialize QuantifiedWorkScheduler");
         }
     }
 
@@ -114,24 +112,132 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
     }
 
     private CompletableFuture<?> submitFuture(String taskName, java.util.function.Supplier<?> work, Duration timeout) {
-        try {
-            Class<?> taskClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask");
-            Object builder = taskClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class)
-                    .invoke(null, SoundAttractMod.MOD_ID, taskName, work);
-            
-            builder.getClass().getMethod("priorityBackground").invoke(builder);
-            builder.getClass().getMethod("threadSafe", boolean.class).invoke(builder, true);
-            
-            if (timeout != null) {
-                builder.getClass().getMethod("timeout", Duration.class).invoke(builder, timeout);
-            }
-            
-            return (CompletableFuture<?>) submit.invoke(null, builder);
-        } catch (Throwable t) {
-            CompletableFuture<Object> failed = new CompletableFuture<>();
-            failed.completeExceptionally(t);
-            return failed;
+        CompletableFuture<?> future = QuantifiedOptionalBridge.trySubmitTask(
+            SoundAttractMod.MOD_ID,
+            taskName,
+            work,
+            true,
+            false,
+            timeout,
+            taskName
+        );
+        if (future != null) {
+            return future;
         }
+        CompletableFuture<Object> failed = new CompletableFuture<>();
+        failed.completeExceptionally(new IllegalStateException("Quantified task submission unavailable"));
+        return failed;
+    }
+
+    public static String soundScoreCacheKeyForTests(WorkerScheduler.SoundScoreRequest req) {
+        return soundScoreCacheKey(req);
+    }
+
+    public static byte[] encodeSoundScoreResultForTests(WorkerScheduler.SoundScoreResult result) {
+        return encodeSoundScoreResult(result);
+    }
+
+    public static WorkerScheduler.SoundScoreResult decodeSoundScoreResultForTests(byte[] bytes) {
+        return decodeSoundScoreResult(bytes);
+    }
+
+    private static String soundScoreCacheKey(WorkerScheduler.SoundScoreRequest req) {
+        if (req == null) {
+            return "null";
+        }
+        StringBuilder builder = new StringBuilder(512);
+        builder.append(bucket(req.mobX)).append('|')
+            .append(bucket(req.mobY)).append('|')
+            .append(bucket(req.mobZ)).append('|')
+            .append(req.currentTargetSoundId == null ? "" : req.currentTargetSoundId).append('|')
+            .append(req.switchRatio).append('|')
+            .append(req.noveltyBonus).append('|')
+            .append(req.noveltyTicks).append('|')
+            .append(req.gameTime / 5L);
+        List<WorkerScheduler.SoundCandidate> normalized = new ArrayList<>(req.candidates);
+        normalized.sort(Comparator
+            .comparing((WorkerScheduler.SoundCandidate c) -> c.soundId == null ? "" : c.soundId)
+            .thenComparingDouble(c -> c.x)
+            .thenComparingDouble(c -> c.y)
+            .thenComparingDouble(c -> c.z)
+            .thenComparingLong(c -> c.gameTime)
+            .thenComparingDouble(c -> c.range)
+            .thenComparingDouble(c -> c.weight)
+            .thenComparingDouble(c -> c.mufflingFactor));
+        for (WorkerScheduler.SoundCandidate candidate : normalized) {
+            builder.append('|')
+                .append(candidate.soundId == null ? "" : candidate.soundId).append('@')
+                .append(bucket(candidate.x)).append(',')
+                .append(bucket(candidate.y)).append(',')
+                .append(bucket(candidate.z)).append(',')
+                .append(candidate.gameTime / 5L).append(',')
+                .append(candidate.range).append(',')
+                .append(candidate.weight).append(',')
+                .append(candidate.mufflingFactor);
+        }
+        return builder.toString();
+    }
+
+    private static byte[] encodeSoundScoreResult(WorkerScheduler.SoundScoreResult result) {
+        if (result == null) {
+            return new byte[0];
+        }
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(bytes);
+            writeNullableUuid(out, result.mobUuid());
+            writeNullableString(out, result.soundId());
+            out.writeDouble(result.score());
+            out.flush();
+            return bytes.toByteArray();
+        } catch (Throwable ignored) {
+            return new byte[0];
+        }
+    }
+
+    private static WorkerScheduler.SoundScoreResult decodeSoundScoreResult(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return new WorkerScheduler.SoundScoreResult(null, null, 0.0);
+        }
+        try {
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
+            UUID mobUuid = readNullableUuid(in);
+            String soundId = readNullableString(in);
+            double score = in.readDouble();
+            return new WorkerScheduler.SoundScoreResult(mobUuid, soundId, score);
+        } catch (Throwable ignored) {
+            return new WorkerScheduler.SoundScoreResult(null, null, 0.0);
+        }
+    }
+
+    private static long bucket(double value) {
+        return Math.round(value * 100.0);
+    }
+
+    private static void writeNullableUuid(DataOutputStream out, UUID value) throws Exception {
+        out.writeBoolean(value != null);
+        if (value != null) {
+            out.writeLong(value.getMostSignificantBits());
+            out.writeLong(value.getLeastSignificantBits());
+        }
+    }
+
+    private static UUID readNullableUuid(DataInputStream in) throws Exception {
+        if (!in.readBoolean()) {
+            return null;
+        }
+        return new UUID(in.readLong(), in.readLong());
+    }
+
+    private static void writeNullableString(DataOutputStream out, String value) throws Exception {
+        out.writeBoolean(value != null);
+        if (value != null) {
+            out.writeUTF(value);
+        }
+    }
+
+    private static String readNullableString(DataInputStream in) throws Exception {
+        return in.readBoolean() ? in.readUTF() : null;
     }
 
     private long computeDeadlineMs() {
@@ -158,52 +264,6 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
     }
 
     private static final class ParallelComputeBridge {
-        private static final Object INIT_LOCK = new Object();
-        private static boolean initialized = false;
-
-        private static Method parallelBuilderFactory;
-        private static Method slicesMethod;
-        private static Method sliceExecutorMethod;
-        private static Method maxParallelismMethod;
-        private static Method failurePolicyMethod;
-        private static Object failurePolicyBestEffort;
-        private static Method submitParallelMethod;
-
-        private static boolean ensureInit() {
-            if (initialized) {
-                return submitParallelMethod != null;
-            }
-            synchronized (INIT_LOCK) {
-                if (initialized) {
-                    return submitParallelMethod != null;
-                }
-                try {
-                    Class<?> parallelComputeClass = Class.forName("org.admany.quantified.api.parallel.ParallelCompute");
-                    parallelBuilderFactory = parallelComputeClass.getMethod("builder", String.class, String.class, long.class);
-
-                    Class<?> builderClass = Class.forName("org.admany.quantified.api.parallel.ParallelCompute$Builder");
-                    slicesMethod = builderClass.getMethod("slices", Supplier.class);
-                    sliceExecutorMethod = builderClass.getMethod("sliceExecutor", Function.class);
-                    maxParallelismMethod = builderClass.getMethod("maxParallelism", int.class);
-
-                    try {
-                        Class<?> failurePolicyClass = Class.forName("org.admany.quantified.core.common.parallel.policy.ParallelFailurePolicy");
-                        failurePolicyBestEffort = Enum.valueOf((Class<? extends Enum>) failurePolicyClass.asSubclass(Enum.class), "BEST_EFFORT");
-                        failurePolicyMethod = builderClass.getMethod("failurePolicy", failurePolicyClass);
-                    } catch (Throwable ignored) {
-                        failurePolicyBestEffort = null;
-                        failurePolicyMethod = null;
-                    }
-
-                    submitParallelMethod = builderClass.getMethod("submit");
-                } catch (Throwable t) {
-                    submitParallelMethod = null;
-                }
-                initialized = true;
-                return submitParallelMethod != null;
-            }
-        }
-
         private static CompletableFuture<List<WorkerScheduler.SoundScoreResult>> trySubmitSoundScores(
             List<WorkerScheduler.SoundScoreRequest> batch,
             long deadlineMs,
@@ -212,15 +272,17 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
             if (batch == null || batch.isEmpty()) {
                 return CompletableFuture.completedFuture(java.util.Collections.emptyList());
             }
-            if (!ensureInit()) {
-                return null;
-            }
             try {
                 long taskKey = System.nanoTime();
-                Object builder = parallelBuilderFactory.invoke(null, SoundAttractMod.MOD_ID, "soundattract_sound_score_parallel", taskKey);
+                Object builder = QuantifiedOptionalBridge.tryCreateParallelBuilder(SoundAttractMod.MOD_ID, "soundattract_sound_score_parallel", taskKey);
+                if (builder == null) {
+                    return null;
+                }
 
                 Supplier<List<WorkerScheduler.SoundScoreRequest>> supplier = () -> batch;
-                slicesMethod.invoke(builder, supplier);
+                if (!QuantifiedOptionalBridge.trySetParallelSlices(builder, supplier)) {
+                    return null;
+                }
 
                 Function<WorkerScheduler.SoundScoreRequest, WorkerScheduler.SoundScoreResult> scorer = req -> {
                     try {
@@ -229,7 +291,47 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
                         return new WorkerScheduler.SoundScoreResult(req == null ? null : req.mobUuid, null, 0.0);
                     }
                 };
-                sliceExecutorMethod.invoke(builder, scorer);
+                if (!QuantifiedOptionalBridge.trySetParallelSliceExecutor(builder, scorer)) {
+                    return null;
+                }
+
+                boolean useSliceCache = false;
+                boolean persistentSliceCache = false;
+                long sliceCacheTtlTicks = 20L;
+                long sliceCacheMaxEntries = 4096L;
+                try {
+                    useSliceCache = SoundAttractConfig.COMMON.enableQuantifiedSoundScoreSliceCache.get();
+                    persistentSliceCache = SoundAttractConfig.COMMON.quantifiedSoundScoreSliceCachePersistent.get();
+                    sliceCacheTtlTicks = Math.max(1L, SoundAttractConfig.COMMON.quantifiedSoundScoreSliceCacheTtlTicks.get().longValue());
+                    sliceCacheMaxEntries = Math.max(64L, SoundAttractConfig.COMMON.quantifiedSoundScoreSliceCacheMaxEntries.get().longValue());
+                } catch (Throwable ignored) {
+                }
+                if (useSliceCache) {
+                    Duration sliceCacheTtl = Duration.ofMillis(sliceCacheTtlTicks * 50L);
+                    boolean configured = persistentSliceCache
+                        ? QuantifiedOptionalBridge.trySetParallelPersistentSliceCache(
+                            builder,
+                            "soundattract_sound_score_slice",
+                            QuantifiedWorkScheduler::soundScoreCacheKey,
+                            QuantifiedWorkScheduler::encodeSoundScoreResult,
+                            QuantifiedWorkScheduler::decodeSoundScoreResult,
+                            sliceCacheTtl,
+                            sliceCacheMaxEntries,
+                            false
+                        )
+                        : QuantifiedOptionalBridge.trySetParallelMemorySliceCache(
+                            builder,
+                            "soundattract_sound_score_slice",
+                            QuantifiedWorkScheduler::soundScoreCacheKey,
+                            QuantifiedWorkScheduler::encodeSoundScoreResult,
+                            QuantifiedWorkScheduler::decodeSoundScoreResult,
+                            sliceCacheTtl,
+                            sliceCacheMaxEntries
+                        );
+                    if (!configured) {
+                        return null;
+                    }
+                }
 
                 int maxParallelism = 0;
                 try {
@@ -237,14 +339,14 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
                 } catch (Throwable ignored) {
                 }
                 if (maxParallelism > 0) {
-                    maxParallelismMethod.invoke(builder, maxParallelism);
+                    if (!QuantifiedOptionalBridge.trySetParallelMaxParallelism(builder, maxParallelism)) {
+                        return null;
+                    }
                 }
 
-                if (failurePolicyMethod != null && failurePolicyBestEffort != null) {
-                    failurePolicyMethod.invoke(builder, failurePolicyBestEffort);
-                }
+                QuantifiedOptionalBridge.trySetParallelBestEffort(builder);
 
-                CompletableFuture<List<WorkerScheduler.SoundScoreResult>> future = (CompletableFuture<List<WorkerScheduler.SoundScoreResult>>) submitParallelMethod.invoke(builder);
+                CompletableFuture<List<WorkerScheduler.SoundScoreResult>> future = QuantifiedOptionalBridge.trySubmitParallel(builder);
                 if (future == null) {
                     return null;
                 }

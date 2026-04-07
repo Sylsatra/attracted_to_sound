@@ -345,6 +345,10 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue quantifiedCacheMemoryLimitMB = IntegrationConfig.QUANTIFIED_CACHE_MEMORY_LIMIT_MB;
         public final ForgeConfigSpec.BooleanValue disableQuantifiedCacheOnMemoryPressure = IntegrationConfig.DISABLE_QUANTIFIED_CACHE_ON_MEMORY_PRESSURE;
         public final ForgeConfigSpec.BooleanValue triggerQuantifiedCacheCleanupOnMemoryPressure = IntegrationConfig.TRIGGER_QUANTIFIED_CACHE_CLEANUP_ON_MEMORY_PRESSURE;
+        public final ForgeConfigSpec.BooleanValue enableQuantifiedSoundScoreSliceCache = IntegrationConfig.ENABLE_QUANTIFIED_SOUND_SCORE_SLICE_CACHE;
+        public final ForgeConfigSpec.BooleanValue quantifiedSoundScoreSliceCachePersistent = IntegrationConfig.QUANTIFIED_SOUND_SCORE_SLICE_CACHE_PERSISTENT;
+        public final ForgeConfigSpec.IntValue quantifiedSoundScoreSliceCacheTtlTicks = IntegrationConfig.QUANTIFIED_SOUND_SCORE_SLICE_CACHE_TTL_TICKS;
+        public final ForgeConfigSpec.IntValue quantifiedSoundScoreSliceCacheMaxEntries = IntegrationConfig.QUANTIFIED_SOUND_SCORE_SLICE_CACHE_MAX_ENTRIES;
 
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> attractedEntities = GeneralConfig.ATTRACTED_ENTITIES;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> stealthBypassMobIds = GeneralConfig.STEALTH_BYPASS_MOB_IDS;
@@ -623,6 +627,11 @@ public class SoundAttractConfig {
             }
             
             COMMON.configSchemaVersion.set(14);
+        }
+
+        if (COMMON.configSchemaVersion.get() < 15) {
+            SoundAttractMod.LOGGER.info("Config migration: Adding Quantified sound score slice cache settings (Schema v15).");
+            COMMON.configSchemaVersion.set(15);
         }
 
 

@@ -2,7 +2,7 @@ package com.example.soundattract.quantified;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import java.lang.reflect.Method;
+import com.example.soundattract.quantified.bridge.QuantifiedOptionalBridge;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -53,7 +53,7 @@ public final class QuantifiedCacheCompat {
         Duration ttl = Duration.ofMillis(clampedTtlTicks * estimateMillisPerTick());
         long clampedMax = Math.max(0L, maxSize);
 
-        T value = CacheBridge.invokeGetCached(cacheName, key, loader, ttl, clampedMax, useDisk);
+        T value = QuantifiedOptionalBridge.tryGetCached(SoundAttractMod.MOD_ID, cacheName, key, loader, ttl, clampedMax, useDisk);
         if (value != null) {
             return value;
         }
@@ -65,7 +65,7 @@ public final class QuantifiedCacheCompat {
         if (!INIT_ATTEMPTED.compareAndSet(false, true)) {
             return cacheManager != null;
         }
-        cacheManager = CacheBridge.fetchManager();
+        cacheManager = QuantifiedOptionalBridge.tryFetchCacheManager(SoundAttractMod.MOD_ID);
         return cacheManager != null;
     }
 
@@ -81,7 +81,7 @@ public final class QuantifiedCacheCompat {
         limitMb = Math.max(0L, limitMb);
 
         if (limitMb != lastAppliedLimitMb) {
-            if (CacheBridge.setMemoryLimit(manager, limitMb)) {
+            if (QuantifiedOptionalBridge.trySetCacheMemoryLimit(manager, limitMb)) {
                 lastAppliedLimitMb = limitMb;
             }
         }
@@ -93,13 +93,14 @@ public final class QuantifiedCacheCompat {
         }
         if (!triggerCleanup) return;
 
-        if (!CacheBridge.isMemoryPressureHigh(manager)) return;
+        Boolean memoryPressureHigh = QuantifiedOptionalBridge.tryIsCacheMemoryPressureHigh(manager);
+        if (!Boolean.TRUE.equals(memoryPressureHigh)) return;
         long tick = System.currentTimeMillis() / 50L;
         if ((tick - lastCleanupTick) < 20L) {
             return;
         }
         lastCleanupTick = tick;
-        CacheBridge.triggerCleanup(manager);
+        QuantifiedOptionalBridge.tryTriggerCacheCleanup(manager);
     }
 
     private static boolean isMemoryPressureHigh() {
@@ -112,7 +113,7 @@ public final class QuantifiedCacheCompat {
 
         Object manager = cacheManager;
         if (manager == null) return false;
-        return CacheBridge.isMemoryPressureHigh(manager);
+        return Boolean.TRUE.equals(QuantifiedOptionalBridge.tryIsCacheMemoryPressureHigh(manager));
     }
 
     private static long estimateMillisPerTick() {
@@ -127,100 +128,6 @@ public final class QuantifiedCacheCompat {
             return Math.max(20L, Math.min(250L, ms));
         } catch (Throwable ignored) {
             return fallback;
-        }
-    }
-
-    private static final class CacheBridge {
-        private static final Object LOCK = new Object();
-        private static boolean initialized = false;
-        private static Class<?> apiClass;
-        private static Class<?> managerInterface;
-        private static Method registerMethod;
-        private static Method getCacheManagerMethod;
-        private static Method getCachedMethod;
-        private static Method setMemoryLimitMethod;
-        private static Method isMemoryPressureHighMethod;
-        private static Method triggerCleanupMethod;
-
-        private static boolean ensureInit() {
-            if (initialized) {
-                return getCacheManagerMethod != null;
-            }
-            synchronized (LOCK) {
-                if (initialized) {
-                    return getCacheManagerMethod != null;
-                }
-                try {
-                    apiClass = Class.forName("org.admany.quantified.api.QuantifiedAPI");
-                    managerInterface = Class.forName("org.admany.quantified.api.interfaces.ModCacheManager");
-                    registerMethod = apiClass.getMethod("register", String.class);
-                    getCacheManagerMethod = apiClass.getMethod("getCacheManager");
-                    getCachedMethod = apiClass.getMethod("getCached", String.class, String.class, java.util.function.Supplier.class, Duration.class, long.class, boolean.class);
-                    setMemoryLimitMethod = managerInterface.getMethod("setMemoryLimitMB", long.class);
-                    isMemoryPressureHighMethod = managerInterface.getMethod("isMemoryPressureHigh");
-                    triggerCleanupMethod = managerInterface.getMethod("triggerMemoryPressureCleanup");
-                } catch (Throwable t) {
-                    getCacheManagerMethod = null;
-                }
-                initialized = true;
-                return getCacheManagerMethod != null;
-            }
-        }
-
-        private static Object fetchManager() {
-            if (!ensureInit()) {
-                return null;
-            }
-            try {
-                registerMethod.invoke(null, SoundAttractMod.MOD_ID);
-                return getCacheManagerMethod.invoke(null);
-            } catch (Throwable ignored) {
-                return null;
-            }
-        }
-
-        private static <T> T invokeGetCached(String cacheName, String key, Supplier<T> loader, Duration ttl, long maxSize, boolean useDisk) {
-            if (!ensureInit()) {
-                return null;
-            }
-            try {
-                return (T) getCachedMethod.invoke(null, cacheName, key, loader, ttl, maxSize, useDisk);
-            } catch (Throwable ignored) {
-                return null;
-            }
-        }
-
-        private static boolean setMemoryLimit(Object manager, long limitMb) {
-            if (!ensureInit()) {
-                return false;
-            }
-            try {
-                setMemoryLimitMethod.invoke(manager, limitMb);
-                return true;
-            } catch (Throwable ignored) {
-                return false;
-            }
-        }
-
-        private static boolean isMemoryPressureHigh(Object manager) {
-            if (!ensureInit()) {
-                return false;
-            }
-            try {
-                return (Boolean) isMemoryPressureHighMethod.invoke(manager);
-            } catch (Throwable ignored) {
-                return false;
-            }
-        }
-
-        private static void triggerCleanup(Object manager) {
-            if (!ensureInit()) {
-                return;
-            }
-            try {
-                triggerCleanupMethod.invoke(manager);
-            } catch (Throwable ignored) {
-            }
         }
     }
 }

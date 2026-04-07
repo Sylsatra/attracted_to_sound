@@ -15,6 +15,10 @@ public class IntegrationConfig {
     public static final ForgeConfigSpec.IntValue QUANTIFIED_CACHE_MEMORY_LIMIT_MB;
     public static final ForgeConfigSpec.BooleanValue DISABLE_QUANTIFIED_CACHE_ON_MEMORY_PRESSURE;
     public static final ForgeConfigSpec.BooleanValue TRIGGER_QUANTIFIED_CACHE_CLEANUP_ON_MEMORY_PRESSURE;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_QUANTIFIED_SOUND_SCORE_SLICE_CACHE;
+    public static final ForgeConfigSpec.BooleanValue QUANTIFIED_SOUND_SCORE_SLICE_CACHE_PERSISTENT;
+    public static final ForgeConfigSpec.IntValue QUANTIFIED_SOUND_SCORE_SLICE_CACHE_TTL_TICKS;
+    public static final ForgeConfigSpec.IntValue QUANTIFIED_SOUND_SCORE_SLICE_CACHE_MAX_ENTRIES;
 
     public static final ForgeConfigSpec.BooleanValue ENABLE_BLOCK_BREAKING;
     public static final ForgeConfigSpec.DoubleValue BLOCK_BREAKING_TIME_MULTIPLIER;
@@ -100,6 +104,10 @@ public class IntegrationConfig {
         QUANTIFIED_CACHE_MEMORY_LIMIT_MB = BUILDER.defineInRange("quantifiedCacheMemoryLimitMB", 256, 0, 65536);
         DISABLE_QUANTIFIED_CACHE_ON_MEMORY_PRESSURE = BUILDER.define("disableQuantifiedCacheOnMemoryPressure", true);
         TRIGGER_QUANTIFIED_CACHE_CLEANUP_ON_MEMORY_PRESSURE = BUILDER.define("triggerQuantifiedCacheCleanupOnMemoryPressure", true);
+        ENABLE_QUANTIFIED_SOUND_SCORE_SLICE_CACHE = BUILDER.define("enableQuantifiedSoundScoreSliceCache", true);
+        QUANTIFIED_SOUND_SCORE_SLICE_CACHE_PERSISTENT = BUILDER.define("quantifiedSoundScoreSliceCachePersistent", false);
+        QUANTIFIED_SOUND_SCORE_SLICE_CACHE_TTL_TICKS = BUILDER.defineInRange("quantifiedSoundScoreSliceCacheTtlTicks", 20, 1, 72000);
+        QUANTIFIED_SOUND_SCORE_SLICE_CACHE_MAX_ENTRIES = BUILDER.defineInRange("quantifiedSoundScoreSliceCacheMaxEntries", 4096, 64, 1_000_000);
         BUILDER.pop();
 
         BUILDER.push("enhanced_ai_inspired");

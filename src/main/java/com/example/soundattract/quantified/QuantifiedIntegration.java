@@ -2,9 +2,9 @@ package com.example.soundattract.quantified;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
+import com.example.soundattract.quantified.bridge.QuantifiedOptionalBridge;
 import net.minecraftforge.fml.ModList;
 
-import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class QuantifiedIntegration {
@@ -22,9 +22,9 @@ public final class QuantifiedIntegration {
         }
 
         try {
-            Class<?> api = Class.forName("org.admany.quantified.api.QuantifiedAPI");
-            Method register = api.getMethod("register", String.class);
-            register.invoke(null, SoundAttractMod.MOD_ID);
+            if (!QuantifiedOptionalBridge.register(SoundAttractMod.MOD_ID)) {
+                return;
+            }
             
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.debug("[Quantified] Successfully registered with Quantified API 1.1.0");

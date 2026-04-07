@@ -183,11 +183,10 @@ public class StealthDetectionEvents {
         if (mob == null) return null;
         LivingEntity direct = mob.getTarget();
         if (direct != null) return direct;
-        try {
+        if (mob.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET)) {
             return mob.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
-        } catch (Throwable ignored) {
-            return null;
         }
+        return null;
     }
 
     private static boolean isTargetingPlayerCompat(Mob mob) {
@@ -627,12 +626,11 @@ public class StealthDetectionEvents {
 
             if (!canMobDetectLivingEntity(mob, playerTarget)) {
                 event.setCanceled(true);
-                try {
+                if (mob.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET)) {
                     LivingEntity mem = mob.getBrain().getMemory(MemoryModuleType.ATTACK_TARGET).orElse(null);
                     if (mem == playerTarget) {
                         mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
                     }
-                } catch (Throwable ignored) {
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
                     SoundAttractMod.LOGGER.info(
@@ -1122,9 +1120,8 @@ public class StealthDetectionEvents {
                         if (mob.getBrain().hasMemoryValue(MemoryModuleType.ANGRY_AT)) {
                             mob.getBrain().eraseMemory(MemoryModuleType.ANGRY_AT);
                         }
-                        try {
+                        if (mob.getBrain().hasMemoryValue(MemoryModuleType.ATTACK_TARGET)) {
                             mob.getBrain().eraseMemory(MemoryModuleType.ATTACK_TARGET);
-                        } catch (Throwable ignored) {
                         }
                         mob.setTarget(null);
                         mobOutOfRangeTicks.remove(mobId);

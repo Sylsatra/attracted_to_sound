@@ -2,7 +2,7 @@ package com.example.soundattract.async;
 
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
-import java.lang.reflect.Method;
+import com.example.soundattract.quantified.bridge.QuantifiedOptionalBridge;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -58,7 +58,15 @@ public final class AsyncManager {
             return CompletableFuture.completedFuture(null);
         }
         if (isQuantifiedAvailable()) {
-            CompletableFuture<T> quantifiedFuture = QuantifiedAsyncBridge.trySubmit(taskName, supplier, priority, threadSafe);
+            CompletableFuture<T> quantifiedFuture = QuantifiedOptionalBridge.trySubmitTask(
+                SoundAttractMod.MOD_ID,
+                taskName,
+                supplier,
+                threadSafe,
+                priority == Priority.HIGH,
+                null,
+                taskName
+            );
             if (quantifiedFuture != null) {
                 return quantifiedFuture;
             }
@@ -169,60 +177,5 @@ public final class AsyncManager {
             thread.setDaemon(true);
             return thread;
         };
-    }
-
-    private static final class QuantifiedAsyncBridge {
-        private static final Object INIT_LOCK = new Object();
-        private static boolean initialized = false;
-        private static Class<?> taskClass;
-        private static Class<?> builderClass;
-        private static Method builderFactory;
-        private static Method submitMethod;
-        private static Method threadSafeMethod;
-        private static Method priorityForegroundMethod;
-        private static Method priorityBackgroundMethod;
-
-        private static boolean ensureInit() {
-            if (initialized) {
-                return submitMethod != null;
-            }
-            synchronized (INIT_LOCK) {
-                if (initialized) {
-                    return submitMethod != null;
-                }
-                try {
-                    Class<?> apiClass = Class.forName("org.admany.quantified.api.QuantifiedAPI");
-                    taskClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask");
-                    builderClass = Class.forName("org.admany.quantified.api.model.QuantifiedTask$Builder");
-                    builderFactory = taskClass.getMethod("builder", String.class, String.class, java.util.function.Supplier.class);
-                    submitMethod = apiClass.getMethod("submit", builderClass);
-                    threadSafeMethod = builderClass.getMethod("threadSafe", boolean.class);
-                    priorityForegroundMethod = builderClass.getMethod("priorityForeground");
-                    priorityBackgroundMethod = builderClass.getMethod("priorityBackground");
-                } catch (Throwable t) {
-                    submitMethod = null;
-                }
-                initialized = true;
-                return submitMethod != null;
-            }
-        }
-
-        private static <T> CompletableFuture<T> trySubmit(String taskName, Supplier<T> supplier, Priority priority, boolean threadSafe) {
-            if (!ensureInit()) {
-                return null;
-            }
-            try {
-                Object builder = builderFactory.invoke(null, SoundAttractMod.MOD_ID, taskName, supplier);
-                threadSafeMethod.invoke(builder, threadSafe);
-                if (priority == Priority.HIGH) {
-                    priorityForegroundMethod.invoke(builder);
-                } else {
-                    priorityBackgroundMethod.invoke(builder);
-                }
-                return (CompletableFuture<T>) submitMethod.invoke(null, builder);
-            } catch (Throwable t) {
-                return null;
-            }
-        }
     }
 }
