@@ -1,0 +1,36 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.soundattract.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "soundattract.refmap.json",
+  "mixins": [
+    "HurtByTargetGoalMixin",
+    "LivingEntityLosMixin",
+    "SensingMixin",
+    "PointBlankGunItemMixin",
+    "TaczNpcsAbstractScavEntityMixin",
+    "CustomNpcsEntityNPCInterfaceMixin",
+    "CustomNpcsEntityAIMovingPathMixin",
+    "CustomNpcsEntityAIWanderMixin",
+    "CustomNpcsEntityAIReturnMixin",
+    "CustomNpcsUpdateTasksMixin",
+    "ItemStackMixin",
+    "LivingEntityMixin",
+    "EntityMixin",
+    "SnowballMixin",
+    "ThrownPotionMixin",
+    "MobAccessor"
+  ],
+  "client": [
+    "HumanoidArmorLayerMixin",
+    "ItemInHandLayerMixin",
+    "SimpleTextureMixin",
+    "HttpTextureMixin",
+    "NativeImageAccessor"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

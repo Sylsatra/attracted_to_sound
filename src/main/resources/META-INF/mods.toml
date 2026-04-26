@@ -1,0 +1,115 @@
+modLoader="javafml" 
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.mixins.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.customnpcs.mixins.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.tacznpcs.mixins.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.mixins.gecko.json"
+[[mods]]
+modId="${mod_id}" 
+version="${mod_version}" 
+logoFile="attract-to-sound-mod-logo.jpg"
+displayName="${mod_name}" 
+authors="${mod_authors}" 
+description='''
+A mod to make mobs lured into sound.
+Also camouflage is a thing.
+'''
+[[dependencies.soundattract]] 
+    modId="forge"
+    mandatory=true 
+    versionRange="${forge_version_range}" 
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="voicechat"
+    mandatory=false
+    versionRange="[${voicechat_dependency},)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="enhancedai"
+    mandatory=false
+    versionRange="[3.3.6,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="plasmovoice"
+    mandatory=false
+    versionRange="[2.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="pointblank"
+    mandatory=false
+    versionRange="[1.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="superbwarfare"
+    mandatory=false
+    versionRange="[0.7.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="origins"
+    mandatory=false
+    versionRange="[1.10.0.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="quantified"
+    mandatory=false
+    versionRange="[1.0.5,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="smartbrainlib"
+    mandatory=false
+    versionRange="[1.15,)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="teammanagement"
+    mandatory=false
+    versionRange="[1.0.2,)"
+    ordering="NONE"
+    side="BOTH"
+    
+[[dependencies.soundattract]]
+    modId="relentlessundead"
+    mandatory=false
+    versionRange="[0.0.2-ALPHA,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="csgrenades"
+    mandatory=false
+    versionRange="[1.5.0,)"
+    ordering="NONE"
+    side="BOTH"
