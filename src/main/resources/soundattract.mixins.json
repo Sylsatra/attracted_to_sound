@@ -1,0 +1,29 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.soundattract.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "HurtByTargetGoalMixin",
+    "LivingEntityLosMixin",
+    "SensingMixin",
+    "ItemStackMixin",
+    "LivingEntityMixin",
+    "EntityMixin",
+    "SnowballMixin",
+    "ThrownPotionMixin",
+    "MobAccessor",
+    "ItemInHandLayerMixin",
+    "HumanoidArmorLayerMixin",
+    "SimpleTextureMixin",
+    "HttpTextureMixin",
+    "SimpleTextureTextureImageMixin",
+    "NativeImageAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
