@@ -1,0 +1,16 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.example.soundattract.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "soundattract.refmap.json",
+  "mixins": [
+    "CustomNpcsEntityNPCInterfaceMixin",
+    "CustomNpcsEntityAIReturnMixin",
+    "CustomNpcsEntityAIWanderMixin",
+    "CustomNpcsEntityAIMovingPathMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

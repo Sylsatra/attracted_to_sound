@@ -1,0 +1,54 @@
+{
+	"schemaVersion": 1,
+	"id": "soundattract",
+	"version": "${version}",
+	"name": "Sound Attract",
+	"description": "Sound-based mob attraction and stealth system for Minecraft",
+	"authors": [
+		"Sylsatra"
+	],
+	"contact": {
+		"homepage": "https://www.curseforge.com/minecraft/mc-mods/attract-to-sound",
+		"sources": "https://github.com/Sylsatra/attract_to_sound"
+	},
+	"license": "GPL-3.0",
+	"icon": "assets/soundattract/icon.png",
+	"accessWidener": "soundattract.accesswidener",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.example.soundattract.Soundattract"
+		],
+		"client": [
+			"com.example.soundattract.SoundAttractClient"
+		],
+		"cardinal-components-entity": [
+			"com.example.soundattract.component.EntityComponents"
+		],
+		"cardinal-components-world": [
+			"com.example.soundattract.component.WorldComponents"
+		],
+		"voicechat": [
+			"com.example.soundattract.integration.voicechat.SoundAttractVoiceChatPlugin"
+		]
+	},
+	"mixins": [
+		"soundattract.mixins.json",
+		"soundattract.mixins.gecko.json",
+		"soundattract.customnpcs.mixins.json",
+		"soundattract.tacznpcs.mixins.json"
+	],
+	"custom": {
+		"cardinal-components": [
+			"soundattract:camouflage",
+			"soundattract:scent"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": ">=0.116.0",
+		"forgeconfigapiport": ">=21.1.0"
+	}
+}
