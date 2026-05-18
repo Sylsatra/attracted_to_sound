@@ -406,12 +406,6 @@ public class FovEvents {
         }
 
         try {
-            if (state.is(BlockTags.WALLS) || state.getBlock() instanceof IronBarsBlock) {
-                return false;
-            }
-        } catch (Throwable ignored) {}
-
-        try {
             ResourceLocation id = ForgeRegistries.BLOCKS.getKey(state.getBlock());
             boolean inConfig = false;
             if (id != null) {
@@ -446,6 +440,12 @@ public class FovEvents {
                     if (inConfig) return true;
                     if (inTag) return true;
                 }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            if (state.is(BlockTags.WALLS) || state.getBlock() instanceof IronBarsBlock) {
+                return false;
             }
         } catch (Throwable ignored) {}
 

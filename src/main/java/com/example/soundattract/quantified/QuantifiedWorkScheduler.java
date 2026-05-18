@@ -33,9 +33,6 @@ public final class QuantifiedWorkScheduler implements SoundAttractWorkScheduler 
     private final LocalWorkScheduler fallback = new LocalWorkScheduler();
 
     public QuantifiedWorkScheduler() {
-        if (!QuantifiedOptionalBridge.register(SoundAttractMod.MOD_ID)) {
-            throw new RuntimeException("Failed to initialize QuantifiedWorkScheduler");
-        }
     }
 
     @Override

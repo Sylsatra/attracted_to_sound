@@ -22,16 +22,12 @@ public final class QuantifiedIntegration {
         }
 
         try {
-            if (!QuantifiedOptionalBridge.register(SoundAttractMod.MOD_ID)) {
-                return;
-            }
-            
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.debug("[Quantified] Successfully registered with Quantified API 1.1.0");
+                SoundAttractMod.LOGGER.debug("[Quantified] Successfully initialized with Quantified API 2.0");
             }
         } catch (Throwable t) {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                SoundAttractMod.LOGGER.debug("[Quantified] Registration failed: {}", t.getMessage());
+                SoundAttractMod.LOGGER.debug("[Quantified] Initialization failed: {}", t.getMessage());
             }
         }
     }

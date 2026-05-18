@@ -120,7 +120,7 @@ dependencies {
     compileOnly "su.plo.voice.api:server:2.1.5"
     compileOnly "su.plo.voice.api:client:2.1.5"
     compileOnly "maven.modrinth:smartbrainlib:1.15"
-    compileOnly files('libs/quantified-1.0.5.jar')
+    compileOnly files('libs/quantified api-omni-2.0.0.jar')
     compileOnly files('libs/relentlessundead-1.20.1-0.0.2-ALPHA.jar')
     compileOnly files('libs/spore_2.2.0_1.20.1.jar')
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-1.20.1:4.4.2")
