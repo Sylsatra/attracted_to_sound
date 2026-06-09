@@ -125,6 +125,7 @@ public class SoundAttractMod {
             SoundAttractNetwork.register();
             QuantifiedIntegration.bootstrap();
             com.example.soundattract.integration.csgrenades.CsGrenadesIntegration.register();
+            registerHotBathIntegrationIfPresent();
 
             if (ModList.get().isLoaded("spore")) {
                 MinecraftForge.EVENT_BUS.register(BiomassSoundHandler.class);
@@ -134,6 +135,18 @@ public class SoundAttractMod {
             }
         });
         event.enqueueWork(this::handleTaczIntegration);
+    }
+
+    private static void registerHotBathIntegrationIfPresent() {
+        if (!ModList.get().isLoaded("hotbath") || !SoundAttractConfig.COMMON.enableHotBathIntegration.get()) {
+            return;
+        }
+        try {
+            Class<?> integration = Class.forName("com.example.soundattract.integration.hotbath.HotBathIntegration");
+            integration.getMethod("registerIfPresent", IEventBus.class).invoke(null, MinecraftForge.EVENT_BUS);
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOGGER.error("Failed to register HotBath integration. HotBath support will be disabled.", e);
+        }
     }
 
     private void handleTaczIntegration() {

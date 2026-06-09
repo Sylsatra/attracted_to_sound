@@ -18,6 +18,7 @@ import com.example.soundattract.ai.LeaderAttractionGoal;
 import com.example.soundattract.ai.PickUpAndThrowToSoundGoal;
 import com.example.soundattract.ai.TeleportToSoundGoal;
 import com.example.soundattract.SoundAttractMod;
+import com.example.soundattract.config.AttractedEntityIdResolver;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.data.DataDrivenTags;
 import com.example.soundattract.worker.WorkerScheduler.GroupComputeResult;
@@ -137,16 +138,35 @@ public class SoundAttractionEvents {
         boolean shouldRetryLater = false;
         for (String idStr : SoundAttractConfig.COMMON.attractedEntities.get()) {
             try {
-                ResourceLocation id = ResourceLocation.parse(idStr);
-                EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
-                if (type != null) {
-                    configSet.add(type);
-                } else {
-                    if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                        SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown attracted entity type in config: {}", idStr);
+                if (AttractedEntityIdResolver.isNamespaceWildcard(idStr)) {
+                    String namespace = idStr.substring(0, idStr.length() - 2);
+                    if (!AttractedEntityIdResolver.isValidNamespace(namespace)) {
+                        SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Invalid wildcard namespace in attracted entity config: {}", idStr);
+                        continue;
                     }
-                    if (id != null && !"minecraft".equals(id.getNamespace()) && ModList.get().isLoaded(id.getNamespace())) {
-                        shouldRetryLater = true;
+                    Set<EntityType<?>> wildcardTypes = getEntityTypesForNamespace(namespace);
+                    if (!wildcardTypes.isEmpty()) {
+                        configSet.addAll(wildcardTypes);
+                    } else {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] No registered entity types found for attracted entity wildcard: {}", idStr);
+                        }
+                        if (!"minecraft".equals(namespace) && ModList.get().isLoaded(namespace)) {
+                            shouldRetryLater = true;
+                        }
+                    }
+                } else {
+                    ResourceLocation id = ResourceLocation.parse(idStr);
+                    EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(id);
+                    if (type != null) {
+                        configSet.add(type);
+                    } else {
+                        if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                            SoundAttractMod.LOGGER.warn("[SoundAttractionEvents] Unknown attracted entity type in config: {}", idStr);
+                        }
+                        if (id != null && !"minecraft".equals(id.getNamespace()) && ModList.get().isLoaded(id.getNamespace())) {
+                            shouldRetryLater = true;
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -171,6 +191,8 @@ public class SoundAttractionEvents {
             }
         }
 
+        result.removeAll(getCachedBlacklistedEntityTypes());
+
         if (shouldRetryLater) {
             return result;
         }
@@ -185,6 +207,17 @@ public class SoundAttractionEvents {
         }
 
         return CACHED_ATTRACTED_ENTITY_TYPES;
+    }
+
+    private static Set<EntityType<?>> getEntityTypesForNamespace(String namespace) {
+        Set<EntityType<?>> result = new HashSet<>();
+        for (EntityType<?> type : ForgeRegistries.ENTITY_TYPES) {
+            ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(type);
+            if (id != null && namespace.equals(id.getNamespace())) {
+                result.add(type);
+            }
+        }
+        return result;
     }
 
     public static Set<EntityType<?>> getCachedBlacklistedEntityTypes() {

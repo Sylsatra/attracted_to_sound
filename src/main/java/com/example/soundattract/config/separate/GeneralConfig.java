@@ -134,7 +134,7 @@ public class GeneralConfig {
         BUILDER.pop();
 
         BUILDER.push("mobs");
-        ATTRACTED_ENTITIES = BUILDER.comment("Mobs attracted to sounds.")
+        ATTRACTED_ENTITIES = BUILDER.comment("Mobs attracted to sounds. Use 'modid:*' to include every registered entity type from a mod namespace; mobBlacklist still overrides matches.")
                 .defineList("attractedEntities", Arrays.asList(
                         "minecraft:cave_spider", "minecraft:creeper", "minecraft:drowned",
                         "minecraft:endermite", "minecraft:evoker", "minecraft:guardian", "minecraft:hoglin", "minecraft:husk",

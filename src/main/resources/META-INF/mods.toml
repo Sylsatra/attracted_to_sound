@@ -13,6 +13,9 @@ license="${mod_license}"
 [[mixins]]
   type = "CONFIG"
   config = "soundattract.mixins.gecko.json"
+[[mixins]]
+  type = "CONFIG"
+  config = "soundattract.hotbath.mixins.json"
 [[mods]]
 modId="${mod_id}" 
 version="${mod_version}" 
@@ -82,7 +85,7 @@ Also camouflage is a thing.
 [[dependencies.soundattract]]
     modId="quantified"
     mandatory=false
-    versionRange="[1.0.5,)"
+    versionRange="[2.0.0,)"
     ordering="AFTER"
     side="BOTH"
 
@@ -112,4 +115,11 @@ Also camouflage is a thing.
     mandatory=false
     versionRange="[1.5.0,)"
     ordering="NONE"
+    side="BOTH"
+
+[[dependencies.soundattract]]
+    modId="hotbath"
+    mandatory=false
+    versionRange="[1.20.1-2.0.1,)"
+    ordering="AFTER"
     side="BOTH"

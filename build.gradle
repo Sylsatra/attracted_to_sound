@@ -35,7 +35,7 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'debug'
-            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json,soundattract.hotbath.mixins.json"
             mods {
                 "${project.property('mod_id')}" {
                     source sourceSets.main
@@ -44,7 +44,7 @@ minecraft {
         }
         client {
             property 'forge.enabledGameTestNamespaces', project.property('mod_id')
-            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json,soundattract.hotbath.mixins.json"
             jvmArgs += [
         "-Dmixin.env.remapRefMap=true",
         "-Dmixin.debug.verbose=true",
@@ -57,7 +57,7 @@ minecraft {
         }
         server {
             property 'forge.enabledGameTestNamespaces', project.property('mod_id')
-            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json"
+            property "mixin.config", "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json,soundattract.hotbath.mixins.json"
             args '--nogui'
             jvmArgs += [
         "-Dmixin.env.remapRefMap=true",
@@ -123,6 +123,7 @@ dependencies {
     compileOnly files('libs/quantified api-omni-2.0.0.jar')
     compileOnly files('libs/relentlessundead-1.20.1-0.0.2-ALPHA.jar')
     compileOnly files('libs/spore_2.2.0_1.20.1.jar')
+    compileOnly files('libs/hotbath-1.20.1-4.0.0.jar')
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-1.20.1:4.4.2")
     implementation("com.eliotlash.mclib:mclib:20")
 }
@@ -158,7 +159,7 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Version'  : project.property('mod_version'), 
                 'Implementation-Vendor'   : project.property('mod_authors'),
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                'MixinConfigs'            : "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json"
+                'MixinConfigs'            : "soundattract.mixins.json,soundattract.customnpcs.mixins.json,soundattract.tacznpcs.mixins.json,soundattract.mixins.gecko.json,soundattract.hotbath.mixins.json"
         ])
     }
     finalizedBy 'reobfJar'

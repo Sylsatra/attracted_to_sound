@@ -99,6 +99,7 @@ public class ScentEvents {
                     .orElse(0.0);
             
             baseStrength *= (float) (1.0 - blockFactor);
+            baseStrength *= (float) com.example.soundattract.integration.hotbath.HotBathScentStateCache.scentMultiplier(player, currentTime);
 
             if (baseStrength <= 0.05f) {
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {

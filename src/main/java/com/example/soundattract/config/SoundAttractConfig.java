@@ -729,6 +729,16 @@ public class SoundAttractConfig {
         public final ForgeConfigSpec.IntValue fireFleeCooldownTicks = IntegrationConfig.FIRE_FLEE_COOLDOWN_TICKS;
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> fleeFromFireEligibleMobs = IntegrationConfig.FLEE_FROM_FIRE_ELIGIBLE_MOBS;
         public final ForgeConfigSpec.IntValue csgrenadesTrackerScanIntervalTicks = IntegrationConfig.CSGRENADES_TRACKER_SCAN_INTERVAL_TICKS;
+        public final ForgeConfigSpec.BooleanValue enableHotBathIntegration = IntegrationConfig.ENABLE_HOTBATH_INTEGRATION;
+        public final ForgeConfigSpec.IntValue hotBathPollIntervalTicks = IntegrationConfig.HOTBATH_POLL_INTERVAL_TICKS;
+        public final ForgeConfigSpec.DoubleValue hotBathMaxDirtyScentMultiplier = IntegrationConfig.HOTBATH_MAX_DIRTY_SCENT_MULTIPLIER;
+        public final ForgeConfigSpec.IntValue hotBathDefaultBathAromaDurationTicks = IntegrationConfig.HOTBATH_DEFAULT_BATH_AROMA_DURATION_TICKS;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathFluidScentModifiers = IntegrationConfig.HOTBATH_FLUID_SCENT_MODIFIERS;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathBiomeScentModifiers = IntegrationConfig.HOTBATH_BIOME_SCENT_MODIFIERS;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathCamoWashRates = IntegrationConfig.HOTBATH_CAMO_WASH_RATES;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathSplashCamoWashRates = IntegrationConfig.HOTBATH_SPLASH_CAMO_WASH_RATES;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathCustomFluidScentModifiers = IntegrationConfig.HOTBATH_CUSTOM_FLUID_SCENT_MODIFIERS;
+        public final ForgeConfigSpec.ConfigValue<List<? extends String>> hotBathCustomFluidCamoWashRates = IntegrationConfig.HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES;
 
         public final ForgeConfigSpec.IntValue configSchemaVersion = GeneralConfig.CONFIG_SCHEMA_VERSION;
 
@@ -1472,6 +1482,7 @@ public class SoundAttractConfig {
 
         parseAndCachePlayerActionConfig();
         com.example.soundattract.camo.CamoMaterialRegistry.parseConfig();
+        com.example.soundattract.integration.hotbath.HotBathScentRules.rebuildFromConfig();
 
         com.example.soundattract.event.StealthDetectionEvents.reinitializeCaches();
         com.example.soundattract.event.ScentEvents.reinitializeCaches();

@@ -110,6 +110,17 @@ public class IntegrationConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FLEE_FROM_FIRE_ELIGIBLE_MOBS;
     public static final ForgeConfigSpec.IntValue CSGRENADES_TRACKER_SCAN_INTERVAL_TICKS;
 
+    public static final ForgeConfigSpec.BooleanValue ENABLE_HOTBATH_INTEGRATION;
+    public static final ForgeConfigSpec.IntValue HOTBATH_POLL_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.DoubleValue HOTBATH_MAX_DIRTY_SCENT_MULTIPLIER;
+    public static final ForgeConfigSpec.IntValue HOTBATH_DEFAULT_BATH_AROMA_DURATION_TICKS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_FLUID_SCENT_MODIFIERS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_BIOME_SCENT_MODIFIERS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_CAMO_WASH_RATES;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_SPLASH_CAMO_WASH_RATES;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_CUSTOM_FLUID_SCENT_MODIFIERS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES;
+
     static {
         BUILDER.comment("Settings for other mod integrations").push("integration");
 
@@ -320,6 +331,52 @@ public class IntegrationConfig {
         CSGRENADES_TRACKER_SCAN_INTERVAL_TICKS = BUILDER
                 .comment("How often the active-grenade cache rebuilds (smoke/fire).")
                 .defineInRange("csgrenadesTrackerScanIntervalTicks", 5, 1, 40);
+        BUILDER.pop();
+
+        BUILDER.comment("HotBath integration settings").push("hotbath");
+        ENABLE_HOTBATH_INTEGRATION = BUILDER.comment("Enable optional HotBath integration for scent and camouflage wash behavior.")
+                .define("enableHotBathIntegration", true);
+        HOTBATH_POLL_INTERVAL_TICKS = BUILDER.comment("Target interval for refreshing each online player's HotBath scent/camo state. Work is spread across ticks.")
+                .defineInRange("hotBathPollIntervalTicks", 80, 1, 24000);
+        HOTBATH_MAX_DIRTY_SCENT_MULTIPLIER = BUILDER.comment("Scent multiplier at 100% HotBath dirtiness. Interpolates linearly from 1.0 when clean.")
+                .defineInRange("maxDirtyScentMultiplier", 2.0, 0.0, 100.0);
+        HOTBATH_DEFAULT_BATH_AROMA_DURATION_TICKS = BUILDER.comment("Fallback duration for bath aroma scent modifiers after bathing or splash cleanup.")
+                .defineInRange("defaultBathAromaDurationTicks", 2400, 0, 72000);
+        HOTBATH_FLUID_SCENT_MODIFIERS = BUILDER.comment("Built-in HotBath fluid scent modifiers. Format: 'fluid_id;scent_multiplier;duration_ticks'.")
+                .defineList("hotBathFluidScentModifiers", Arrays.asList(
+                        "hotbath:hot_water_fluid;0.70;2400",
+                        "hotbath:milk_bath_fluid;0.45;3000",
+                        "hotbath:herbal_bath_fluid;0.55;3000",
+                        "hotbath:honey_bath_fluid;0.85;2400",
+                        "hotbath:peony_bath_fluid;0.80;2400",
+                        "hotbath:rose_bath_fluid;1.10;2400"
+                ), obj -> obj instanceof String);
+        HOTBATH_BIOME_SCENT_MODIFIERS = BUILDER.comment("Bath aroma biome modifiers. Format: 'fluid_id;biome_id_or_#biome_tag;multiplier'.")
+                .defineList("hotBathBiomeScentModifiers", Arrays.asList(
+                        "hotbath:herbal_bath_fluid;#minecraft:is_desert;1.35"
+                ), obj -> obj instanceof String);
+        HOTBATH_CAMO_WASH_RATES = BUILDER.comment("Gradual camo wash while standing in HotBath fluids. Format: 'fluid_id;skin_rate;armor_rate'. Values remove that fraction per poll.")
+                .defineList("hotBathCamoWashRates", Arrays.asList(
+                        "hotbath:hot_water_fluid;0.08;0.08",
+                        "hotbath:milk_bath_fluid;0.05;0.05",
+                        "hotbath:herbal_bath_fluid;0.06;0.06",
+                        "hotbath:honey_bath_fluid;0.03;0.03",
+                        "hotbath:peony_bath_fluid;0.04;0.04",
+                        "hotbath:rose_bath_fluid;0.04;0.04"
+                ), obj -> obj instanceof String);
+        HOTBATH_SPLASH_CAMO_WASH_RATES = BUILDER.comment("Camo wash when hit by HotBath splash bottles. Format: 'fluid_id;skin_fraction;armor_fraction'. Values remove that fraction instantly.")
+                .defineList("hotBathSplashCamoWashRates", Arrays.asList(
+                        "hotbath:hot_water_fluid;0.50;0.50",
+                        "hotbath:milk_bath_fluid;0.50;0.50",
+                        "hotbath:herbal_bath_fluid;0.50;0.50",
+                        "hotbath:honey_bath_fluid;0.40;0.40",
+                        "hotbath:peony_bath_fluid;0.45;0.45",
+                        "hotbath:rose_bath_fluid;0.45;0.45"
+                ), obj -> obj instanceof String);
+        HOTBATH_CUSTOM_FLUID_SCENT_MODIFIERS = BUILDER.comment("Custom HotBath datapack fluid scent modifiers. Format: 'fluid_id;scent_multiplier;duration_ticks'.")
+                .defineList("hotBathCustomFluidScentModifiers", Arrays.asList(), obj -> obj instanceof String);
+        HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES = BUILDER.comment("Custom HotBath datapack fluid camo wash rates. Format: 'fluid_id;skin_rate;armor_rate'.")
+                .defineList("hotBathCustomFluidCamoWashRates", Arrays.asList(), obj -> obj instanceof String);
         BUILDER.pop();
 
         BUILDER.pop();

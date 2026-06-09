@@ -22,6 +22,12 @@ public final class QuantifiedIntegration {
         }
 
         try {
+            if (!QuantifiedOptionalBridge.isAvailable()) {
+                if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                    SoundAttractMod.LOGGER.debug("[Quantified] Quantified API 2.0 bridge unavailable; falling back to local workers/cache.");
+                }
+                return;
+            }
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
                 SoundAttractMod.LOGGER.debug("[Quantified] Successfully initialized with Quantified API 2.0");
             }
