@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.example.soundattract.mixin.hotbath",
+  "compatibilityLevel": "JAVA_21",
+  "plugin": "com.example.soundattract.mixin.hotbath.HotBathMixinPlugin",
+  "mixins": [
+    "ThrownBathWaterMixin",
+    "ThrownCustomFluidBottleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -9,6 +9,7 @@
     "CustomNpcsEntityAIReturnMixin",
     "CustomNpcsEntityAIWanderMixin",
     "CustomNpcsEntityAIMovingPathMixin",
+    "CustomNpcsEventHooksMixin",
     "CustomNpcsUpdateTasksMixin"
   ],
   "injectors": {

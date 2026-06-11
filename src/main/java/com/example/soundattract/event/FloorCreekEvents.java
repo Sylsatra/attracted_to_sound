@@ -127,7 +127,7 @@ public final class FloorCreekEvents {
                 player.getX(), player.getY(), player.getZ(),
                 ModSounds.WOODEN_FLOOR_CREEK.get(),
                 SoundSource.BLOCKS,
-                1.0f,
+                0.3f,
                 pitch);
         if (SoundAttractConfig.COMMON.debugLogging != null && SoundAttractConfig.COMMON.debugLogging.get()) {
             SoundAttractMod.LOGGER.debug("[FloorCreek] {} creak at {} (p={})", player.getName().getString(), player.blockPosition(), probability);

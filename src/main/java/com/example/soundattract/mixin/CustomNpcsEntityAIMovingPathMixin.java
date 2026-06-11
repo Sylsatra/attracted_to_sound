@@ -141,7 +141,7 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
         }
     }
 
-    @Inject(method = "m_8036_()Z", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canUse", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
     private void soundattract$canUse(CallbackInfoReturnable<Boolean> cir) {
         Mob mob = soundattract$getNpcMob(this);
         if (!soundattract$isEligible(mob)) return;
@@ -158,7 +158,7 @@ public abstract class CustomNpcsEntityAIMovingPathMixin extends Goal {
         }
     }
 
-    @Inject(method = "m_8045_()Z", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "canContinueToUse", at = @At("HEAD"), cancellable = true, remap = false, require = 0)
     private void soundattract$canContinue(CallbackInfoReturnable<Boolean> cir) {
         Mob mob = soundattract$getNpcMob(this);
         if (!soundattract$isEligible(mob)) return;

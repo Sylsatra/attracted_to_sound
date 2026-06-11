@@ -26,9 +26,9 @@ public class PointBlankIntegration {
     private static void initializeReflection() {
         if (initialized) return;
         try {
-            attachmentsClass = Class.forName("mod.pbj.attachment.Attachments");
-            attachmentClass = Class.forName("mod.pbj.attachment.Attachment");
-            attachmentCategoryClass = Class.forName("mod.pbj.attachment.AttachmentCategory");
+            attachmentsClass = Class.forName("com.vicmatskiv.pointblank.attachment.Attachments");
+            attachmentClass = Class.forName("com.vicmatskiv.pointblank.attachment.Attachment");
+            attachmentCategoryClass = Class.forName("com.vicmatskiv.pointblank.attachment.AttachmentCategory");
             getAttachmentsRecursiveMethod = attachmentsClass.getMethod("getAttachments", ItemStack.class, boolean.class);
             getCategoryMethod = attachmentClass.getMethod("getCategory");
             getCategoryNameMethod = attachmentCategoryClass.getMethod("getName");

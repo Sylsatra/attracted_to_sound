@@ -145,13 +145,16 @@ configurations {
 dependencies {
     compileOnly files('libs/voicechat-neoforge-1.21.1-2.6.17.jar')
     compileOnly files('libs/plasmovoice-neoforge-1.21.1-2.1.9.jar')
-    compileOnly files('libs/pointblank-neoforge-1.21.1-2.1.0.jar')
+    compileOnly files('libs/pointblank-neoforge-1.21-1.11.1.jar')
     compileOnly files('libs/tacz-neoforge-1.21.1-1.1.8-r2.jar')
     compileOnly files('libs/spore_2.2.0f_1.21.1_neo.jar')
     compileOnly files('libs/SmartBrainLib-neoforge-1.21.1-1.16.11.jar')
     compileOnly files('libs/immersive_melodies-neoforge-0.6.2+1.21.1.jar')
     compileOnly files('libs/enhancedai-4.1.0.0.jar')
     compileOnly files('libs/geckolib-neoforge-1.21.1-4.8.4.jar')
+    compileOnly files('libs/quantified api-omni-2.0.0.jar')
+    compileOnly files('libs/hotbath-1.21.1-4.0.1.jar')
+    compileOnly files('libs/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar')
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

@@ -19,8 +19,11 @@ import com.example.soundattract.event.FovEvents;
 import com.example.soundattract.event.ScentEvents;
 import com.example.soundattract.event.StealthDetectionEvents;
 import com.example.soundattract.event.client.SoundAttractClientEvents;
+import com.example.soundattract.integration.customnpcs.CustomNpcsStealthTargetBridge;
 import com.example.soundattract.integration.immersive_melodies.ImmersiveMelodiesIntegration;
+import com.example.soundattract.integration.hotbath.HotBathIntegration;
 import com.example.soundattract.integration.voicechat.PlasmoVoiceBootstrap;
+import com.example.soundattract.quantified.QuantifiedIntegration;
 import com.example.soundattract.integration.tacz.TaczIntegration;
 import com.example.soundattract.integration.pointblank.PointBlankIntegration;
 import com.example.soundattract.integration.spore.BiomassSoundHandler;
@@ -62,7 +65,7 @@ public class SoundAttractMod {
         NeoForge.EVENT_BUS.register(new FloorCreekEvents());
         NeoForge.EVENT_BUS.register(new ArrowInvestigationEvents());
         if (ModList.get().isLoaded("tacz")) {
-            NeoForge.EVENT_BUS.register(new TaczIntegration());
+            NeoForge.EVENT_BUS.register(com.example.soundattract.integration.tacz.TaczIntegration.class);
         }
         if (ModList.get().isLoaded("plasmovoice")) {
             NeoForge.EVENT_BUS.register(new PlasmoVoiceBootstrap());
@@ -70,6 +73,9 @@ public class SoundAttractMod {
         if (ModList.get().isLoaded("spore")) {
             NeoForge.EVENT_BUS.register(com.example.soundattract.integration.spore.BiomassSoundHandler.class);
             SoundAttractMod.LOGGER.info("Spore mod detected. Registered BiomassSoundHandler.");
+        }
+        if (ModList.get().isLoaded("hotbath")) {
+            NeoForge.EVENT_BUS.register(HotBathIntegration.class);
         }
         NeoForge.EVENT_BUS.register(this);
     }
@@ -107,6 +113,8 @@ public class SoundAttractMod {
             SoundAttractConfig.bakeConfig();
             SoundAttractConfig.parseAndCachePlayerActionConfig();
             SoundAttractConfig.markConfigReady();
+            QuantifiedIntegration.bootstrap();
+            CustomNpcsStealthTargetBridge.registerIfPresent();
             WorkSchedulerManager.refresh();
         });
     }

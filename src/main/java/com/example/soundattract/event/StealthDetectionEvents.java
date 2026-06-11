@@ -1220,8 +1220,8 @@ public class StealthDetectionEvents {
                     baseRange *= penaltyPerItem;
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Penalty: {} items, factor {:.2f} (applied {} times) -> {:.2f}",
-                            heldItemCount, penaltyPerItem, heldItemCount, baseRange);
+                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Penalty: {} items, factor {} (applied {} times) -> {}",
+                            heldItemCount, String.format("%.2f", penaltyPerItem), heldItemCount, String.format("%.2f", baseRange));
                 }
             }
         }
@@ -1238,8 +1238,8 @@ public class StealthDetectionEvents {
                     baseRange *= armorPenaltyFactor;
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Armor Enchant Penalty: {} pieces, factor {:.2f} (applied {} times) -> {:.2f}",
-                            visiblyEnchantedArmorPieces, armorPenaltyFactor, visiblyEnchantedArmorPieces, baseRange);
+                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Armor Enchant Penalty: {} pieces, factor {} (applied {} times) -> {}",
+                            visiblyEnchantedArmorPieces, String.format("%.2f", armorPenaltyFactor), visiblyEnchantedArmorPieces, String.format("%.2f", baseRange));
                 }
             }
             int visiblyEnchantedHeldItems = 0;
@@ -1255,8 +1255,8 @@ public class StealthDetectionEvents {
                     baseRange *= heldItemEnchantPenalty;
                 }
                 if (SoundAttractConfig.COMMON.debugLogging.get()) {
-                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Enchant Penalty: {} items, factor {:.2f} (applied {} times) -> {:.2f}",
-                            visiblyEnchantedHeldItems, heldItemEnchantPenalty, visiblyEnchantedHeldItems, baseRange);
+                    SoundAttractMod.LOGGER.info("[GRSDR_Update] Held Item Enchant Penalty: {} items, factor {} (applied {} times) -> {}",
+                            visiblyEnchantedHeldItems, String.format("%.2f", heldItemEnchantPenalty), visiblyEnchantedHeldItems, String.format("%.2f", baseRange));
                 }
             }
         }

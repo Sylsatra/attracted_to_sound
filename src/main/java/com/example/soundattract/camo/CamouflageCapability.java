@@ -209,6 +209,51 @@ public class CamouflageCapability {
         sync(entity);
     }
 
+    public void applyCamoWash(LivingEntity entity, float skinRemovalFraction, float armorRemovalFraction, boolean totalSplash) {
+        if (entity == null) return;
+        float skinFactor = 1.0f - Math.max(0.0f, Math.min(1.0f, skinRemovalFraction));
+        float armorFactor = 1.0f - Math.max(0.0f, Math.min(1.0f, armorRemovalFraction));
+
+        boolean headEmpty = entity.getItemBySlot(EquipmentSlot.HEAD).isEmpty();
+        boolean chestEmpty = entity.getItemBySlot(EquipmentSlot.CHEST).isEmpty();
+        boolean legsEmpty = entity.getItemBySlot(EquipmentSlot.LEGS).isEmpty();
+        boolean feetEmpty = entity.getItemBySlot(EquipmentSlot.FEET).isEmpty();
+
+        boolean washUpper = totalSplash || ((headEmpty || chestEmpty) && (CamoUtil.isSlotSubmerged(entity, EquipmentSlot.HEAD) || CamoUtil.isSlotSubmerged(entity, EquipmentSlot.CHEST)));
+        boolean washLower = totalSplash || ((legsEmpty || feetEmpty) && (CamoUtil.isSlotSubmerged(entity, EquipmentSlot.LEGS) || CamoUtil.isSlotSubmerged(entity, EquipmentSlot.FEET)));
+        boolean changed = false;
+
+        if (armorFactor < 1.0f) {
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                if (slot.getType() == EquipmentSlot.Type.HUMANOID_ARMOR && (totalSplash || CamoUtil.isSlotSubmerged(entity, slot))) {
+                    changed |= CamoUtil.washStack(entity.getItemBySlot(slot), armorFactor);
+                }
+            }
+        }
+
+        if (skinFactor < 1.0f && (washUpper || washLower)) {
+            List<CamoLayer> next = new ArrayList<>();
+            for (CamoLayer layer : layers) {
+                float upper = washUpper ? layer.upperDurability() * skinFactor : layer.upperDurability();
+                float lower = washLower ? layer.lowerDurability() * skinFactor : layer.lowerDurability();
+                if (upper > 0.01f || lower > 0.01f) {
+                    next.add(new CamoLayer(layer.color(), layer.category(), upper, lower, layer.blocksScent(), layer.appliedTick(), layer.seed(), layer.erosion(), layer.humidity(), layer.temperature()));
+                }
+                if (upper != layer.upperDurability() || lower != layer.lowerDurability()) {
+                    changed = true;
+                }
+            }
+            if (changed) {
+                layers.clear();
+                layers.addAll(next);
+            }
+        }
+
+        if (changed) {
+            sync(entity);
+        }
+    }
+
     public void tickDegradation(LivingEntity entity, Level level, StealthDetectionEvents.StealthPerfTier tier) {
         int interval = getCamoTickInterval(tier);
         

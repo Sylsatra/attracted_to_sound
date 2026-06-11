@@ -3,6 +3,7 @@ package com.example.soundattract.mixin;
 import com.example.soundattract.SoundAttractMod;
 import com.example.soundattract.config.SoundAttractConfig;
 import com.example.soundattract.integration.pointblank.PointBlankIntegration;
+import com.vicmatskiv.pointblank.item.FireModeInstance;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,12 +13,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.UUID;
 
-@Mixin(targets = "mod.pbj.item.GunItem", priority = 1100, remap = false)
+@Mixin(targets = "com.vicmatskiv.pointblank.item.GunItem", priority = 1100, remap = false)
 public abstract class PointBlankGunItemMixin {
 
     @Inject(method = "handleClientHitScanFireRequest", at = @At("RETURN"), remap = false, require = 0)
     private void soundattract$onHitScanFire(ServerPlayer player,
-                                            mod.pbj.item.FireModeInstance fireModeInstance,
+                                            FireModeInstance fireModeInstance,
                                             UUID stateId,
                                             int slotIndex,
                                             int correlationId,
@@ -33,7 +34,7 @@ public abstract class PointBlankGunItemMixin {
 
     @Inject(method = "handleClientProjectileFireRequest", at = @At("RETURN"), remap = false, require = 0)
     private void soundattract$onProjectileFire(ServerPlayer player,
-                                               mod.pbj.item.FireModeInstance fireModeInstance,
+                                               FireModeInstance fireModeInstance,
                                                UUID stateId,
                                                int slotIndex,
                                                int correlationId,
@@ -59,7 +60,7 @@ public abstract class PointBlankGunItemMixin {
                                       ItemStack itemStack,
                                       UUID clientStateId,
                                       int slotIndex,
-                                      mod.pbj.item.FireModeInstance fireModeInstance,
+                                      FireModeInstance fireModeInstance,
                                       CallbackInfo ci) {
         if (!SoundAttractConfig.serverReady() || !SoundAttractConfig.SERVER.enablePointBlankIntegration.get()) return;
         if (SoundAttractConfig.COMMON.debugLogging.get()) {
