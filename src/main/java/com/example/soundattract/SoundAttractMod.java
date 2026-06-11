@@ -125,6 +125,7 @@ public class SoundAttractMod {
             SoundAttractNetwork.register();
             QuantifiedIntegration.bootstrap();
             com.example.soundattract.integration.csgrenades.CsGrenadesIntegration.register();
+            com.example.soundattract.integration.customnpcs.CustomNpcsStealthTargetBridge.registerIfPresent();
             registerHotBathIntegrationIfPresent();
 
             if (ModList.get().isLoaded("spore")) {
