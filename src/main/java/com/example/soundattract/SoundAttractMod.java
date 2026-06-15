@@ -127,6 +127,7 @@ public class SoundAttractMod {
             com.example.soundattract.integration.csgrenades.CsGrenadesIntegration.register();
             com.example.soundattract.integration.customnpcs.CustomNpcsStealthTargetBridge.registerIfPresent();
             registerHotBathIntegrationIfPresent();
+            registerToughAsNailsIntegrationIfPresent();
 
             if (ModList.get().isLoaded("spore")) {
                 MinecraftForge.EVENT_BUS.register(BiomassSoundHandler.class);
@@ -147,6 +148,18 @@ public class SoundAttractMod {
             integration.getMethod("registerIfPresent", IEventBus.class).invoke(null, MinecraftForge.EVENT_BUS);
         } catch (ReflectiveOperationException | LinkageError e) {
             LOGGER.error("Failed to register HotBath integration. HotBath support will be disabled.", e);
+        }
+    }
+
+    private static void registerToughAsNailsIntegrationIfPresent() {
+        if (!ModList.get().isLoaded("toughasnails") || !SoundAttractConfig.COMMON.enableToughAsNailsIntegration.get()) {
+            return;
+        }
+        try {
+            Class<?> integration = Class.forName("com.example.soundattract.integration.toughasnails.ToughAsNailsIntegration");
+            integration.getMethod("registerIfPresent", IEventBus.class).invoke(null, MinecraftForge.EVENT_BUS);
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOGGER.error("Failed to register ToughAsNails integration. ToughAsNails support will be disabled.", e);
         }
     }
 

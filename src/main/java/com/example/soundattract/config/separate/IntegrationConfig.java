@@ -120,6 +120,20 @@ public class IntegrationConfig {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_SPLASH_CAMO_WASH_RATES;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_CUSTOM_FLUID_SCENT_MODIFIERS;
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES;
+    public static final ForgeConfigSpec.BooleanValue ENABLE_TOUGH_AS_NAILS_INTEGRATION;
+    public static final ForgeConfigSpec.IntValue TOUGH_AS_NAILS_POLL_INTERVAL_TICKS;
+    public static final ForgeConfigSpec.ConfigValue<List<? extends String>> TOUGH_AS_NAILS_TEMPERATURE_SCENT_MULTIPLIERS;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_HYPERTHERMIA_SCENT_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_HYPERTHERMIA_SOUND_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_THIRST_SCENT_MULTIPLIER_AT_EMPTY;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_THIRST_SOUND_MULTIPLIER_AT_EMPTY;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_WOOL_ARMOR_SOUND_MULTIPLIER_PER_PIECE;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_WOOL_ARMOR_MINIMUM_SOUND_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_WOOL_WARM_SCENT_MULTIPLIER_PER_PIECE;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_WOOL_HOT_SCENT_MULTIPLIER_PER_PIECE;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_WOOL_HEAT_MAXIMUM_SCENT_MULTIPLIER;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_LEAF_ARMOR_SCENT_MULTIPLIER_PER_PIECE;
+    public static final ForgeConfigSpec.DoubleValue TOUGH_AS_NAILS_LEAF_ARMOR_MINIMUM_SCENT_MULTIPLIER;
 
     static {
         BUILDER.comment("Settings for other mod integrations").push("integration");
@@ -377,6 +391,43 @@ public class IntegrationConfig {
                 .defineList("hotBathCustomFluidScentModifiers", Arrays.asList(), obj -> obj instanceof String);
         HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES = BUILDER.comment("Custom HotBath datapack fluid camo wash rates. Format: 'fluid_id;skin_rate;armor_rate'.")
                 .defineList("hotBathCustomFluidCamoWashRates", Arrays.asList(), obj -> obj instanceof String);
+        BUILDER.pop();
+
+        BUILDER.comment("ToughAsNails integration settings").push("tough_as_nails");
+        ENABLE_TOUGH_AS_NAILS_INTEGRATION = BUILDER.comment("Enable ToughAsNails scent and sound integration.")
+                .define("enableToughAsNailsIntegration", true);
+        TOUGH_AS_NAILS_POLL_INTERVAL_TICKS = BUILDER.comment("How often each player's ToughAsNails state is refreshed.")
+                .defineInRange("toughAsNailsPollIntervalTicks", 40, 1, 24000);
+        TOUGH_AS_NAILS_TEMPERATURE_SCENT_MULTIPLIERS = BUILDER.comment("Scent multipliers by ToughAsNails temperature. Format: 'LEVEL;multiplier'.")
+                .defineList("temperatureScentMultipliers", Arrays.asList(
+                        "ICY;0.75",
+                        "COLD;0.90",
+                        "NEUTRAL;1.00",
+                        "WARM;1.20",
+                        "HOT;1.50"
+                ), obj -> obj instanceof String);
+        TOUGH_AS_NAILS_HYPERTHERMIA_SCENT_MULTIPLIER = BUILDER.comment("Scent multiplier while hyperthermia is active.")
+                .defineInRange("hyperthermiaScentMultiplier", 1.40, 0.0, 100.0);
+        TOUGH_AS_NAILS_HYPERTHERMIA_SOUND_MULTIPLIER = BUILDER.comment("Player-action sound multiplier while hyperthermia is active.")
+                .defineInRange("hyperthermiaSoundMultiplier", 1.15, 0.0, 100.0);
+        TOUGH_AS_NAILS_THIRST_SCENT_MULTIPLIER_AT_EMPTY = BUILDER.comment("Scent multiplier when thirst is empty.")
+                .defineInRange("thirstScentMultiplierAtEmpty", 1.25, 0.0, 100.0);
+        TOUGH_AS_NAILS_THIRST_SOUND_MULTIPLIER_AT_EMPTY = BUILDER.comment("Player-action sound multiplier when thirst is empty.")
+                .defineInRange("thirstSoundMultiplierAtEmpty", 1.10, 0.0, 100.0);
+        TOUGH_AS_NAILS_WOOL_ARMOR_SOUND_MULTIPLIER_PER_PIECE = BUILDER.comment("Sound multiplier for each worn wool armor piece.")
+                .defineInRange("woolArmorSoundMultiplierPerPiece", 0.92, 0.0, 100.0);
+        TOUGH_AS_NAILS_WOOL_ARMOR_MINIMUM_SOUND_MULTIPLIER = BUILDER.comment("Lowest sound multiplier from wool armor.")
+                .defineInRange("woolArmorMinimumSoundMultiplier", 0.70, 0.0, 100.0);
+        TOUGH_AS_NAILS_WOOL_WARM_SCENT_MULTIPLIER_PER_PIECE = BUILDER.comment("Scent multiplier for each wool piece while warm.")
+                .defineInRange("woolWarmScentMultiplierPerPiece", 1.05, 0.0, 100.0);
+        TOUGH_AS_NAILS_WOOL_HOT_SCENT_MULTIPLIER_PER_PIECE = BUILDER.comment("Scent multiplier for each wool piece while hot.")
+                .defineInRange("woolHotScentMultiplierPerPiece", 1.10, 0.0, 100.0);
+        TOUGH_AS_NAILS_WOOL_HEAT_MAXIMUM_SCENT_MULTIPLIER = BUILDER.comment("Highest scent multiplier from hot wool armor.")
+                .defineInRange("woolHeatMaximumScentMultiplier", 1.60, 0.0, 100.0);
+        TOUGH_AS_NAILS_LEAF_ARMOR_SCENT_MULTIPLIER_PER_PIECE = BUILDER.comment("Scent multiplier for each worn leaf armor piece.")
+                .defineInRange("leafArmorScentMultiplierPerPiece", 0.97, 0.0, 100.0);
+        TOUGH_AS_NAILS_LEAF_ARMOR_MINIMUM_SCENT_MULTIPLIER = BUILDER.comment("Lowest scent multiplier from leaf armor.")
+                .defineInRange("leafArmorMinimumScentMultiplier", 0.90, 0.0, 100.0);
         BUILDER.pop();
 
         BUILDER.pop();

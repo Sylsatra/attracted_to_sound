@@ -319,7 +319,12 @@ public class StealthDetectionEvents {
 
         if (!skipExpensive && SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
             int finalColor = CamoUtil.getFinalPerceptionColor(target);
-            java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColor(target, level);
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[EnvCamo_Mob] {} finalColor=0x{}",
+                        target.getName().getString(), String.format("%06X", finalColor));
+            }
+            java.util.Optional<Integer> envColorOpt = com.example.soundattract.util.EnvironmentalCamoColor.getEnvironmentalColor(
+                    target, looker, level, () -> getAverageEnvironmentalColor(target, level));
             
             if (envColorOpt.isPresent()) {
                 int envColor = envColorOpt.get();
@@ -1322,7 +1327,12 @@ public class StealthDetectionEvents {
 
         if (SoundAttractConfig.COMMON.enableEnvironmentalCamouflage.get()) {
             int finalColor = CamoUtil.getFinalPerceptionColor(player);
-            java.util.Optional<Integer> envColorOpt = getAverageEnvironmentalColor(player, level);
+            if (SoundAttractConfig.COMMON.debugLogging.get()) {
+                SoundAttractMod.LOGGER.info("[EnvCamo_Player] {} finalColor=0x{}",
+                        player.getName().getString(), String.format("%06X", finalColor));
+            }
+            java.util.Optional<Integer> envColorOpt = com.example.soundattract.util.EnvironmentalCamoColor.getEnvironmentalColor(
+                    player, mob, level, () -> getAverageEnvironmentalColor(player, level));
 
             if (envColorOpt.isPresent()) {
                 int envColor = envColorOpt.get();

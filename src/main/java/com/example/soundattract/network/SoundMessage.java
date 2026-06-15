@@ -162,6 +162,11 @@ public class SoundMessage {
                     }
                     range = r;
                     weight = w;
+                    if (sender != null) {
+                        double tanMultiplier = com.example.soundattract.integration.toughasnails.ToughAsNailsStateCache.soundMultiplier(sender, serverLevel.getGameTime());
+                        range *= tanMultiplier;
+                        weight *= tanMultiplier;
+                    }
                 } else if (msg.soundId.equals(VOICE_CHAT_SOUND_ID)) {
                     int baseRange = msg.whispering
                             ? SoundAttractConfig.SERVER.voiceChatWhisperRange.get()

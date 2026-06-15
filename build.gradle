@@ -124,6 +124,7 @@ dependencies {
     compileOnly files('libs/relentlessundead-1.20.1-0.0.2-ALPHA.jar')
     compileOnly files('libs/spore_2.2.0_1.20.1.jar')
     compileOnly files('libs/hotbath-1.20.1-4.0.0.jar')
+    compileOnly files('libs/ToughAsNails-forge-1.20.1-9.2.0.171.jar')
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-1.20.1:4.4.2")
     implementation("com.eliotlash.mclib:mclib:20")
 }
