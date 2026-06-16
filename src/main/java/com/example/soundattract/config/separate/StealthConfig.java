@@ -74,6 +74,18 @@ public class StealthConfig {
     public static final ModConfigSpec.IntValue ENV_COLOR_SAMPLE_RADIUS;
     public static final ModConfigSpec.IntValue ENV_COLOR_SAMPLE_Y_OFFSET_START;
     public static final ModConfigSpec.IntValue ENV_COLOR_SAMPLE_Y_OFFSET_END;
+    public static final ModConfigSpec.ConfigValue<String> ENVIRONMENTAL_CAMOUFLAGE_SAMPLING_MODE;
+    public static final ModConfigSpec.IntValue ENV_BACKDROP_MAX_DISTANCE;
+    public static final ModConfigSpec.IntValue ENV_BACKDROP_SAMPLE_RAYS;
+    public static final ModConfigSpec.IntValue ENV_BACKDROP_MIN_SAMPLES;
+    public static final ModConfigSpec.IntValue ENV_BACKDROP_VIEWER_CELL_SIZE;
+    public static final ModConfigSpec.IntValue ENV_BACKDROP_CACHE_TTL_TICKS;
+    public static final ModConfigSpec.DoubleValue ENV_BACKDROP_MIN_TPS;
+    public static final ModConfigSpec.DoubleValue ENV_BACKDROP_RECOVERY_TPS;
+    public static final ModConfigSpec.BooleanValue ENV_BACKDROP_USE_SKY_COLOR;
+    public static final ModConfigSpec.ConfigValue<String> ENV_BACKDROP_DAY_SKY_COLOR;
+    public static final ModConfigSpec.ConfigValue<String> ENV_BACKDROP_NIGHT_SKY_COLOR;
+    public static final ModConfigSpec.ConfigValue<String> ENV_BACKDROP_RAIN_SKY_COLOR;
 
     public static final ModConfigSpec.BooleanValue ENABLE_LAYERED_CAMOUFLAGE;
     public static final ModConfigSpec.IntValue MAX_CAMO_LAYERS;
@@ -265,11 +277,43 @@ public class StealthConfig {
                 "minecraft:netherite_chestplate;#403B3B",
                 "minecraft:netherite_leggings;#403B3B",
                 "minecraft:netherite_boots;#403B3B",
-                "minecraft:turtle_helmet;#7B8834"
+                "minecraft:turtle_helmet;#7B8834",
+                "toughasnails:leaf_helmet;#48B518",
+                "toughasnails:leaf_chestplate;#48B518",
+                "toughasnails:leaf_leggings;#48B518",
+                "toughasnails:leaf_boots;#48B518",
+                "toughasnails:wool_helmet;#FFFFFF",
+                "toughasnails:wool_chestplate;#FFFFFF",
+                "toughasnails:wool_leggings;#FFFFFF",
+                "toughasnails:wool_boots;#FFFFFF"
         ), obj -> obj instanceof String && ((String) obj).split(";").length == 2);
         ENV_COLOR_SAMPLE_RADIUS = BUILDER.defineInRange("envColorSampleRadius", 1, 0, 3);
         ENV_COLOR_SAMPLE_Y_OFFSET_START = BUILDER.defineInRange("envColorSampleYOffsetStart", 0, -2, 2);
         ENV_COLOR_SAMPLE_Y_OFFSET_END = BUILDER.defineInRange("envColorSampleYOffsetEnd", -1, -2, 2);
+        ENVIRONMENTAL_CAMOUFLAGE_SAMPLING_MODE = BUILDER.comment("Environmental color sampler: average_area, viewer_backdrop, or hybrid.")
+                .define("environmentalCamouflageSamplingMode", "hybrid");
+        ENV_BACKDROP_MAX_DISTANCE = BUILDER.comment("How far behind the target to look for backdrop blocks.")
+                .defineInRange("envBackdropMaxDistance", 4, 1, 16);
+        ENV_BACKDROP_SAMPLE_RAYS = BUILDER.comment("How many target silhouette rays to sample.")
+                .defineInRange("envBackdropSampleRays", 5, 1, 5);
+        ENV_BACKDROP_MIN_SAMPLES = BUILDER.comment("Minimum backdrop hits needed for a color.")
+                .defineInRange("envBackdropMinSamples", 2, 1, 5);
+        ENV_BACKDROP_VIEWER_CELL_SIZE = BUILDER.comment("Nearby mobs in the same cell share backdrop results.")
+                .defineInRange("envBackdropViewerCellSize", 6, 1, 64);
+        ENV_BACKDROP_CACHE_TTL_TICKS = BUILDER.comment("How long backdrop color results stay fresh.")
+                .defineInRange("envBackdropCacheTtlTicks", 2, 1, 200);
+        ENV_BACKDROP_MIN_TPS = BUILDER.comment("Below this TPS, use the cheaper sampler.")
+                .defineInRange("envBackdropMinTps", 17.0, 1.0, 20.0);
+        ENV_BACKDROP_RECOVERY_TPS = BUILDER.comment("TPS needed before backdrop sampling resumes.")
+                .defineInRange("envBackdropRecoveryTps", 18.5, 1.0, 20.0);
+        ENV_BACKDROP_USE_SKY_COLOR = BUILDER.comment("Use sky color when the backdrop is open sky.")
+                .define("envBackdropUseSkyColor", true);
+        ENV_BACKDROP_DAY_SKY_COLOR = BUILDER.comment("Backdrop color for clear daytime sky.")
+                .define("envBackdropDaySkyColor", "#77ADFF");
+        ENV_BACKDROP_NIGHT_SKY_COLOR = BUILDER.comment("Backdrop color for night sky.")
+                .define("envBackdropNightSkyColor", "#0B1026");
+        ENV_BACKDROP_RAIN_SKY_COLOR = BUILDER.comment("Backdrop color for rain and thunder sky.")
+                .define("envBackdropRainSkyColor", "#596772");
         BUILDER.pop();
 
         BUILDER.push("layered_camouflage");

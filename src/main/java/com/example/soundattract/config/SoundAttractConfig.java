@@ -656,6 +656,18 @@ public class SoundAttractConfig {
         public final ModConfigSpec.IntValue envColorSampleRadius = StealthConfig.ENV_COLOR_SAMPLE_RADIUS;
         public final ModConfigSpec.IntValue envColorSampleYOffsetStart = StealthConfig.ENV_COLOR_SAMPLE_Y_OFFSET_START;
         public final ModConfigSpec.IntValue envColorSampleYOffsetEnd = StealthConfig.ENV_COLOR_SAMPLE_Y_OFFSET_END;
+        public final ModConfigSpec.ConfigValue<String> environmentalCamouflageSamplingMode = StealthConfig.ENVIRONMENTAL_CAMOUFLAGE_SAMPLING_MODE;
+        public final ModConfigSpec.IntValue envBackdropMaxDistance = StealthConfig.ENV_BACKDROP_MAX_DISTANCE;
+        public final ModConfigSpec.IntValue envBackdropSampleRays = StealthConfig.ENV_BACKDROP_SAMPLE_RAYS;
+        public final ModConfigSpec.IntValue envBackdropMinSamples = StealthConfig.ENV_BACKDROP_MIN_SAMPLES;
+        public final ModConfigSpec.IntValue envBackdropViewerCellSize = StealthConfig.ENV_BACKDROP_VIEWER_CELL_SIZE;
+        public final ModConfigSpec.IntValue envBackdropCacheTtlTicks = StealthConfig.ENV_BACKDROP_CACHE_TTL_TICKS;
+        public final ModConfigSpec.DoubleValue envBackdropMinTps = StealthConfig.ENV_BACKDROP_MIN_TPS;
+        public final ModConfigSpec.DoubleValue envBackdropRecoveryTps = StealthConfig.ENV_BACKDROP_RECOVERY_TPS;
+        public final ModConfigSpec.BooleanValue envBackdropUseSkyColor = StealthConfig.ENV_BACKDROP_USE_SKY_COLOR;
+        public final ModConfigSpec.ConfigValue<String> envBackdropDaySkyColor = StealthConfig.ENV_BACKDROP_DAY_SKY_COLOR;
+        public final ModConfigSpec.ConfigValue<String> envBackdropNightSkyColor = StealthConfig.ENV_BACKDROP_NIGHT_SKY_COLOR;
+        public final ModConfigSpec.ConfigValue<String> envBackdropRainSkyColor = StealthConfig.ENV_BACKDROP_RAIN_SKY_COLOR;
         public final ModConfigSpec.BooleanValue enableEnvironmentalMismatchPenalty = StealthConfig.ENABLE_ENVIRONMENTAL_MISMATCH_PENALTY;
         public final ModConfigSpec.DoubleValue environmentalMismatchPenaltyFactor = StealthConfig.ENVIRONMENTAL_MISMATCH_PENALTY_FACTOR;
         public final ModConfigSpec.IntValue environmentalMismatchThreshold = StealthConfig.ENVIRONMENTAL_MISMATCH_THRESHOLD;
@@ -750,6 +762,20 @@ public class SoundAttractConfig {
         public final ModConfigSpec.ConfigValue<List<? extends String>> hotBathSplashCamoWashRates = IntegrationConfig.HOTBATH_SPLASH_CAMO_WASH_RATES;
         public final ModConfigSpec.ConfigValue<List<? extends String>> hotBathCustomFluidScentModifiers = IntegrationConfig.HOTBATH_CUSTOM_FLUID_SCENT_MODIFIERS;
         public final ModConfigSpec.ConfigValue<List<? extends String>> hotBathCustomFluidCamoWashRates = IntegrationConfig.HOTBATH_CUSTOM_FLUID_CAMO_WASH_RATES;
+        public final ModConfigSpec.BooleanValue enableToughAsNailsIntegration = IntegrationConfig.ENABLE_TOUGH_AS_NAILS_INTEGRATION;
+        public final ModConfigSpec.IntValue toughAsNailsPollIntervalTicks = IntegrationConfig.TOUGH_AS_NAILS_POLL_INTERVAL_TICKS;
+        public final ModConfigSpec.ConfigValue<List<? extends String>> toughAsNailsTemperatureScentMultipliers = IntegrationConfig.TOUGH_AS_NAILS_TEMPERATURE_SCENT_MULTIPLIERS;
+        public final ModConfigSpec.DoubleValue toughAsNailsHyperthermiaScentMultiplier = IntegrationConfig.TOUGH_AS_NAILS_HYPERTHERMIA_SCENT_MULTIPLIER;
+        public final ModConfigSpec.DoubleValue toughAsNailsHyperthermiaSoundMultiplier = IntegrationConfig.TOUGH_AS_NAILS_HYPERTHERMIA_SOUND_MULTIPLIER;
+        public final ModConfigSpec.DoubleValue toughAsNailsThirstScentMultiplierAtEmpty = IntegrationConfig.TOUGH_AS_NAILS_THIRST_SCENT_MULTIPLIER_AT_EMPTY;
+        public final ModConfigSpec.DoubleValue toughAsNailsThirstSoundMultiplierAtEmpty = IntegrationConfig.TOUGH_AS_NAILS_THIRST_SOUND_MULTIPLIER_AT_EMPTY;
+        public final ModConfigSpec.DoubleValue toughAsNailsWoolArmorSoundMultiplierPerPiece = IntegrationConfig.TOUGH_AS_NAILS_WOOL_ARMOR_SOUND_MULTIPLIER_PER_PIECE;
+        public final ModConfigSpec.DoubleValue toughAsNailsWoolArmorMinimumSoundMultiplier = IntegrationConfig.TOUGH_AS_NAILS_WOOL_ARMOR_MINIMUM_SOUND_MULTIPLIER;
+        public final ModConfigSpec.DoubleValue toughAsNailsWoolWarmScentMultiplierPerPiece = IntegrationConfig.TOUGH_AS_NAILS_WOOL_WARM_SCENT_MULTIPLIER_PER_PIECE;
+        public final ModConfigSpec.DoubleValue toughAsNailsWoolHotScentMultiplierPerPiece = IntegrationConfig.TOUGH_AS_NAILS_WOOL_HOT_SCENT_MULTIPLIER_PER_PIECE;
+        public final ModConfigSpec.DoubleValue toughAsNailsWoolHeatMaximumScentMultiplier = IntegrationConfig.TOUGH_AS_NAILS_WOOL_HEAT_MAXIMUM_SCENT_MULTIPLIER;
+        public final ModConfigSpec.DoubleValue toughAsNailsLeafArmorScentMultiplierPerPiece = IntegrationConfig.TOUGH_AS_NAILS_LEAF_ARMOR_SCENT_MULTIPLIER_PER_PIECE;
+        public final ModConfigSpec.DoubleValue toughAsNailsLeafArmorMinimumScentMultiplier = IntegrationConfig.TOUGH_AS_NAILS_LEAF_ARMOR_MINIMUM_SCENT_MULTIPLIER;
 
         public final ModConfigSpec.IntValue configSchemaVersion = GeneralConfig.CONFIG_SCHEMA_VERSION;
 
@@ -860,6 +886,50 @@ public class SoundAttractConfig {
             newValue.set((T) oldValue);
             SoundAttractMod.LOGGER.info("Migrated config value '{}' -> '{}'", oldPath, String.join(".", newValue.getPath()));
         }
+    }
+
+    private static void saveConfigSpec(ModConfigSpec spec, String name) {
+        if (spec == null || !spec.isLoaded()) {
+            return;
+        }
+        try {
+            spec.save();
+        } catch (Throwable t) {
+            SoundAttractMod.LOGGER.warn("[SoundAttract] {} config save failed after migration: {}", name, t.toString());
+        }
+    }
+
+    private static int ensureToughAsNailsArmorColorConfigEntries() {
+        if (COMMON == null || COMMON.customArmorColors == null) {
+            return 0;
+        }
+
+        List<String> armorColors = new ArrayList<>(COMMON.customArmorColors.get());
+        List<String> tanArmorColors = List.of(
+                "toughasnails:leaf_helmet;#48B518",
+                "toughasnails:leaf_chestplate;#48B518",
+                "toughasnails:leaf_leggings;#48B518",
+                "toughasnails:leaf_boots;#48B518",
+                "toughasnails:wool_helmet;#FFFFFF",
+                "toughasnails:wool_chestplate;#FFFFFF",
+                "toughasnails:wool_leggings;#FFFFFF",
+                "toughasnails:wool_boots;#FFFFFF");
+        int addedArmorColors = 0;
+        for (String entry : tanArmorColors) {
+            String itemId = entry.split(";")[0];
+            boolean present = armorColors.stream().anyMatch(existing -> existing != null && existing.trim().startsWith(itemId + ";"));
+            if (!present) {
+                armorColors.add(entry);
+                addedArmorColors++;
+            }
+        }
+
+        if (addedArmorColors > 0) {
+            COMMON.customArmorColors.set(armorColors);
+            SoundAttractMod.LOGGER.info("Added {} ToughAsNails armor color defaults.", addedArmorColors);
+            saveConfigSpec(StealthConfig.SPEC, "stealth");
+        }
+        return addedArmorColors;
     }
 
     public static void bakeConfig() {
@@ -996,6 +1066,16 @@ public class SoundAttractConfig {
 
             COMMON.configSchemaVersion.set(17);
         }
+
+        if (COMMON.configSchemaVersion.get() < 18) {
+            SoundAttractMod.LOGGER.info("Config migration: Adding ToughAsNails armor color defaults (Schema v18).");
+
+            ensureToughAsNailsArmorColorConfigEntries();
+            COMMON.configSchemaVersion.set(18);
+            saveConfigSpec(GeneralConfig.SPEC, "general");
+        }
+
+        ensureToughAsNailsArmorColorConfigEntries();
 
         SOUND_ID_WHITELIST_CACHE.clear();
         COMMON.soundIdWhitelist.get().forEach(idStr -> {

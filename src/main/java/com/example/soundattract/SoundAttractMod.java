@@ -115,8 +115,21 @@ public class SoundAttractMod {
             SoundAttractConfig.markConfigReady();
             QuantifiedIntegration.bootstrap();
             CustomNpcsStealthTargetBridge.registerIfPresent();
+            registerToughAsNailsIntegrationIfPresent();
             WorkSchedulerManager.refresh();
         });
+    }
+
+    private static void registerToughAsNailsIntegrationIfPresent() {
+        if (!ModList.get().isLoaded("toughasnails") || !SoundAttractConfig.COMMON.enableToughAsNailsIntegration.get()) {
+            return;
+        }
+        try {
+            Class<?> integration = Class.forName("com.example.soundattract.integration.toughasnails.ToughAsNailsIntegration");
+            integration.getMethod("registerIfPresent", IEventBus.class).invoke(null, NeoForge.EVENT_BUS);
+        } catch (ReflectiveOperationException | LinkageError e) {
+            LOGGER.error("Failed to register ToughAsNails integration. ToughAsNails support will be disabled.", e);
+        }
     }
 
     private static void onClientSetup(final FMLClientSetupEvent event) {
