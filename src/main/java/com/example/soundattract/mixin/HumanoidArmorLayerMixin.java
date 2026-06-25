@@ -1,8 +1,6 @@
 package com.example.soundattract.mixin;
 
 import com.example.soundattract.config.SoundAttractConfig;
-import com.example.soundattract.camo.CamoAttachments;
-import com.example.soundattract.camo.CamoLayer;
 import com.example.soundattract.camo.CamoLODUtil;
 import com.example.soundattract.camo.CamoRenderTypes;
 import com.example.soundattract.camo.CamoTextureGenerator;
@@ -20,19 +18,15 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterial;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.util.FastColor;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.component.DyedItemColor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.List;
-import java.util.Optional;
 
 @Mixin(HumanoidArmorLayer.class)
 public abstract class HumanoidArmorLayerMixin {
@@ -43,12 +37,12 @@ public abstract class HumanoidArmorLayerMixin {
             boolean hasArmor = false;
             for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
                 ItemStack stack = entity.getItemBySlot(slot);
-                if (!stack.isEmpty()) {
+                if (stack.getItem() instanceof ArmorItem) {
                     hasArmor = true;
                     break;
                 }
             }
-            
+
             if (hasArmor) {
                 ci.cancel();
             }
@@ -71,6 +65,14 @@ public abstract class HumanoidArmorLayerMixin {
             ItemStack stack = entity.getItemBySlot(slot);
             if (stack.isEmpty()) continue;
 
+            if (!(stack.getItem() instanceof ArmorItem armorItem)) {
+                continue;
+            }
+
+            if (armorItem.getEquipmentSlot() != slot) {
+                continue;
+            }
+
             CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
             if (tag == null || tag.isEmpty()) continue;
 
@@ -80,19 +82,19 @@ public abstract class HumanoidArmorLayerMixin {
             if (tag.contains("soundattract:CamoLayers", Tag.TAG_LIST)) {
                 ListTag list = tag.getList("soundattract:CamoLayers", Tag.TAG_COMPOUND);
                 CamoUtil.BlendedCamoData blended = CamoUtil.getBlendedDataFromTag(list);
-                
+
                 if (blended.color().isPresent()) {
                     ResourceLocation smudgeTex = CamoTextureGenerator.getOrCreateMaskedSmudge(
-                        blended.seed(), 
-                        blended.color().get(), 
-                        blended.strength() * 2.0f, 
+                        blended.seed(),
+                        blended.color().get(),
+                        blended.strength() * 2.0f,
                         armorTextures,
                         lod.resolution(),
                         blended.erosion(),
                         blended.humidity(),
                         blended.temp()
                     );
-        
+
                     if (smudgeTex != null) {
                         HumanoidModel<?> armorModel = getArmorModel(self, slot);
                         if (armorModel == null) continue;
@@ -113,14 +115,13 @@ public abstract class HumanoidArmorLayerMixin {
                         armorModel.setAllVisible(true);
                     }
                 }
-            }
-            else if (tag.contains("soundattract:CamoStrength")) {
+            } else if (tag.contains("soundattract:CamoStrength")) {
                 int color = tag.getInt("soundattract:CamoColor");
                 float strength = tag.getFloat("soundattract:CamoStrength");
                 long seed = tag.getLong("soundattract:CamoSeed");
 
                 ResourceLocation smudgeTex = CamoTextureGenerator.getOrCreateMaskedSmudge(seed, color, strength * 2.0f, armorTextures, lod.resolution(), 0, 0, 0);
-                
+
                 if (smudgeTex != null) {
                     HumanoidModel<?> armorModel = getArmorModel(self, slot);
                     if (armorModel == null) continue;
@@ -161,14 +162,17 @@ public abstract class HumanoidArmorLayerMixin {
 
     private List<ResourceLocation> getArmorTextures(ItemStack stack, EquipmentSlot slot) {
         List<ResourceLocation> textures = new java.util.ArrayList<>();
-        ArmorItem armorItem = (ArmorItem) stack.getItem();
+
+        if (!(stack.getItem() instanceof ArmorItem armorItem)) {
+            return textures;
+        }
+
+        if (armorItem.getEquipmentSlot() != slot) {
+            return textures;
+        }
+
         ArmorMaterial material = armorItem.getMaterial().value();
         boolean usesInnerModel = slot == EquipmentSlot.LEGS;
-
-        int dyeColor = -1;
-        if (stack.is(ItemTags.DYEABLE)) {
-            dyeColor = FastColor.ARGB32.opaque(DyedItemColor.getOrDefault(stack, -6265536));
-        }
 
         for (ArmorMaterial.Layer layer : material.layers()) {
             ResourceLocation texture = layer.texture(usesInnerModel);
@@ -204,4 +208,3 @@ public abstract class HumanoidArmorLayerMixin {
         }
     }
 }
-
