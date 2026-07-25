@@ -46,7 +46,8 @@ public class CamoLODUtil {
         if (distSq > 8 * 8) {
              Vec3 start = cameraPos;
              Vec3 end = entity.getEyePosition();
-             if (!OptimizedLOS.hasLineOfSight(entity.level(), start, end, null)) {
+             LivingEntity looker = mc.player;
+             if (!OptimizedLOS.hasLineOfSight(entity.level(), start, end, looker instanceof net.minecraft.world.entity.Mob mob ? mob : null)) {
                  return new LODResult(false, 16);
              }
         }

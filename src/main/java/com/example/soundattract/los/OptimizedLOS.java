@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
@@ -406,6 +407,14 @@ public final class OptimizedLOS {
             return false;
         }
 
+        Mob clipEntity = looker;
+        if (clipEntity == null && level.isClientSide()) {
+            Entity cameraEntity = Minecraft.getInstance().cameraEntity;
+            if (cameraEntity instanceof Mob mob) {
+                clipEntity = mob;
+            }
+        }
+
         Vec3 currentStart = start;
         for (int i = 0; i < 64; i++) {
             if (currentStart.distanceToSqr(end) < 1.0e-8) {
@@ -413,7 +422,7 @@ public final class OptimizedLOS {
             }
 
             BlockHitResult hit = level.clip(new ClipContext(currentStart, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                    looker));
+                    clipEntity));
             if (hit.getType() == HitResult.Type.MISS) {
                 return true;
             }
