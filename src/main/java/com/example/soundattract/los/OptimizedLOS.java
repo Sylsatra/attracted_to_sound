@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
-import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.Level;
@@ -246,7 +245,7 @@ public final class OptimizedLOS {
         }
     }
 
-    public static boolean hasLineOfSight(Level level, Vec3 start, Vec3 end, Mob looker) {
+    public static boolean hasLineOfSight(Level level, Vec3 start, Vec3 end, Entity looker) {
         if (level == null || start == null || end == null) {
             return false;
         }
@@ -293,7 +292,7 @@ public final class OptimizedLOS {
         }
     }
 
-    private static boolean hasLineOfSightDda(Level level, Vec3 start, Vec3 end, Mob looker) {
+    private static boolean hasLineOfSightDda(Level level, Vec3 start, Vec3 end, Entity looker) {
 
         try {
             if (SoundAttractConfig.COMMON.debugLogging.get()) {
@@ -402,17 +401,9 @@ public final class OptimizedLOS {
         return hasLineOfSightVanillaIgnoringNonBlocking(level, start, end, looker);
     }
 
-    private static boolean hasLineOfSightVanillaIgnoringNonBlocking(Level level, Vec3 start, Vec3 end, Mob looker) {
+    private static boolean hasLineOfSightVanillaIgnoringNonBlocking(Level level, Vec3 start, Vec3 end, Entity looker) {
         if (level == null || start == null || end == null) {
             return false;
-        }
-
-        Mob clipEntity = looker;
-        if (clipEntity == null && level.isClientSide()) {
-            Entity cameraEntity = Minecraft.getInstance().cameraEntity;
-            if (cameraEntity instanceof Mob mob) {
-                clipEntity = mob;
-            }
         }
 
         Vec3 currentStart = start;
@@ -422,7 +413,7 @@ public final class OptimizedLOS {
             }
 
             BlockHitResult hit = level.clip(new ClipContext(currentStart, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE,
-                    clipEntity));
+                    looker));
             if (hit.getType() == HitResult.Type.MISS) {
                 return true;
             }
